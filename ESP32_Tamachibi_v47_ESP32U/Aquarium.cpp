@@ -1,4 +1,5 @@
 #include "Aquarium.h"
+#include "NativeUI.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -448,52 +449,8 @@ void AquariumSystem::drawSmallIcon(int x, int y, bool inverse) {
   display_.drawPixel(x + 11, y + 10, inverse ? SSD1306_WHITE : SSD1306_BLACK);
 }
 
-void AquariumSystem::drawFishSprite(uint8_t species, int x, int y, bool facingRight,
-                                    uint8_t lifeStage, bool selected) {
-  const uint8_t stage = min(static_cast<uint8_t>(2), lifeStage);
-  const uint8_t targetW = stage == 0 ? 10 : (stage == 1 ? 13 : 16);
-  const uint8_t targetH = stage == 0 ? 5 : (stage == 1 ? 7 : 8);
-  const int left = x - targetW / 2;
-  const int top = y - targetH / 2;
-  const uint8_t id = species % AQUARIUM_SPECIES_COUNT;
-
-  for (uint8_t dy = 0; dy < targetH; ++dy) {
-    const uint8_t sy = static_cast<uint8_t>((static_cast<uint16_t>(dy) * 8U) / targetH);
-    for (uint8_t dx = 0; dx < targetW; ++dx) {
-      uint8_t sx = static_cast<uint8_t>((static_cast<uint16_t>(dx) * 16U) / targetW);
-      if (!facingRight) sx = static_cast<uint8_t>(15U - sx);
-      if (fishBitmapPixel(id, sx, sy)) display_.drawPixel(left + dx, top + dy, SSD1306_WHITE);
-    }
-  }
-
-  const int eyeX = facingRight ? left + targetW - max(2, targetW / 4) : left + max(1, targetW / 4);
-  const int eyeY = top + max(1, targetH / 3);
-  display_.drawPixel(eyeX, eyeY, SSD1306_BLACK);
-
-  // Species markings remain readable on a one-bit screen.
-  if (id == 3) { // neon stripe
-    display_.drawLine(left + 3, top + targetH / 2, left + targetW - 4, top + targetH / 2, SSD1306_BLACK);
-  } else if (id == 7) { // koi patches
-    display_.drawPixel(left + targetW / 2, top + 2, SSD1306_BLACK);
-    display_.drawPixel(left + targetW / 2 + 2, top + targetH - 3, SSD1306_BLACK);
-  } else if (id == 9) { // clownfish bands
-    display_.drawFastVLine(left + targetW / 2 - 2, top + 1, max(1, targetH - 2), SSD1306_BLACK);
-    display_.drawFastVLine(left + targetW / 2 + 3, top + 1, max(1, targetH - 2), SSD1306_BLACK);
-  } else if (id == 10) { // moon crescent
-    display_.drawPixel(left + targetW / 2, top + targetH / 2, SSD1306_BLACK);
-    display_.drawPixel(left + targetW / 2 + 1, top + targetH / 2, SSD1306_BLACK);
-  } else if (id == 11) { // star sparkle
-    display_.drawPixel(left + targetW / 2, top + 1, SSD1306_BLACK);
-    display_.drawPixel(left + targetW / 2, top + targetH - 2, SSD1306_BLACK);
-  }
-
-  // The old full rectangle looked like a graphical bug. A small caret now
-  // indicates the selected fish without surrounding or obscuring the sprite.
-  if (selected) {
-    const int markerY = min(48, top + targetH + 2);
-    display_.drawLine(x - 2, markerY, x, markerY + 2, SSD1306_WHITE);
-    display_.drawLine(x, markerY + 2, x + 2, markerY, SSD1306_WHITE);
-  }
+void AquariumSystem::drawFishSprite(uint8_t species,int x,int y,bool facingRight,uint8_t lifeStage,bool selected) {
+  (void)lifeStage;NativeUI::fish(display_,x-7,y-4,species,facingRight,selected);
 }
 
 void AquariumSystem::drawTankMeters() {
@@ -507,76 +464,22 @@ void AquariumSystem::drawTankMeters() {
   display_.print(fishCount()); display_.print(F("/")); display_.print(capacity());
 }
 
-void AquariumSystem::drawTankScene(uint8_t selected, uint16_t frame, bool includePet) {
-  display_.clearDisplay();
-  display_.setTextWrap(false);
-  display_.setTextSize(1);
-  display_.setTextColor(SSD1306_WHITE);
-  display_.setCursor(2, 0);
-  if (slotOccupied(selected)) display_.print(names_[selected]);
-  else display_.print(F("Aquarium"));
-
-  const int tankX = includePet ? 23 : 2;
-  const int tankW = includePet ? 103 : 124;
-  display_.drawRoundRect(tankX, 10, tankW, 44, 4, SSD1306_WHITE);
-  display_.drawLine(tankX + 2, 17, tankX + tankW - 3, 17, SSD1306_WHITE);
-  display_.drawLine(tankX + 2, 49, tankX + tankW - 3, 49, SSD1306_WHITE);
-
-  if (includePet) {
-    drawCurrentPetTiny(3, 35);
-    display_.drawLine(1, 52, 21, 52, SSD1306_WHITE);
+void AquariumSystem::drawTankScene(uint8_t selected,uint16_t frame,bool includePet) {
+  (void)includePet;NativeUI::Scope native(display_);display_.clearDisplay();
+  char count[10];snprintf(count,sizeof(count),"%u/%u",fishCount(),capacity());
+  NativeUI::header(display_,slotOccupied(selected)?names_[selected]:"AQUARIUM",count,needsCare());
+  display_.drawRoundRect(5,24,118,73,4,SSD1306_WHITE);
+  display_.drawFastHLine(7,30,114,SSD1306_WHITE);display_.drawFastHLine(7,89,114,SSD1306_WHITE);
+  for(uint8_t i=0;i<5;++i){int x=11+i*24;display_.drawPixel(x,93,SSD1306_WHITE);}
+  NativeUI::plant(display_,13,73,tankDecor_,2);NativeUI::plant(display_,98,72,tankDecor_+1,3);
+  uint8_t lane=0;
+  for(uint8_t slot=0;slot<AQUARIUM_FISH_SLOTS;++slot)if(slotOccupied(slot)){
+    uint16_t period=64+slot*11,phase=(frame+slot*29)%(period*2);bool right=phase<period;
+    int px=14+((right?phase:period*2-phase)*83)/period;
+    NativeUI::fish(display_,px,35+lane*10,species_[slot],right,slot==selected);++lane;
   }
-
-  if (tankDecor_ >= 1) {
-    display_.drawLine(tankX + 11, 48, tankX + 11, 37, SSD1306_WHITE);
-    display_.drawCircle(tankX + 7, 37, 3, SSD1306_WHITE);
-    display_.drawCircle(tankX + 15, 34, 3, SSD1306_WHITE);
-  }
-  if (tankDecor_ >= 2) {
-    display_.drawRect(tankX + tankW - 27, 39, 18, 10, SSD1306_WHITE);
-    display_.drawTriangle(tankX + tankW - 29, 39, tankX + tankW - 18, 31, tankX + tankW - 7, 39, SSD1306_WHITE);
-  }
-  if (tankDecor_ >= 3) {
-    display_.drawCircle(tankX + tankW / 2, 26 + (frame % 5), 2, SSD1306_WHITE);
-    display_.drawCircle(tankX + tankW / 2 + 7, 20 + (frame % 7), 1, SSD1306_WHITE);
-  }
-  if (tankDecor_ >= 4) {
-    display_.drawCircle(tankX + 27, 45, 4, SSD1306_WHITE);
-    display_.drawCircle(tankX + 34, 43, 5, SSD1306_WHITE);
-  }
-  if (tankDecor_ >= 5) {
-    display_.drawCircle(tankX + tankW - 15, 24, 5, SSD1306_WHITE);
-    display_.drawPixel(tankX + tankW - 15, 24, SSD1306_BLACK);
-  }
-
-  uint8_t visualIndex = 0;
-  for (uint8_t slot = 0; slot < AQUARIUM_FISH_SLOTS; ++slot) {
-    if (!slotOccupied(slot)) continue;
-
-    // Each fish follows a slow triangular path in its own lane. Direction only
-    // changes at the tank ends, eliminating the old rapid flipping and jumps.
-    const uint16_t halfCycle = static_cast<uint16_t>(58 + slot * 11);
-    const uint16_t cycle = static_cast<uint16_t>(halfCycle * 2U);
-    const uint16_t phase = static_cast<uint16_t>((frame + slot * 29U) % cycle);
-    const bool right = phase < halfCycle;
-    const uint16_t travelPhase = right ? phase : static_cast<uint16_t>(cycle - phase);
-    const int margin = 12;
-    const int span = max(12, tankW - margin * 2 - 1);
-    const int travel = static_cast<int>((static_cast<uint32_t>(travelPhase) * span) / halfCycle);
-    const int px = tankX + margin + travel;
-
-    const int laneY[4] = {24, 31, 38, 45};
-    const int bobPhase = static_cast<int>((frame + slot * 7U) % 24U);
-    const int bob = bobPhase < 6 ? 0 : (bobPhase < 12 ? 1 : (bobPhase < 18 ? 0 : -1));
-    const int py = laneY[min(static_cast<uint8_t>(3), visualIndex)] + bob;
-    drawFishSprite(species_[slot], px, py, right, fishLifeStage(slot), slot == selected);
-    ++visualIndex;
-  }
-
-  if (tankClean_ <= 3) {
-    for (uint8_t i = 0; i < 8; ++i) display_.drawPixel(tankX + 6 + (i * 13) % (tankW - 12), 46 - (i % 3), SSD1306_WHITE);
-  }
-  drawTankMeters();
+  char stats[24];snprintf(stats,sizeof(stats),"WATER %u  CLEAN %u",waterQuality_,tankClean_);
+  NativeUI::text(display_,stats,7,104,114);NativeUI::footer(display_,"FISH","BOND","FISH");
 }
 
 void AquariumSystem::interactWithFish(uint8_t slot) {
@@ -688,7 +591,7 @@ void AquariumSystem::cleanTankAction() {
 
   for (uint8_t frame = 0; frame < 9; ++frame) {
     drawTankScene(selectedSlot_, frame, true);
-    display_.drawLine(25 + frame * 9, 18, 18 + frame * 9, 49, SSD1306_WHITE);
+    display_.drawLine(17 + frame * 10, 33, 12 + frame * 10, 86, SSD1306_WHITE);
     display_.display();
     delay(90);
   }

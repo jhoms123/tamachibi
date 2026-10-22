@@ -13,6 +13,9 @@ ESP32U_WIRING_AND_MUSIC.md
 Esp32Platform.h
 GameMain.cpp
 GameDisplay.h
+GameDisplay.cpp
+NativeUI.h
+NativeUI.cpp
 VisualOverhaul.cpp
 VisualOverhaul.h
 GrowingTogether.cpp

@@ -1,4 +1,5 @@
 #include "VisualOverhaul.h"
+#include "NativeUI.h"
 
 namespace {
 
@@ -212,51 +213,13 @@ void drawRoomSpecificProps(GameDisplay &display, uint8_t room, uint8_t anim, boo
 
 namespace V46UI {
 
-void drawHeader(GameDisplay &display,
-                const __FlashStringHelper *title,
-                uint8_t hour,
-                uint8_t minute,
-                bool showAlert,
-                uint8_t worldIcon) {
-  display.fillRoundRect(2, 0, 124, HEADER_H, 3, SSD1306_WHITE);
-  drawWorldIcon(display, worldIcon, 1, 0);
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_BLACK);
-  display.setCursor(12, 0);
-  display.print(title);
-  int16_t x1 = 0, y1 = 0;
-  uint16_t titleWidth = 0, titleHeight = 0;
-  display.getTextBounds(title, 0, 0, &x1, &y1, &titleWidth, &titleHeight);
-  if (titleWidth <= 76) {
-    display.setCursor(91, 0);
-    uint8_t shown = hour % 12;
-    if (shown == 0) shown = 12;
-    display.print(shown);
-    display.print(':');
-    printTwoDigits(display, minute);
-  }
-  if (showAlert) {
-    display.fillCircle(124, 4, 3, SSD1306_BLACK);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(122, 0);
-    display.print('!');
-    display.setTextColor(SSD1306_BLACK);
-  }
+void drawHeader(GameDisplay &display,const __FlashStringHelper *title,uint8_t hour,uint8_t minute,bool showAlert,uint8_t worldIcon) {
+  (void)hour;(void)minute;(void)showAlert;(void)worldIcon;
+  char name[64];NativeUI::flashCopy(name,title,sizeof(name));display.setPageTitle(name);
 }
 
-void drawFooter(GameDisplay &display,
-                const __FlashStringHelper *left,
-                const __FlashStringHelper *center,
-                const __FlashStringHelper *right) {
-  display.fillRoundRect(2, FOOTER_Y, 124, 9, 3, SSD1306_WHITE);
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_BLACK);
-  display.setCursor(2, FOOTER_Y + 1);
-  display.print(left);
-  display.setCursor(43, FOOTER_Y + 1);
-  display.print(center);
-  display.setCursor(86, FOOTER_Y + 1);
-  display.print(right);
+void drawFooter(GameDisplay &display,const __FlashStringHelper *left,const __FlashStringHelper *center,const __FlashStringHelper *right) {
+  char a[24],b[24],c[24];NativeUI::flashCopy(a,left,sizeof(a));NativeUI::flashCopy(b,center,sizeof(b));NativeUI::flashCopy(c,right,sizeof(c));display.setPageFooter(a,b,c);
 }
 
 void drawCarouselFrame(GameDisplay &display,

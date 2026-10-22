@@ -44,13 +44,13 @@ void NeedsDisplay::showStartup() {
   oled_.clearDisplay();
   oled_.setTextSize(1);
   oled_.setTextColor(SSD1306_WHITE);
-  oled_.setCursor(22, 1);
-  oled_.print(F("TAMACHIBI STATUS"));
+  oled_.setCursor(19, 1);
+  oled_.print(F("TAMA / STATUS"));
   oled_.drawLine(4, 11, 123, 11, SSD1306_WHITE);
-  oled_.setCursor(25, 16);
-  oled_.print(F("Starting v47..."));
-  oled_.setCursor(13, 25);
-  oled_.print(F("Set clock on main OLED"));
+  oled_.setCursor(25, 14);
+  oled_.print(F("WAKING UP..."));
+  oled_.setCursor(7, 24);
+  oled_.print(F("SET CLOCK ON MAIN"));
   oled_.display();
 }
 
@@ -69,7 +69,7 @@ bool NeedsDisplay::blinkVisible(uint8_t urgency, uint32_t nowMs) {
 void NeedsDisplay::drawNeedField(int16_t x, int16_t y, const char *label,
                                  uint8_t value, uint8_t urgency,
                                  uint32_t nowMs, uint8_t maximum) {
-  if (!blinkVisible(urgency, nowMs)) return;
+  // Values stay visible; only the urgency marker pulses.
 
   oled_.setCursor(x, y);
   oled_.print(label);
@@ -85,7 +85,7 @@ void NeedsDisplay::drawNeedField(int16_t x, int16_t y, const char *label,
   int16_t fillW = maximum == 0 ? 0 : static_cast<int16_t>((bounded * (barW - 2)) / maximum);
   if (fillW > 0) oled_.fillRect(barX + 1, barY + 1, fillW, 4, SSD1306_WHITE);
 
-  if (urgency >= 2) {
+  if (urgency >= 1 && blinkVisible(urgency, nowMs)) {
     oled_.drawPixel(x + 25, y + 1, SSD1306_WHITE);
     oled_.drawPixel(x + 25, y + 3, SSD1306_WHITE);
     oled_.drawPixel(x + 25, y + 6, SSD1306_WHITE);

@@ -14,3 +14,17 @@ Tamachibi v47 ESP32-WROOM-32U breakout port
 - Added a 128×128 home room, pet view, activity picker, splash screen, and I²C address detection for 0x3C/0x3D.
 - Added a lightweight legacy-display adapter so the existing 128×64 mini-games and activity pages fill the taller panel.
 - Kept original roster art and created new room and UI art from vector drawing primitives; no external image assets need to be copied to the SD card.
+
+
+Native square visual redesign (supersedes the earlier vertical adapter)
+- Removed independent vertical pixel scaling entirely.
+- Added native top-down home/house/town art, a compact original pet family,
+  icons, garden/plant grids, tank, dialogue/choice/reply screens and audio UI.
+- Replaced the main carousel with a six-card activity grid and three-row actions.
+- Added semantic text/art composition for supporting pages, bounded title/footer
+  lanes, scalar stat columns, word wrapping and dense-page section indicators.
+- Preserved complete mini-game canvases with square pixels and per-game buttons.
+- Kept the side OLED values visible while only urgency markers pulse.
+- Added 17 firmware-rendered screenshots plus a reproducible host renderer.
+- Built successfully against Arduino-ESP32 3.3.12 (PlatformIO espressif32 8.0.0).
+- Hardware pin assignments, music paths and save layouts remain compatible.
