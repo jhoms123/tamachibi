@@ -38,9 +38,9 @@ Connect the module's SPI pins as follows:
 | MOSI | GPIO23 |
 | MISO | GPIO19 |
 | GND | common GND |
-| VCC | regulated 5V for the pictured AMS1117-regulator version, if its board documentation confirms 5V input |
+| VCC | regulated 5V |
 
-The photo shows a small regulator marked `1117` and a 16-pin logic IC. The 1117 board version is normally powered from 5V so its 3.3V regulator has enough input headroom; the AMS1117 datasheet specifies up to 1.3V dropout at full load. https://www.advanced-monolithic.com/pdf/ds1117.pdf Do not connect 5V to CS, SCK, MOSI, or MISO. Before wiring MISO to the ESP32, confirm that this exact module's logic circuit keeps its SPI output at 3.3V or less. If the module's documentation does not confirm 5V input and 3.3V logic, use a known 3.3V-compatible microSD breakout instead. Keep SPI wires short.
+The photo matches the common six-pin module with an `1117` regulator and a 16-pin level-conversion IC. That board version is specified for 4.5–5.5V at VCC; its onboard regulator supplies the card at 3.3V and its MISO conversion outputs 3.3V logic. https://keszoox.com/products/micro-sd-tf-card-storage-module-with-spi-interface-and-level-conversion-chip-for-arduino The AMS1117 regulator itself may need up to 1.3V headroom, so powering its VCC from only 3.3V can underpower the card. https://www.advanced-monolithic.com/pdf/ds1117.pdf Do not connect 5V to CS, SCK, MOSI, or MISO. If your module has a different revision or its labels/chip differ from the photo, check its own specifications before powering it. Keep SPI wires short.
 
 ## Future I²S audio board
 
