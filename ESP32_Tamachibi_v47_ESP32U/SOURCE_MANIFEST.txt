@@ -12,6 +12,9 @@ DeepLifeDialogueData.h
 ESP32U_WIRING_AND_MUSIC.md
 Esp32Platform.h
 GameMain.cpp
+GameDisplay.h
+VisualOverhaul.cpp
+VisualOverhaul.h
 GrowingTogether.cpp
 GrowingTogether.h
 GrowingTogetherData.h
@@ -33,6 +36,4 @@ SaveProfiles.cpp
 SaveProfiles.h
 ESP32_Tamachibi_v47_ESP32U.ino
 V47_ESP32U_CHANGE_NOTES.txt
-VisualOverhaul.cpp
-VisualOverhaul.h
 platformio.ini

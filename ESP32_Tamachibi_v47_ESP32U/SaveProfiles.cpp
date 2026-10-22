@@ -36,7 +36,7 @@ uint32_t fnvUpdate(uint32_t value, const uint8_t *data, size_t count) {
   return value;
 }
 }
-SaveProfileManager::SaveProfileManager(Adafruit_SSD1306 &display,
+SaveProfileManager::SaveProfileManager(GameDisplay &display,
                                        uint8_t buttonLeft,
                                        uint8_t buttonSelect,
                                        uint8_t buttonRight)

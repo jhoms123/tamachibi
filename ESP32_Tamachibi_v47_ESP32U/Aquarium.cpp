@@ -73,7 +73,7 @@ uint8_t boundedSub(uint8_t value, uint8_t amount) {
 }
 }
 
-AquariumSystem::AquariumSystem(size_t storageBase, Adafruit_SSD1306 &display,
+AquariumSystem::AquariumSystem(size_t storageBase, GameDisplay &display,
                                uint8_t buttonLeft, uint8_t buttonSelect,
                                uint8_t buttonRight)
     : storeA_(storageBase), storeB_(storageBase + sizeof(AquariumSave)),

@@ -5,14 +5,14 @@
   layer with Arduino-ESP32 support. The reference pin map and build instructions
   are in README_ESP32U.md and ESP32U_WIRING_AND_MUSIC.md.
 
-  Required libraries: Adafruit SSD1306, Adafruit GFX, Adafruit BusIO, and
-  ESP8266Audio (MP3 decoding to a future I2S audio module).
+  Required libraries: Adafruit SH110X, Adafruit SSD1306 (small status OLED),
+  Adafruit GFX, Adafruit BusIO, and ESP8266Audio.
 */
 
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include <EEPROM.h>
 #include <stddef.h>
 #include "Esp32Platform.h"
@@ -31,12 +31,14 @@
 #include "MusicPlayer.h"
 
 #define OLED_W 128
-#define OLED_H 64
+#define OLED_H 128
+#define LEGACY_OLED_H 64
 #define OLED_RESET -1
 #define OLED_ADDR 0x3C
 #define NEEDS_OLED_ADDR 0x3C
 
-Adafruit_SSD1306 display(OLED_W, OLED_H, &Wire, OLED_RESET);
+Adafruit_SH1107 mainOled(OLED_W, OLED_H, &Wire, OLED_RESET, 400000UL, 100000UL);
+GameDisplay display(mainOled);
 NeedsDisplay needsDisplay(&Wire1);
 Esp32RTCCompat rtc;
 bool externalRtcReady = false;
@@ -713,6 +715,12 @@ void enterCitySelection();
 
 // ---------- forward declarations ----------
 void drawScreen(bool doDisplay);
+void drawSquarePet();
+void drawSquareHeader(const __FlashStringHelper *title, bool alert);
+void drawSquareFooter(const __FlashStringHelper *left,
+                      const __FlashStringHelper *center,
+                      const __FlashStringHelper *right);
+void drawSquareRoomBackdrop();
 void petTone(unsigned int freq, unsigned int durationMs);
 void snd(unsigned int freq, byte dur);
 void serviceSoftBuzzer();
@@ -1080,50 +1088,38 @@ void developerUnlockEverything();
 // ---------- forward declarations ----------
 void drawScreen(bool doDisplay) {
   if (screenSleeping) return;
+  display.setLegacyLayout(false);
   display.clearDisplay();
 
   // The encoder cycles the three world scales. Buttons navigate within the
   // selected scale.
   if (!menuVisible && dialWorldView == VIEW_HOUSE) {
+    display.setLegacyLayout(true);
     drawHouseWorldView();
     if (doDisplay) display.display();
+    display.setLegacyLayout(true);
     return;
   }
   if (!menuVisible && dialWorldView == VIEW_CITY) {
+    display.setLegacyLayout(true);
     drawCityWorldView();
     if (doDisplay) display.display();
+    display.setLegacyLayout(true);
     return;
   }
 
   if (menuVisible) {
+    display.setLegacyLayout(false);
     drawMenu();
     if (doDisplay) display.display();
+    display.setLegacyLayout(true);
     return;
   }
 
-  drawPet();
-
-  const bool alert = needsCare() || pendingCallType != 0 || sick || poop > 0 ||
-                     botany.needsCare() || aquarium.needsCare() ||
-                     parentDialogue.hasPending() ||
-                     (stage != STAGE_BABY && growingTogether.hasPending());
-  V46UI::drawHeader(display, F("TAMAGOTCHI"), visualHour(), clockMinute(), alert, 0);
-
-  // One calm, persistent notification at a time. The room remains readable.
-  if ((parentDialogue.hasPending() || (stage != STAGE_BABY && growingTogether.hasPending())) && (anim & 2)) {
-    V46UI::drawNotificationToast(display, F("Wants to talk"), 1, anim);
-  } else if (sick || conditionType != 0) {
-    V46UI::drawNotificationToast(display, F("Needs medicine"), 0, anim);
-  } else if (poop > 0 || clean <= 2) {
-    V46UI::drawNotificationToast(display, F("Room needs cleaning"), 0, anim);
-  } else if (botany.needsCare()) {
-    V46UI::drawNotificationToast(display, F("Plants need care"), 2, anim);
-  } else if (aquarium.needsCare()) {
-    V46UI::drawNotificationToast(display, F("Aquarium needs care"), 2, anim);
-  }
-
-  V46UI::drawFooter(display, F("D0 MENU"), F("D1 OPEN"), F("D2 MENU"));
+  display.setLegacyLayout(false);
+  drawSquarePet();
   if (doDisplay) display.display();
+  display.setLegacyLayout(true);
 }
 
 
@@ -2769,9 +2765,9 @@ bool batteryCritical() {
 }
 
 void applyBrightness() {
-  byte contrast = (brightnessLevel == 0) ? 0x20 : ((brightnessLevel == 1) ? 0x7F : 0xCF);
-  display.ssd1306_command(SSD1306_SETCONTRAST);
-  display.ssd1306_command(contrast);
+  // SH1107 contrast is a 7-bit value (0x00–0x7F).
+  byte contrast = (brightnessLevel == 0) ? 0x20 : ((brightnessLevel == 1) ? 0x60 : 0x7F);
+  display.setContrast(contrast);
 }
 
 const __FlashStringHelper* speciesName() {
@@ -3135,26 +3131,178 @@ void drawBatteryIcon(int x, int y) {
   for (byte i = 0; i < bars; i++) display.fillRect(x + 2 + i * 2, y + 2, 1, 2, WHITE);
 }
 
+void drawSquareHeader(const __FlashStringHelper *title, bool alert) {
+  display.drawRoundRect(1, 1, 126, 126, 10, WHITE);
+  display.fillRoundRect(5, 5, 118, 17, 5, WHITE);
+  display.setTextSize(1);
+  display.setTextColor(BLACK);
+  display.setCursor(10, 10);
+  display.print(title);
+  display.setCursor(78, 10);
+  uint8_t hour12 = visualHour() % 12;
+  if (hour12 == 0) hour12 = 12;
+  display.print(hour12);
+  display.print(':');
+  if (clockMinute() < 10) display.print('0');
+  display.print(clockMinute());
+  display.print(visualHour() < 12 ? 'a' : 'p');
+  if (alert) {
+    display.fillCircle(118, 13, 3, BLACK);
+    display.setTextColor(WHITE);
+    display.setCursor(116, 10);
+    display.print('!');
+  }
+  display.setTextColor(WHITE);
+}
+
+void drawSquareFooter(const __FlashStringHelper *left,
+                      const __FlashStringHelper *center,
+                      const __FlashStringHelper *right) {
+  display.fillRoundRect(4, 115, 120, 10, 4, WHITE);
+  display.setTextSize(1);
+  display.setTextColor(BLACK);
+  display.setCursor(7, 117); display.print(left);
+  display.setCursor(45, 117); display.print(center);
+  display.setCursor(84, 117); display.print(right);
+  display.setTextColor(WHITE);
+}
+
+void drawSquareCentered(const __FlashStringHelper *text, int16_t y,
+                        uint16_t color) {
+  int16_t x1 = 0, y1 = 0;
+  uint16_t w = 0, h = 0;
+  display.getTextBounds(text, 0, y, &x1, &y1, &w, &h);
+  display.setTextColor(color);
+  display.setCursor((128 - static_cast<int16_t>(w)) / 2, y);
+  display.print(text);
+}
+
+void drawSquareRoomBackdrop() {
+  display.drawRoundRect(5, 24, 118, 80, 7, WHITE);
+  display.drawLine(10, 31, 118, 31, WHITE);
+  display.drawLine(10, 88, 118, 88, WHITE);
+  display.drawLine(10, 92, 118, 92, WHITE);
+
+  // Original hand-drawn pixel window; the sun/moon and weather vary with the
+  // game's clock instead of relying on downloaded bitmap assets.
+  display.drawRoundRect(11, 36, 27, 24, 3, WHITE);
+  display.drawLine(24, 37, 24, 59, WHITE);
+  display.drawLine(12, 48, 37, 48, WHITE);
+  if (visualHour() < 7 || visualHour() >= 19) {
+    display.drawCircle(18, 42, 4, WHITE);
+    display.fillCircle(20, 40, 4, BLACK);
+    display.drawPixel(32, 41, WHITE);
+    display.drawPixel(34, 44, WHITE);
+  } else {
+    display.drawCircle(18, 42, 3, WHITE);
+    display.drawLine(18, 36, 18, 38, WHITE);
+    display.drawLine(13, 42, 15, 42, WHITE);
+  }
+  if (visualWeather() == 1) {
+    display.drawLine(15, 51, 13, 55, WHITE);
+    display.drawLine(22, 52, 20, 56, WHITE);
+    display.drawLine(31, 51, 29, 55, WHITE);
+  } else if (visualWeather() == 2) {
+    display.drawPixel(15, 54, WHITE);
+    display.drawPixel(29, 54, WHITE);
+    display.drawPixel(34, 53, WHITE);
+  }
+
+  // A small shelf and room-style details stay to the right of the character.
+  display.drawRect(98, 35, 19, 22, WHITE);
+  display.drawLine(100, 43, 115, 43, WHITE);
+  display.drawLine(100, 50, 115, 50, WHITE);
+  display.drawRect(102, 37, 5, 5, WHITE);
+  display.drawRoundRect(109, 37, 5, 5, 1, WHITE);
+  display.drawCircle(108, 47, 2, WHITE);
+
+  // Low furniture and the rug establish scale without crowding the pet.
+  display.drawRoundRect(8, 75, 24, 10, 4, WHITE);
+  display.drawLine(11, 85, 11, 88, WHITE);
+  display.drawLine(29, 85, 29, 88, WHITE);
+  display.drawRoundRect(35, 84, 58, 7, 3, WHITE);
+  display.drawLine(41, 88, 87, 88, WHITE);
+  for (uint8_t x = 17; x < 118; x += 17) {
+    display.drawLine(x, 93, x - 2, 98, WHITE);
+  }
+
+  switch (roomStyle % ROOM_STYLE_COUNT) {
+    case 1:  // cozy room: heart picture
+      display.drawCircle(52, 29, 2, WHITE);
+      display.drawCircle(57, 29, 2, WHITE);
+      display.drawLine(50, 30, 55, 35, WHITE);
+      display.drawLine(55, 35, 60, 30, WHITE);
+      break;
+    case 2:  // nature room: potted plant
+      display.drawLine(107, 83, 107, 68, WHITE);
+      display.drawCircle(102, 69, 4, WHITE);
+      display.drawCircle(112, 69, 4, WHITE);
+      display.drawRoundRect(101, 82, 13, 5, 2, WHITE);
+      break;
+    case 3:  // study room: desk lamp
+      display.drawLine(16, 74, 16, 66, WHITE);
+      display.drawLine(16, 66, 23, 62, WHITE);
+      display.drawLine(23, 62, 29, 65, WHITE);
+      display.drawLine(13, 74, 21, 74, WHITE);
+      break;
+    case 4:  // arcade room: tiny console on shelf
+      display.drawRoundRect(101, 63, 18, 13, 3, WHITE);
+      display.drawRect(104, 66, 8, 5, WHITE);
+      display.drawPixel(115, 67, WHITE);
+      display.drawPixel(115, 71, WHITE);
+      break;
+    case 5:  // space room: star map
+      display.drawCircle(58, 31, 4, WHITE);
+      display.drawPixel(58, 31, WHITE);
+      display.drawPixel(68, 28, WHITE);
+      display.drawPixel(73, 34, WHITE);
+      break;
+    default:
+      display.drawPixel(49, 31, WHITE);
+      display.drawPixel(72, 30, WHITE);
+      break;
+  }
+
+  if (roomOwned & (1UL << 1)) {
+    display.drawLine(108, 83, 108, 70, WHITE);
+    display.drawCircle(103, 70, 4, WHITE);
+    display.drawCircle(113, 69, 4, WHITE);
+  }
+  if (clean <= 3) {
+    display.drawLine(14, 86, 20, 83, WHITE);
+    display.drawPixel(27, 85, WHITE);
+    display.drawPixel(114, 85, WHITE);
+  }
+}
+
 void drawMenu() {
   if (!menuVisible) return;
 
-  V46UI::drawHeader(display, F("MAIN MENU"), visualHour(), clockMinute(),
-                    needsCare() || pendingCallType != 0, 0);
-  V46UI::drawCarouselFrame(display, mainCategory, CATEGORY_COUNT, false, anim);
+  const bool alert = needsCare() || pendingCallType != 0 || sick;
+  drawSquareHeader(F("ACTIVITIES"), alert);
+  display.drawRoundRect(7, 26, 114, 77, 9, WHITE);
+  display.drawRoundRect(40, 31, 48, 42, 8, WHITE);
+  const int bob = (anim & 2) ? -1 : 0;
+  drawBigMenuEmoji(categoryIcon(mainCategory), 46, 35 + bob, false);
 
-  // One large selected icon only. The right panel explains exactly what opens.
-  drawBigMenuEmoji(categoryIcon(mainCategory), 6, 16 + ((anim & 2) ? -1 : 0), false);
+  drawSquareCentered(categoryShortTitle(mainCategory), 78, WHITE);
+  drawSquareCentered(categoryDescription(mainCategory), 90, WHITE);
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.setCursor(53, 18);
-  display.print(categoryShortTitle(mainCategory));
-  display.setCursor(53, 30);
-  display.print(categoryDescription(mainCategory));
-  display.setCursor(53, 41);
+  display.setCursor(47, 99);
+  display.print(F("SECTION "));
   display.print(mainCategory + 1);
   display.print(F(" / "));
   display.print(CATEGORY_COUNT);
-  V46UI::drawFooter(display, F("D0 PREV"), F("D1 OPEN"), F("D2 NEXT"));
+
+  const int trackX = 29;
+  const int trackY = 108;
+  for (uint8_t i = 0; i < CATEGORY_COUNT; ++i) {
+    const int x = trackX + i * 12;
+    if (i == mainCategory) display.fillRoundRect(x, trackY, 10, 3, 1, WHITE);
+    else display.drawRoundRect(x, trackY, 10, 3, 1, WHITE);
+  }
+  drawSquareFooter(F("D0 PREV"), F("D1 OPEN"), F("D2 NEXT"));
 }
 
 void drawMenuName() {
@@ -5250,6 +5398,187 @@ void drawPet() {
       display.fillTriangle(24, 38, 32, 38, 28, 44, WHITE);
     }
   }
+}
+
+void drawSquareAdultFace(int x, int y, bool asleep) {
+  const int cx = x + 32;
+  const int eyeY = y + 25;
+  if (asleep || energy <= 2) {
+    display.drawLine(cx - 11, eyeY, cx - 5, eyeY, BLACK);
+    display.drawLine(cx + 5, eyeY, cx + 11, eyeY, BLACK);
+  } else if (sick || happy <= 2) {
+    display.drawLine(cx - 11, eyeY - 2, cx - 5, eyeY + 3, BLACK);
+    display.drawLine(cx - 5, eyeY - 2, cx - 11, eyeY + 3, BLACK);
+    display.drawLine(cx + 5, eyeY - 2, cx + 11, eyeY + 3, BLACK);
+    display.drawLine(cx + 11, eyeY - 2, cx + 5, eyeY + 3, BLACK);
+  } else {
+    display.fillRoundRect(cx - 10, eyeY - 2, 4, 7, 2, BLACK);
+    display.fillRoundRect(cx + 6, eyeY - 2, 4, 7, 2, BLACK);
+    if (happy >= 8) {
+      display.drawPixel(cx - 8, eyeY - 1, WHITE);
+      display.drawPixel(cx + 8, eyeY - 1, WHITE);
+    }
+  }
+
+  const int mouthY = eyeY + 13;
+  if (full <= 2) {
+    display.drawCircle(cx, mouthY, 3, BLACK);
+  } else if (happy >= 7) {
+    display.drawLine(cx - 5, mouthY - 1, cx - 3, mouthY + 2, BLACK);
+    display.drawLine(cx - 3, mouthY + 2, cx + 3, mouthY + 2, BLACK);
+    display.drawLine(cx + 3, mouthY + 2, cx + 5, mouthY - 1, BLACK);
+  } else {
+    display.drawLine(cx - 4, mouthY, cx + 4, mouthY, BLACK);
+  }
+}
+
+void drawSquareNeedBubble() {
+  if (dead || sleeping || lightOff || stage == STAGE_EGG) return;
+  byte need = pendingCallType;
+  if (need == 0) {
+    if (sick || conditionType != 0) need = 3;
+    else if (poop > 0 || clean <= 2) need = 2;
+    else if (full <= 2) need = 1;
+    else if (happy <= 2) need = 4;
+    else if (energy <= 2) need = 6;
+  }
+  if (need == 0) return;
+
+  display.fillRoundRect(7, 55, 23, 20, 5, BLACK);
+  display.drawRoundRect(7, 55, 23, 20, 5, WHITE);
+  display.drawLine(23, 73, 28, 78, WHITE);
+  if (need == 1) {
+    display.drawRoundRect(12, 64, 13, 6, 3, WHITE);
+    display.drawPixel(16, 61, WHITE);
+    display.drawPixel(20, 60, WHITE);
+  } else if (need == 2) {
+    display.drawCircle(15, 64, 3, WHITE);
+    display.drawCircle(22, 61, 2, WHITE);
+    display.drawCircle(23, 69, 2, WHITE);
+  } else if (need == 3) {
+    display.drawLine(18, 59, 18, 71, WHITE);
+    display.drawLine(12, 65, 24, 65, WHITE);
+  } else if (need == 4) {
+    display.drawCircle(14, 64, 3, WHITE);
+    display.drawCircle(21, 64, 3, WHITE);
+    display.drawLine(11, 65, 18, 72, WHITE);
+    display.drawLine(18, 72, 24, 65, WHITE);
+  } else {
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(12, 61);
+    display.print(F("Zz"));
+  }
+}
+
+void drawSquarePetStatus() {
+  display.drawRoundRect(4, 106, 120, 8, 3, WHITE);
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(8, 107);
+
+  if (dead) {
+    display.print(F("D1 NEW EGG"));
+  } else if (petAway) {
+    display.print(F("AWAY - USE CALL"));
+  } else if (sick || conditionType != 0) {
+    display.print(F("NEEDS MEDICINE"));
+  } else if (poop > 0 || clean <= 2) {
+    display.print(F("ROOM NEEDS CLEANING"));
+  } else if (botany.needsCare()) {
+    display.print(F("PLANTS NEED CARE"));
+  } else if (aquarium.needsCare()) {
+    display.print(F("AQUARIUM NEEDS CARE"));
+  } else if (parentDialogue.hasPending() ||
+             (stage != STAGE_BABY && growingTogether.hasPending())) {
+    display.print(F("TALK IS READY"));
+  } else {
+    display.print(F("AGE "));
+    display.print(petAgeDays());
+    display.print(F("D  F"));
+    display.print(full);
+    display.print(F(" H"));
+    display.print(happy);
+  }
+}
+
+void drawSquarePet() {
+  // Keep the school/work cutaway art intact and scale it to the panel. The
+  // everyday room and pet are drawn natively at 128x128 below.
+  if (isScheduledAwayTime() && !dead && !petAway) {
+    display.setLegacyLayout(true);
+    drawScheduledAwayScene();
+    display.setLegacyLayout(false);
+    return;
+  }
+
+  drawSquareRoomBackdrop();
+  int petX = 32;
+  int petY = 30 + ((anim & 2) ? -1 : 0);
+
+  if (petAway && !dead) {
+    display.drawRoundRect(47, 34, 34, 53, 5, WHITE);
+    display.drawLine(64, 35, 64, 85, WHITE);
+    display.drawCircle(73, 61, 1, WHITE);
+    drawSquareCentered(F("AWAY"), 72, WHITE);
+  } else if (dead) {
+    display.drawRoundRect(39, 38, 50, 45, 14, WHITE);
+    display.drawLine(51, 51, 59, 59, WHITE);
+    display.drawLine(59, 51, 51, 59, WHITE);
+    display.drawLine(69, 51, 77, 59, WHITE);
+    display.drawLine(77, 51, 69, 59, WHITE);
+    display.drawLine(56, 73, 72, 73, WHITE);
+    drawSquareCentered(F("GOODNIGHT"), 88, WHITE);
+  } else {
+    const bool asleep = sleeping || lightOff;
+    if (stage < STAGE_ADULT) {
+      drawGrowthSprite(48, petY, 4, asleep);
+    } else {
+      petX += (speciesType % 2 == 0 && (anim & 4)) ? 1 : 0;
+      drawMaskSprite(petX, petY, ROSTER_SPRITES[speciesType % SPECIES_COUNT], 2);
+      drawSquareAdultFace(petX, petY, asleep);
+      if (stage == STAGE_ELDER) {
+        display.drawLine(petX + 61, petY + 38, petX + 61, petY + 62, WHITE);
+        display.drawCircle(petX + 58, petY + 38, 3, WHITE);
+        display.drawPixel(petX - 2, petY + 8, WHITE);
+      }
+    }
+    if (!asleep && stage >= STAGE_CHILD && outfit != 0) {
+      drawOutfitOnPet(petX, petY + 17, (anim & 1), 64, 64);
+    }
+    if (cityWorld.partnerLivesAtHome(partnerId, partnerBond)) {
+      cityWorld.drawPartnerAtHome(partnerId, 91, 72, (anim / 6) & 1);
+    }
+    if (poop > 0 || clean <= 6) drawPoopPile(13, 76);
+    if (poop > 1) drawPoopPile(102, 76);
+
+    if (asleep) {
+      display.setTextSize(1);
+      display.setTextColor(WHITE);
+      display.setCursor(91, 38); display.print('Z');
+      display.setCursor(99, 32); display.print('z');
+      if (anim & 1) { display.setCursor(106, 27); display.print('z'); }
+    } else {
+      drawSquareNeedBubble();
+    }
+  }
+
+  // The nameplate and status strip sit below the room artwork, never on top
+  // of the eyes or the custom outfit.
+  display.fillRoundRect(39, 95, 50, 9, 3, WHITE);
+  display.setTextSize(1);
+  display.setTextColor(BLACK);
+  display.setCursor(46, 96);
+  display.print(petName);
+  display.setTextColor(WHITE);
+
+  const bool alert = needsCare() || pendingCallType != 0 || sick || poop > 0 ||
+                     botany.needsCare() || aquarium.needsCare() ||
+                     parentDialogue.hasPending() ||
+                     (stage != STAGE_BABY && growingTogether.hasPending());
+  drawSquareHeader(F("TAMACHIBI"), alert);
+  drawSquarePetStatus();
+  drawSquareFooter(F("D0 MENU"), F("D1 OPEN"), F("D2 MENU"));
 }
 
 
@@ -7991,8 +8320,8 @@ void walkGame() {
         if (px > 110) px = 110;
 
         // v26: use a border flash instead of full-screen inversion.
-        display.drawRect(0, 0, OLED_W, OLED_H, WHITE);
-        display.drawRect(2, 2, OLED_W - 4, OLED_H - 4, WHITE);
+        display.drawRect(0, 0, OLED_W, LEGACY_OLED_H, WHITE);
+        display.drawRect(2, 2, OLED_W - 4, LEGACY_OLED_H - 4, WHITE);
         display.display();
         delay(120);
         display.clearDisplay();
@@ -12322,10 +12651,10 @@ void serviceLifeClock() {
 }
 
 void forceDisplayOn() {
-  // v26: do not call display.begin() again here. Reinitializing the SSD1306
+  // v26: do not call display.begin() again here. Reinitializing the SH1107
   // during a wake can leave inexpensive modules black, white, or peppered.
-  display.ssd1306_command(SSD1306_NORMALDISPLAY);
-  display.ssd1306_command(SSD1306_DISPLAYON);
+  display.oled_command(SH110X_NORMALDISPLAY);
+  display.oled_command(SH110X_DISPLAYON);
   display.setTextWrap(false);
   display.clearDisplay();
   display.display();
@@ -12346,7 +12675,7 @@ void turnOledOffIdle() {
   if (screenSleeping || oledIsOff) return;
   display.clearDisplay();
   display.display();
-  display.ssd1306_command(SSD1306_DISPLAYOFF);
+  display.oled_command(SH110X_DISPLAYOFF);
   oledIsOff = true;
   menuVisible = false;
 #endif
@@ -12701,18 +13030,25 @@ void updateButtons() {
 // ---------- setup and main ----------
 
 void splash() {
+  display.setLegacyLayout(false);
   display.clearDisplay();
+  display.drawRoundRect(1, 1, 126, 126, 12, WHITE);
+  display.drawRoundRect(8, 8, 112, 112, 10, WHITE);
+  display.drawCircle(64, 42, 17, WHITE);
+  display.drawCircle(57, 39, 2, WHITE);
+  display.drawCircle(71, 39, 2, WHITE);
+  display.drawLine(58, 49, 64, 52, WHITE);
+  display.drawLine(64, 52, 70, 49, WHITE);
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.drawRoundRect(22, 8, 84, 47, 8, WHITE);
-  display.setCursor(38, 17);
-  display.print(F("PICO"));
-  display.setCursor(25, 29);
+  display.setCursor(40, 72);
   display.print(F("TAMACHIBI"));
-  display.setCursor(40, 40);
-  display.print(F("v47 ESP32-U"));
-  display.drawCircle(64, 51, 3, WHITE);
+  display.setCursor(37, 87);
+  display.print(F("A LITTLE LIFE"));
+  display.setCursor(48, 101);
+  display.print(F("ESP32 v47"));
   display.display();
+  display.setLegacyLayout(true);
   delay(1000);
 }
 
@@ -12725,6 +13061,25 @@ void lifeRecordNeighborInteraction(byte resident, byte interaction, byte relatio
   lifeWorld.recordNeighborInteraction(resident, interaction, relation);
   deepLife.recordNeighborInteraction(resident, interaction, relation);
   parentDialogue.recordSocialResult(relation >= 45 || interaction == 0);
+}
+
+uint8_t detectMainOledAddress() {
+  const uint8_t candidates[] = {OLED_ADDR, 0x3C, 0x3D};
+  for (uint8_t i = 0; i < sizeof(candidates); ++i) {
+    bool duplicate = false;
+    for (uint8_t j = 0; j < i; ++j) {
+      if (candidates[j] == candidates[i]) duplicate = true;
+    }
+    if (duplicate) continue;
+    Wire.beginTransmission(candidates[i]);
+    if (Wire.endTransmission() == 0) {
+      Serial.print(F("Main 128x128 OLED at I2C 0x"));
+      Serial.println(candidates[i], HEX);
+      return candidates[i];
+    }
+  }
+  Serial.println(F("No OLED at 0x3C/0x3D; trying 0x3C (check SDA/SCL/controller)"));
+  return OLED_ADDR;
 }
 
 void setup() {
@@ -12747,7 +13102,8 @@ void setup() {
   resetWorldViewEncoder();
 
   // ESP32 supports assigning I2C pins at begin(). The displays can share
-  // address 0x3C because they use separate I2C controllers.
+  // address 0x3C because they use separate I2C controllers. The main panel
+  // probes both common SH1107 addresses so either 0x3C or 0x3D modules work.
   Wire.begin(MAIN_OLED_SDA, MAIN_OLED_SCL);
   Wire.setClock(100000UL);
   Wire1.begin(NEEDS_OLED_SDA, NEEDS_OLED_SCL);
@@ -12763,12 +13119,14 @@ void setup() {
 #endif
   initExternalRtc();
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+  const uint8_t mainOledAddress = detectMainOledAddress();
+  if (!display.begin(mainOledAddress, true)) {
+    Serial.println(F("SH1107 init failed; check 3V3, GND, SDA/SCL, and controller"));
     while (1) { delay(100); }
   }
 
-  display.ssd1306_command(SSD1306_NORMALDISPLAY);
-  display.ssd1306_command(SSD1306_DISPLAYON);
+  display.oled_command(SH110X_NORMALDISPLAY);
+  display.oled_command(SH110X_DISPLAYON);
   display.clearDisplay();
   display.display();
 

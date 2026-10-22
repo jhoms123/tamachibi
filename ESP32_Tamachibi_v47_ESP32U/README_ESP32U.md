@@ -1,6 +1,6 @@
 # Tamachibi v47 — ESP32-WROOM-32U breakout port
 
-This folder contains the v47 game port for a classic ESP32-WROOM-32U development breakout. It keeps the two SSD1306 displays, buttons, rotary encoder, piezo, save/profile system, life simulation, and the original Music rhythm game. It adds a Music Player that scans MP3 files from a separate SPI microSD adapter and sends decoded audio over I²S to a separate audio board.
+This folder contains the v47 game port for a classic ESP32-WROOM-32U development breakout. It uses a 128×128 SH1107 main OLED and the optional 128×32 SSD1306 status OLED, along with the buttons, rotary encoder, piezo, save/profile system, life simulation, and original Music rhythm game. The home screen and activity picker are drawn for the square panel; the existing 128×64 game screens are vertically expanded to fill it. It also adds a Music Player that scans MP3 files from a separate SPI microSD adapter and sends decoded audio over I²S to a separate audio board.
 
 The pictured blue module is used only as the microSD reader. The red HW-261/VS1053 shield is not part of this build. The I²S audio board can be chosen later; its exact power and analog/speaker wiring depend on that board.
 
@@ -17,7 +17,7 @@ Open this folder as a PlatformIO project and build the `esp32u` environment. `pl
 ### Arduino IDE
 
 1. Install the Espressif **esp32** board package.
-2. Install `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
+2. Install `Adafruit SH110X`, `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
 3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding and I²S output.
 4. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
 5. Select the flash size printed for your board and a partition scheme with at least a 2 MB app slot. Saves use ESP32 EEPROM emulation and do not need a filesystem partition.
@@ -37,4 +37,4 @@ The player reads up to 32 `.mp3` files from the top level of `/music` and sorts 
 
 ## Hardware and card setup
 
-See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for wiring, SD card formatting and file names, the future I²S audio connection, and LiPo/charger notes. The charger board model is needed to confirm its exact battery and power connections.
+See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the 128×128 OLED wiring, SD card formatting and file names, the future I²S audio connection, and LiPo/charger notes. The charger board model is needed to confirm its exact battery and power connections.

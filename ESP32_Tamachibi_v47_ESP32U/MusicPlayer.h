@@ -1,21 +1,21 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include <AudioFileSourceSD.h>
 #include <AudioGeneratorMP3.h>
 #include <AudioOutputI2S.h>
 
 class Esp32MusicPlayer {
 public:
-  Esp32MusicPlayer(Adafruit_SSD1306 &display, uint8_t buttonLeft,
+  Esp32MusicPlayer(GameDisplay &display, uint8_t buttonLeft,
                    uint8_t buttonSelect, uint8_t buttonRight,
                    uint8_t volumeEncoderClk, uint8_t volumeEncoderDt);
   void run();
 
 private:
   static constexpr uint8_t MAX_TRACKS = 32;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t buttonLeft_;
   uint8_t buttonSelect_;
   uint8_t buttonRight_;

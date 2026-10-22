@@ -37,14 +37,14 @@ const uint8_t RESIDENT_SPECIES[CITY_RESIDENT_COUNT] = {
   2, 8, 19, 29, 42, 43, 48, 38
 };
 
-void printRight(Adafruit_SSD1306 &display, int right, int y, const char *text) {
+void printRight(GameDisplay &display, int right, int y, const char *text) {
   const int width = static_cast<int>(strlen(text)) * 6;
   display.setCursor(max(0, right - width + 1), y);
   display.print(text);
 }
 }
 
-CityWorldSystem::CityWorldSystem(size_t storageBase, Adafruit_SSD1306 &display,
+CityWorldSystem::CityWorldSystem(size_t storageBase, GameDisplay &display,
                                  uint8_t buttonLeft, uint8_t buttonSelect,
                                  uint8_t buttonRight)
     : storeA_(storageBase), storeB_(storageBase + sizeof(CityWorldSave)),

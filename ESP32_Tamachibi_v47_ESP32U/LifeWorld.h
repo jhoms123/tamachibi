@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint32_t LIFEWORLD_SAVE_MAGIC = 0x4C465731UL; // LFW1
@@ -84,7 +84,7 @@ struct LifeWorldSave {
 
 class LifeWorldSystem {
 public:
-  LifeWorldSystem(size_t storageBase, Adafruit_SSD1306 &display,
+  LifeWorldSystem(size_t storageBase, GameDisplay &display,
                   uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -137,7 +137,7 @@ public:
 private:
   Esp32EEPROMStorage<LifeWorldSave> storeA_;
   Esp32EEPROMStorage<LifeWorldSave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
 
   uint32_t sequence_;

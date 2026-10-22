@@ -6,7 +6,7 @@ This map assumes a classic ESP32-WROOM-32U development breakout. GPIO numbers ar
 
 | Part | Pin or signal | ESP32 connection |
 |---|---|---:|
-| Main 128×64 SSD1306 OLED | SDA / SCL | GPIO21 / GPIO22 |
+| Main 128×128 SH1107 OLED | SDA / SCL | GPIO21 / GPIO22 |
 | Side 128×32 SSD1306 OLED | SDA / SCL | GPIO16 / GPIO17 |
 | Left / select / right buttons | one side of each switch | GPIO32 / GPIO33 / GPIO25 respectively |
 | Left / select / right buttons | other side of each switch | GND |
@@ -23,7 +23,9 @@ This map assumes a classic ESP32-WROOM-32U development breakout. GPIO numbers ar
 | Separate SPI microSD adapter | MISO | GPIO19 |
 | I²S audio board, when selected | BCLK / LRCLK / DATA | GPIO14 / GPIO13 / GPIO4 |
 
-Both OLEDs may use I²C address `0x3C` because they are on separate I²C buses. Each button is wired between its GPIO and GND; the firmware enables the ESP32 pull-up.
+Wire the main screen's four pins as follows: **GND → GND, VCC → 3V3, SCL → GPIO22, SDA → GPIO21**. Keep the panel on 3.3V logic. The firmware uses Adafruit's open-source SH110X driver for the 128×128 SH1107 panel, and detects its address at `0x3C` or `0x3D`. The small status OLED remains on I²C pins GPIO16/GPIO17 and uses the SSD1306 driver. Both OLEDs may use address `0x3C` because they are on separate I²C buses. Each button is wired between its GPIO and GND; the firmware enables the ESP32 pull-up.
+
+The main display is assumed to use an SH1107 controller, as used by common 1.5-inch 128×128 OLED modules. If the I²C scan finds the module but the image remains blank or corrupted, check the controller marking on the back of the panel; some visually similar 128×128 modules use a different controller and need a different driver.
 
 The pictured black control is a **rotary encoder**, not an analog potentiometer. On your ESP32 board, GPIO39 is printed as `VN`; connect the encoder's DT wire to the header pin labeled `VN`. Espressif lists `SENSOR_VN` as GPIO39. In the main game the encoder cycles Pet / House / City; on the Music Player screen it changes volume. GPIO35 and GPIO39 are input-only and have no internal pull-ups, so connect the encoder's `+` to 3V3 and use its onboard pull-ups or add a 10 kΩ pull-up from each of CLK and DT to 3V3. Never power the encoder from 5V or feed 5V to an ESP32 GPIO. If turning it clockwise lowers the volume or cycles views backward, swap CLK and DT.
 

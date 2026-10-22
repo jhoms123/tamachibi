@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint32_t DEEPLIFE_SAVE_MAGIC = 0x444C4631UL; // DLF1
@@ -131,7 +131,7 @@ struct DeepLifeSave {
 
 class DeepLifeSystem {
 public:
-  DeepLifeSystem(size_t storageBase, Adafruit_SSD1306 &display,
+  DeepLifeSystem(size_t storageBase, GameDisplay &display,
                  uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -182,7 +182,7 @@ public:
 private:
   Esp32EEPROMStorage<DeepLifeSave> storeA_;
   Esp32EEPROMStorage<DeepLifeSave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
 
   uint32_t sequence_;

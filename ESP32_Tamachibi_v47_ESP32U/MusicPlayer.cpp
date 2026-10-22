@@ -21,7 +21,7 @@ constexpr uint32_t RIGHT_HOLD_EXIT_MS = 900UL;
 constexpr const char *MUSIC_DIRECTORY = "/music";
 }
 
-Esp32MusicPlayer::Esp32MusicPlayer(Adafruit_SSD1306 &display,
+Esp32MusicPlayer::Esp32MusicPlayer(GameDisplay &display,
                                    uint8_t buttonLeft,
                                    uint8_t buttonSelect,
                                    uint8_t buttonRight,

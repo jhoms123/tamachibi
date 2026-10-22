@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint32_t PARENT_DIALOGUE_SAVE_MAGIC = 0x50444231UL; // PDB1
@@ -138,7 +138,7 @@ struct ParentDialogueSave {
 
 class ParentDialogueSystem {
 public:
-  ParentDialogueSystem(size_t storageBase, Adafruit_SSD1306 &display,
+  ParentDialogueSystem(size_t storageBase, GameDisplay &display,
                        uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -180,7 +180,7 @@ public:
 private:
   Esp32EEPROMStorage<ParentDialogueSave> storeA_;
   Esp32EEPROMStorage<ParentDialogueSave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
 
   uint32_t sequence_;

@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint8_t CITY_RESIDENT_COUNT = 8;
@@ -25,7 +25,7 @@ struct CityWorldSave {
 
 class CityWorldSystem {
 public:
-  CityWorldSystem(size_t storageBase, Adafruit_SSD1306 &display,
+  CityWorldSystem(size_t storageBase, GameDisplay &display,
                   uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -58,7 +58,7 @@ public:
 private:
   Esp32EEPROMStorage<CityWorldSave> storeA_;
   Esp32EEPROMStorage<CityWorldSave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
   uint32_t sequence_;
   uint8_t relation_[CITY_RESIDENT_COUNT];

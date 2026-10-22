@@ -186,7 +186,7 @@ uint8_t popcount16(uint16_t v) {
 }
 }
 
-DeepLifeSystem::DeepLifeSystem(size_t storageBase, Adafruit_SSD1306 &display,
+DeepLifeSystem::DeepLifeSystem(size_t storageBase, GameDisplay &display,
                                uint8_t buttonLeft, uint8_t buttonSelect,
                                uint8_t buttonRight)
     : storeA_(storageBase), storeB_(storageBase + sizeof(DeepLifeSave)),
