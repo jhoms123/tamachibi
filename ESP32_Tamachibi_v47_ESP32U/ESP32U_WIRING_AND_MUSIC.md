@@ -13,7 +13,7 @@ This map assumes a classic ESP32-WROOM-32U development breakout. GPIO numbers ar
 | Passive piezo | positive | GPIO26 |
 | Passive piezo | negative | GND |
 | Rotary encoder module | CLK | GPIO35 |
-| Rotary encoder module | DT | GPIO39 |
+| Rotary encoder module | DT | VN (GPIO39) |
 | Rotary encoder module | `+` | 3V3 |
 | Rotary encoder module | GND | common GND |
 | Rotary encoder module | SW | leave unconnected; firmware does not use the push switch |
@@ -25,7 +25,7 @@ This map assumes a classic ESP32-WROOM-32U development breakout. GPIO numbers ar
 
 Both OLEDs may use I²C address `0x3C` because they are on separate I²C buses. Each button is wired between its GPIO and GND; the firmware enables the ESP32 pull-up.
 
-The pictured black control is a **rotary encoder**, not an analog potentiometer. In the main game it cycles Pet / House / City; on the Music Player screen it changes volume. GPIO35 and GPIO39 are input-only and have no internal pull-ups, so connect the encoder's `+` to 3V3 and use its onboard pull-ups or add a 10 kΩ pull-up from each of CLK and DT to 3V3. Never power the encoder from 5V or feed 5V to an ESP32 GPIO. If turning it clockwise lowers the volume or cycles views backward, swap CLK and DT.
+The pictured black control is a **rotary encoder**, not an analog potentiometer. On your ESP32 board, GPIO39 is printed as `VN`; connect the encoder's DT wire to the header pin labeled `VN`. Espressif lists `SENSOR_VN` as GPIO39. In the main game the encoder cycles Pet / House / City; on the Music Player screen it changes volume. GPIO35 and GPIO39 are input-only and have no internal pull-ups, so connect the encoder's `+` to 3V3 and use its onboard pull-ups or add a 10 kΩ pull-up from each of CLK and DT to 3V3. Never power the encoder from 5V or feed 5V to an ESP32 GPIO. If turning it clockwise lowers the volume or cycles views backward, swap CLK and DT.
 
 ## Separate microSD adapter shown in your photo
 
