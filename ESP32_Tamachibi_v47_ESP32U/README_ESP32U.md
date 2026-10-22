@@ -31,6 +31,7 @@ In the Play menu, choose **Music Player**:
 - D1: start or stop the selected MP3
 - D2: next track; hold D2 for about one second to exit
 - Rotary encoder: playback volume
+- Encoder push switch: Right / D2
 - On the main pet screen, the same encoder cycles Pet → House → City
 
 The player reads up to 32 `.mp3` files from the top level of `/music` and sorts them by filename. It does not scan nested folders or playlists. The firmware decodes MP3 and outputs I²S on BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. There is no sound until a compatible I²S DAC or amplifier board is connected.
