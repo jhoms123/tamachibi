@@ -31,7 +31,7 @@ PolishedScenes.h
 README_ESP32U.md
 SaveProfiles.cpp
 SaveProfiles.h
-Tamachibi_ESP32U.ino
+ESP32_Tamachibi_v47_ESP32U.ino
 V47_ESP32U_CHANGE_NOTES.txt
 VisualOverhaul.cpp
 VisualOverhaul.h

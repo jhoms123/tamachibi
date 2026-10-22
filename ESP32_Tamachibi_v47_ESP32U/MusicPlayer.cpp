@@ -25,17 +25,26 @@ Esp32MusicPlayer::Esp32MusicPlayer(Adafruit_SSD1306 &display,
                                    uint8_t buttonLeft,
                                    uint8_t buttonSelect,
                                    uint8_t buttonRight,
-                                   uint8_t volumePin)
+                                   uint8_t volumeEncoderClk,
+                                   uint8_t volumeEncoderDt)
     : display_(display), buttonLeft_(buttonLeft), buttonSelect_(buttonSelect),
-      buttonRight_(buttonRight), volumePin_(volumePin), trackCount_(0),
-      selectedTrack_(0), spiStarted_(false), sdReady_(false),
-      playbackFinished_(false), gain_(0.0f), status_("STOPPED"),
-      source_(nullptr), decoder_(nullptr), output_(nullptr) {}
+      buttonRight_(buttonRight), volumeEncoderClk_(volumeEncoderClk),
+      volumeEncoderDt_(volumeEncoderDt), trackCount_(0), selectedTrack_(0),
+      encoderPreviousState_(0), encoderTransitionCount_(0), spiStarted_(false),
+      sdReady_(false), playbackFinished_(false), gain_(0.55f),
+      status_("STOPPED"), source_(nullptr), decoder_(nullptr), output_(nullptr) {}
 
 bool Esp32MusicPlayer::initializeCard() {
   if (!spiStarted_) {
+    pinMode(SD_CS_PIN, OUTPUT);
+    digitalWrite(SD_CS_PIN, HIGH);
+    pinMode(volumeEncoderClk_, INPUT);
+    pinMode(volumeEncoderDt_, INPUT);
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     spiStarted_ = true;
+    encoderPreviousState_ =
+        (static_cast<uint8_t>(digitalRead(volumeEncoderClk_)) << 1) |
+        static_cast<uint8_t>(digitalRead(volumeEncoderDt_));
   }
   if (!sdReady_) sdReady_ = SD.begin(SD_CS_PIN, SPI, SD_SPI_HZ);
   return sdReady_;
@@ -139,10 +148,27 @@ void Esp32MusicPlayer::startPlayback() {
 }
 
 void Esp32MusicPlayer::updateGain() {
-  const int raw = analogRead(volumePin_);
-  const int bounded = constrain(raw, 0, 1023);
-  gain_ = (static_cast<float>(bounded) / 1023.0f) * 0.90f;
-  if (output_) output_->SetGain(gain_);
+  static const int8_t transitions[16] = {
+      0, -1, 1, 0, 1, 0, 0, -1,
+      -1, 0, 0, 1, 0, 1, -1, 0};
+  const uint8_t currentState =
+      (static_cast<uint8_t>(digitalRead(volumeEncoderClk_)) << 1) |
+      static_cast<uint8_t>(digitalRead(volumeEncoderDt_));
+  const uint8_t transition = (encoderPreviousState_ << 2) | currentState;
+  encoderTransitionCount_ += transitions[transition];
+  encoderPreviousState_ = currentState;
+
+  bool changed = false;
+  if (encoderTransitionCount_ >= 4) {
+    gain_ = gain_ < 0.90f ? gain_ + 0.05f : 0.90f;
+    encoderTransitionCount_ = 0;
+    changed = true;
+  } else if (encoderTransitionCount_ <= -4) {
+    gain_ = gain_ > 0.0f ? gain_ - 0.05f : 0.0f;
+    encoderTransitionCount_ = 0;
+    changed = true;
+  }
+  if (changed && output_) output_->SetGain(gain_);
 }
 
 void Esp32MusicPlayer::drawPlayerScreen() const {
@@ -227,7 +253,7 @@ void Esp32MusicPlayer::run() {
       stopPlayback("FINISHED");
       playbackFinished_ = true;
     }
-    if (now - lastGainAt >= 80UL) {
+    if (now - lastGainAt >= 4UL) {
       updateGain();
       lastGainAt = now;
     }

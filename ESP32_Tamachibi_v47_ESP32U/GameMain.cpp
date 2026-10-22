@@ -6,7 +6,7 @@
   are in README_ESP32U.md and ESP32U_WIRING_AND_MUSIC.md.
 
   Required libraries: Adafruit SSD1306, Adafruit GFX, Adafruit BusIO, and
-  ESP8266Audio (MP3 playback from the microSD card over I2S).
+  ESP8266Audio (MP3 decoding to a future I2S audio module).
 */
 
 #include <Arduino.h>
@@ -65,8 +65,6 @@ const byte AQUARIUM_MENU_COUNT = 10;
 // Recheck these numbers against the exact carrier-board pin labels before wiring.
 #define SD_MISO_PIN 19
 #define SD_CS_PIN 27
-#define SD_SCK_PIN 18
-#define SD_MOSI_PIN 23
 #define MAIN_OLED_SDA 21
 #define MAIN_OLED_SCL 22
 #define NEEDS_OLED_SDA 16
@@ -75,10 +73,8 @@ const byte AQUARIUM_MENU_COUNT = 10;
 #define BTN_S 33
 #define BTN_R 25
 #define BUZZER_PIN 26
-#define AUDIO_BCLK_PIN 14
-#define AUDIO_LRCLK_PIN 13
-#define AUDIO_DATA_PIN 4
-#define VIEW_DIAL_PIN 34         // input-only ADC1 pin; center/wiper of B10K
+#define VOLUME_ENCODER_CLK_PIN 35
+#define VOLUME_ENCODER_DT_PIN 39
 
 // Set to 1 while balancing: one five-minute pet tick passes each real second.
 #define TAMACHIBI_TEST_MODE 0
@@ -305,8 +301,10 @@ const byte CATEGORY_COUNT = 6;
 
 enum DialWorldView : byte { VIEW_PET = 0, VIEW_HOUSE = 1, VIEW_CITY = 2 };
 byte dialWorldView = VIEW_PET;
-int viewDialFiltered = 0;
 unsigned long lastViewDialReadAt = 0;
+uint8_t worldEncoderPreviousState = 0;
+int8_t worldEncoderTransitionCount = 0;
+bool worldEncoderInitialized = false;
 
 // v21 living-world systems. These are stored in a separate checksummed save
 // block so v19/v20 main saves remain loadable without resetting the pet.
@@ -609,7 +607,8 @@ ParentDialogueSystem parentDialogue(PARENT_DIALOGUE_SAVE_BASE, display, BTN_L, B
 const size_t GROWING_TOGETHER_SAVE_BASE = PARENT_DIALOGUE_SAVE_BASE + sizeof(ParentDialogueSave) * 2;
 GrowingTogetherSystem growingTogether(GROWING_TOGETHER_SAVE_BASE, display, BTN_L, BTN_S, BTN_R);
 SaveProfileManager saveProfiles(display, BTN_L, BTN_S, BTN_R);
-Esp32MusicPlayer musicPlayer(display, BTN_L, BTN_S, BTN_R, VIEW_DIAL_PIN);
+Esp32MusicPlayer musicPlayer(display, BTN_L, BTN_S, BTN_R,
+                             VOLUME_ENCODER_CLK_PIN, VOLUME_ENCODER_DT_PIN);
 static_assert(GROWING_TOGETHER_SAVE_BASE + sizeof(GrowingTogetherSave) * 2 <= TAMACHIBI_EEPROM_BYTES,
               "Tamachibi save data exceeds the 4 KB EEPROM allocation");
 
@@ -703,8 +702,10 @@ const byte ROUTINE_TALK = 8;
 const byte ROUTINE_PLAY = 16;
 const byte ROUTINE_BED = 32;
 
-// Three-position view dial and living-world overview.
-void updateWorldViewFromDial(bool forceRead = false);
+// Rotary encoder view control and living-world overview.
+void updateWorldViewFromEncoder(bool forceRead = false);
+void resetWorldViewEncoder();
+int8_t readWorldViewEncoderStep();
 void drawHouseWorldView();
 void drawCityWorldView();
 void enterHouseSelection();
@@ -1081,8 +1082,8 @@ void drawScreen(bool doDisplay) {
   if (screenSleeping) return;
   display.clearDisplay();
 
-  // The potentiometer owns all movement between the three world scales.
-  // Buttons only navigate inside whichever scale the dial selected.
+  // The encoder cycles the three world scales. Buttons navigate within the
+  // selected scale.
   if (!menuVisible && dialWorldView == VIEW_HOUSE) {
     drawHouseWorldView();
     if (doDisplay) display.display();
@@ -11998,7 +11999,12 @@ void executeAction(byte action) {
   else if (menu == M_PARADISE) paradiseLabPage();
   else if (menu == M_LIFE) lifeWorld.runHub();
   else if (menu == M_MUSIC) musicGame();
-  else if (menu == M_PLAYER) { musicPlayer.run(); drawScreen(true); return; }
+  else if (menu == M_PLAYER) {
+    musicPlayer.run();
+    updateWorldViewFromEncoder(true);  // Re-sync after the player used the encoder.
+    drawScreen(true);
+    return;
+  }
   else if (menu == M_SHOP) shopClothes();
   else if (menu == M_TOY) toyActivity();
   else if (menu == M_EXPLORE) exploreTrip();
@@ -12387,29 +12393,20 @@ void noteInput() {
 
 
 
-void updateWorldViewFromDial(bool forceRead) {
+void updateWorldViewFromEncoder(bool forceRead) {
   const unsigned long now = millis();
-  if (!forceRead && now - lastViewDialReadAt < 80UL) return;
+  if (forceRead) {
+    resetWorldViewEncoder();
+    return;
+  }
+  if (now - lastViewDialReadAt < 2UL) return;
   lastViewDialReadAt = now;
 
-  long total = 0;
-  for (byte i = 0; i < 8; ++i) total += analogRead(VIEW_DIAL_PIN);
-  const int sample = static_cast<int>(total / 8L);
-  if (forceRead || viewDialFiltered == 0) viewDialFiltered = sample;
-  else viewDialFiltered = (viewDialFiltered * 3 + sample) / 4;
-
+  const int8_t step = readWorldViewEncoderStep();
+  if (step == 0) return;
   byte nextView = dialWorldView;
-  // Hysteresis prevents analog noise from rapidly switching screens near a boundary.
-  if (dialWorldView == VIEW_PET) {
-    if (viewDialFiltered > 710) nextView = VIEW_CITY;
-    else if (viewDialFiltered > 370) nextView = VIEW_HOUSE;
-  } else if (dialWorldView == VIEW_HOUSE) {
-    if (viewDialFiltered < 315) nextView = VIEW_PET;
-    else if (viewDialFiltered > 710) nextView = VIEW_CITY;
-  } else {
-    if (viewDialFiltered < 315) nextView = VIEW_PET;
-    else if (viewDialFiltered < 650) nextView = VIEW_HOUSE;
-  }
+  if (step > 0) nextView = (dialWorldView + 1) % 3;
+  else nextView = (dialWorldView + 2) % 3;
 
   if (nextView != dialWorldView) {
     dialWorldView = nextView;
@@ -12418,6 +12415,42 @@ void updateWorldViewFromDial(bool forceRead) {
     if (!forceRead) clickSound();
     drawScreen(true);
   }
+}
+
+void resetWorldViewEncoder() {
+  worldEncoderPreviousState =
+      (static_cast<uint8_t>(digitalRead(VOLUME_ENCODER_CLK_PIN)) << 1) |
+      static_cast<uint8_t>(digitalRead(VOLUME_ENCODER_DT_PIN));
+  worldEncoderTransitionCount = 0;
+  worldEncoderInitialized = true;
+  lastViewDialReadAt = millis();
+}
+
+int8_t readWorldViewEncoderStep() {
+  static const int8_t transitions[16] = {
+      0, -1, 1, 0, 1, 0, 0, -1,
+      -1, 0, 0, 1, 0, 1, -1, 0};
+  if (!worldEncoderInitialized) {
+    resetWorldViewEncoder();
+    return 0;
+  }
+
+  const uint8_t currentState =
+      (static_cast<uint8_t>(digitalRead(VOLUME_ENCODER_CLK_PIN)) << 1) |
+      static_cast<uint8_t>(digitalRead(VOLUME_ENCODER_DT_PIN));
+  const uint8_t transition = (worldEncoderPreviousState << 2) | currentState;
+  worldEncoderTransitionCount += transitions[transition];
+  worldEncoderPreviousState = currentState;
+
+  if (worldEncoderTransitionCount >= 4) {
+    worldEncoderTransitionCount = 0;
+    return 1;
+  }
+  if (worldEncoderTransitionCount <= -4) {
+    worldEncoderTransitionCount = 0;
+    return -1;
+  }
+  return 0;
 }
 
 void drawHouseWorldView() {
@@ -12577,7 +12610,7 @@ void updateButtons() {
   }
 
   // In House and City views the buttons navigate the visible world. Rotate
-  // the view dial back to Pet view whenever the normal category menu is needed.
+  // the living-world selector back to Pet view whenever the normal category menu is needed.
   if (!menuVisible && dialWorldView != VIEW_PET) {
     if (now - lastButtonTick > 130 && oldL == HIGH && l == LOW) {
       if (dialWorldView == VIEW_HOUSE) cityWorld.previousHouseRoom();
@@ -12707,8 +12740,11 @@ void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
   esp32BuzzerBegin(BUZZER_PIN);
   esp32BuzzerStop(BUZZER_PIN);
-  pinMode(VIEW_DIAL_PIN, INPUT);
-  analogReadResolution(10);
+  // The encoder module is powered at 3V3. GPIO35/39 are input-only and have
+  // no internal pull-ups, so use the module's pull-ups or add 10k resistors.
+  pinMode(VOLUME_ENCODER_CLK_PIN, INPUT);
+  pinMode(VOLUME_ENCODER_DT_PIN, INPUT);
+  resetWorldViewEncoder();
 
   // ESP32 supports assigning I2C pins at begin(). The displays can share
   // address 0x3C because they use separate I2C controllers.
@@ -12808,13 +12844,13 @@ void setup() {
   lastInputAt = millis();
   lastGameTick = millis();
   lastAnimTick = millis();
-  updateWorldViewFromDial(true);
+  updateWorldViewFromEncoder(true);
   drawScreen(true);
   serviceNeedsDisplay(true);
 }
 
 void loop() {
-  updateWorldViewFromDial(false);
+  updateWorldViewFromEncoder(false);
   updateButtons();
 
   unsigned long now = millis();

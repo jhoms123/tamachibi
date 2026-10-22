@@ -1,39 +1,40 @@
 # Tamachibi v47 — ESP32-WROOM-32U breakout port
 
-This folder contains the complete v47 Tamachibi game logic, ported from the RP2040 ProMicro build to the Arduino ESP32 core. It keeps the two SSD1306 displays, buttons, dial, piezo, save/profile system, life simulation, and the original Music rhythm game. It adds a separate **Music Player** action that scans `/music` on a microSD card and plays MP3 files through an I2S DAC.
+This folder contains the v47 game port for a classic ESP32-WROOM-32U development breakout. It keeps the two SSD1306 displays, buttons, rotary encoder, piezo, save/profile system, life simulation, and the original Music rhythm game. It adds a Music Player that scans MP3 files from a separate SPI microSD adapter and sends decoded audio over I²S to a separate audio board.
+
+The pictured blue module is used only as the microSD reader. The red HW-261/VS1053 shield is not part of this build. The I²S audio board can be chosen later; its exact power and analog/speaker wiring depend on that board.
 
 ## Hardware assumption
 
-The pin map is for a **classic ESP32-WROOM-32U on a development breakout** with exposed GPIO labels. The WROOM-32U is an ESP32 module, not a complete USB development board by itself. If you have a bare module, a WROVER/PSRAM board, an ESP32-S2/S3/C3 board, or a carrier with different labels, stop and use that board's schematic before wiring. GPIO16/17 are reserved for the second display in this map and can conflict with PSRAM on some different ESP32 modules.
+The pin map is for a **classic ESP32-WROOM-32U on a development breakout** with exposed GPIO labels. The WROOM-32U is a module, not a complete USB development board by itself. If you have a bare module, a WROVER/PSRAM board, an ESP32-S2/S3/C3 board, or a carrier with different labels, check that board's schematic before wiring. GPIO16/17 are reserved for the second display in this map and may conflict with PSRAM on some other ESP32 modules.
 
 ## Build
 
 ### PlatformIO
 
-Open this folder as a PlatformIO project and build the `esp32u` environment. `platformio.ini` selects the generic `esp32dev` target used by the classic WROOM-32U breakout and installs the display and audio libraries.
+Open this folder as a PlatformIO project and build the `esp32u` environment. `platformio.ini` selects the generic `esp32dev` target used for a classic WROOM-32U breakout and installs the display and MP3/I²S libraries.
 
 ### Arduino IDE
 
 1. Install the Espressif **esp32** board package.
 2. Install `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
-3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding.
-4. Open `Tamachibi_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
-5. Select the flash size printed for your board and a partition scheme with at least a 2 MB app slot. The included PlatformIO config uses `min_spiffs.csv`, which keeps OTA support and provides more app space than the default scheme. v47 stores saves in ESP32 EEPROM emulation and does not need a filesystem partition.
+3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding and I²S output.
+4. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
+5. Select the flash size printed for your board and a partition scheme with at least a 2 MB app slot. Saves use ESP32 EEPROM emulation and do not need a filesystem partition.
 6. Upload over USB with the battery boost output switched off. Keep all `.cpp`, `.h`, and `.ino` files together.
-
-The source includes both Arduino-ESP32 LEDC API variants (core 2.x and 3.x). A current Espressif board package is recommended.
 
 ## Controls
 
-In the Play menu, choose **Music Player**. The new player is independent from the original rhythm mini-game:
+In the Play menu, choose **Music Player**:
 
 - D0: previous track
 - D1: start or stop the selected MP3
 - D2: next track; hold D2 for about one second to exit
-- B10K dial: playback volume
+- Rotary encoder: playback volume
+- On the main pet screen, the same encoder cycles Pet → House → City
 
-The player reads up to 32 `.mp3` files from the top level of `/music` and sorts filenames alphabetically. It does not scan nested folders or playlists. Playback uses an external I2S DAC such as a PCM5102A; the DAC's analog output must feed powered speakers, an AUX input, or a headphone amplifier.
+The player reads up to 32 `.mp3` files from the top level of `/music` and sorts them by filename. It does not scan nested folders or playlists. The firmware decodes MP3 and outputs I²S on BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. There is no sound until a compatible I²S DAC or amplifier board is connected.
 
 ## Hardware and card setup
 
-See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the reference pin table, SD card folder layout, audio path, and LiPo/charger conditions. The charger board model is needed before its exact battery and power connections can be confirmed.
+See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for wiring, SD card formatting and file names, the future I²S audio connection, and LiPo/charger notes. The charger board model is needed to confirm its exact battery and power connections.

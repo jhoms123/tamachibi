@@ -10,7 +10,7 @@ class Esp32MusicPlayer {
 public:
   Esp32MusicPlayer(Adafruit_SSD1306 &display, uint8_t buttonLeft,
                    uint8_t buttonSelect, uint8_t buttonRight,
-                   uint8_t volumePin);
+                   uint8_t volumeEncoderClk, uint8_t volumeEncoderDt);
   void run();
 
 private:
@@ -19,10 +19,13 @@ private:
   uint8_t buttonLeft_;
   uint8_t buttonSelect_;
   uint8_t buttonRight_;
-  uint8_t volumePin_;
+  uint8_t volumeEncoderClk_;
+  uint8_t volumeEncoderDt_;
   String tracks_[MAX_TRACKS];
   uint8_t trackCount_;
   uint8_t selectedTrack_;
+  uint8_t encoderPreviousState_;
+  int8_t encoderTransitionCount_;
   bool spiStarted_;
   bool sdReady_;
   bool playbackFinished_;
