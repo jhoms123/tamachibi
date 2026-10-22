@@ -466,12 +466,12 @@ void ParentDialogueSystem::printWrapped(const char *text, int x, int y, uint8_t 
 
 void ParentDialogueSystem::drawDialoguePage(const ParentDialogueContext &ctx, const char *text,
                                              uint8_t page, uint8_t pages) const {
-  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(WHITE); display_.setTextWrap(false);
-  display_.fillRoundRect(1, 1, 25, 17, 4, BLACK); display_.drawRoundRect(1, 1, 25, 17, 4, WHITE);
+  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(SSD1306_WHITE); display_.setTextWrap(false);
+  display_.fillRoundRect(1, 1, 25, 17, 4, SSD1306_BLACK); display_.drawRoundRect(1, 1, 25, 17, 4, SSD1306_WHITE);
   drawCurrentPetTiny(4, 2);
   display_.setCursor(31, 2); display_.print(ctx.stage <= 1 ? F("BABY BABBLE") : F("TAMA TALK"));
   display_.setCursor(108, 2); display_.print(page); display_.print('/'); display_.print(pages);
-  display_.drawRoundRect(2, 20, 124, 34, 5, WHITE);
+  display_.drawRoundRect(2, 20, 124, 34, 5, SSD1306_WHITE);
   printWrapped(text, 7, 24, 19, 4);
   display_.setCursor(3, 57); display_.print(F("D1 next"));
   display_.display();
@@ -491,15 +491,15 @@ bool ParentDialogueSystem::waitForContinue(bool allowDismiss) const {
 
 void ParentDialogueSystem::drawChoicePage(const ParentDialogueContext &ctx, uint8_t responseSet,
                                            uint8_t selected) const {
-  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(WHITE); display_.setTextWrap(false);
+  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(SSD1306_WHITE); display_.setTextWrap(false);
   display_.setCursor(24, 1); display_.print(ctx.stage <= 1 ? F("HOW DO YOU RESPOND?") : F("YOUR RESPONSE"));
   for (uint8_t i = 0; i < 3; ++i) {
     const int y = 14 + i * 15;
-    if (i == selected) { display_.fillRoundRect(2, y, 124, 12, 3, WHITE); display_.setTextColor(BLACK); }
-    else { display_.drawRoundRect(2, y, 124, 12, 3, WHITE); display_.setTextColor(WHITE); }
+    if (i == selected) { display_.fillRoundRect(2, y, 124, 12, 3, SSD1306_WHITE); display_.setTextColor(SSD1306_BLACK); }
+    else { display_.drawRoundRect(2, y, 124, 12, 3, SSD1306_WHITE); display_.setTextColor(SSD1306_WHITE); }
     display_.setCursor(6, y + 2); display_.print(i == 0 ? 'A' : (i == 1 ? 'B' : 'C')); display_.print(F(" "));
     display_.print(choiceLabel(responseSet, i));
-    display_.setTextColor(WHITE);
+    display_.setTextColor(SSD1306_WHITE);
   }
   display_.setCursor(3, 59); display_.print(F("D0/D2 choose  D1 answer"));
   display_.display();
@@ -507,10 +507,10 @@ void ParentDialogueSystem::drawChoicePage(const ParentDialogueContext &ctx, uint
 
 void ParentDialogueSystem::drawResultPage(const ParentDialogueContext &ctx, const char *reply,
                                            const ParentDialogueOutcome &o) const {
-  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(WHITE); display_.setTextWrap(false);
-  display_.fillRoundRect(1, 1, 25, 17, 4, BLACK); display_.drawRoundRect(1, 1, 25, 17, 4, WHITE); drawCurrentPetTiny(4, 2);
+  display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(SSD1306_WHITE); display_.setTextWrap(false);
+  display_.fillRoundRect(1, 1, 25, 17, 4, SSD1306_BLACK); display_.drawRoundRect(1, 1, 25, 17, 4, SSD1306_WHITE); drawCurrentPetTiny(4, 2);
   display_.setCursor(31, 2); display_.print(F("RESPONSE REMEMBERED"));
-  display_.drawRoundRect(2, 20, 124, 27, 5, WHITE); printWrapped(reply, 7, 24, 19, 3);
+  display_.drawRoundRect(2, 20, 124, 27, 5, SSD1306_WHITE); printWrapped(reply, 7, 24, 19, 3);
   display_.setCursor(3, 50);
   if (o.trust > 0) { display_.print(F("Trust +")); display_.print(o.trust); }
   else if (o.trust < 0) { display_.print(F("Trust ")); display_.print(o.trust); }
@@ -563,16 +563,16 @@ void ParentDialogueSystem::showScrollableText(const ParentDialogueContext &ctx,
     if (oldR == HIGH && r == LOW) { if (top + 5 < count) ++top; clickSound(); delay(90); }
     if (oldS == HIGH && sel == LOW) { clickSound(); waitButtonRelease(); return; }
     oldL = l; oldS = sel; oldR = r;
-    display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(WHITE); display_.setTextWrap(false);
+    display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(SSD1306_WHITE); display_.setTextWrap(false);
     display_.setCursor(1, 0);
     for (uint8_t i = 0; title && title[i] && i < 21; ++i) display_.print(title[i]);
-    display_.drawLine(0, 8, 127, 8, WHITE);
+    display_.drawLine(0, 8, 127, 8, SSD1306_WHITE);
     for (uint8_t row = 0; row < 5; ++row) {
       const uint8_t idx = static_cast<uint8_t>(top + row);
       if (idx >= count) break;
       display_.setCursor(1, 11 + row * 9); display_.print(lines[idx]);
     }
-    display_.drawLine(0, 55, 127, 55, WHITE);
+    display_.drawLine(0, 55, 127, 55, SSD1306_WHITE);
     display_.setCursor(1, 57);
     if (count > 5) {
       display_.print(F("D0/D2 ")); display_.print(top + 1); display_.print('/');
@@ -674,7 +674,7 @@ void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
       else return;
     }
     oldL = l; oldS = s; oldR = r;
-    display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(WHITE); display_.setTextWrap(false);
+    display_.clearDisplay(); display_.setTextSize(1); display_.setTextColor(SSD1306_WHITE); display_.setTextWrap(false);
     display_.setCursor(20, 1); display_.print(F("PARENT BOND JOURNAL")); display_.setCursor(108, 1); display_.print(page + 1); display_.print('/'); display_.print(pages);
     if (page == 0) {
       display_.setCursor(2, 14); display_.print(F("This pet talks ")); display_.print(generationConversations_);
