@@ -1,6 +1,6 @@
 # Tamachibi v47 — ESP32-WROOM-32U breakout port
 
-This folder contains the complete v47 Tamachibi game logic, ported from the RP2040 ProMicro build to the Arduino ESP32 core. It keeps the two SSD1306 displays, buttons, dial, piezo, save/profile system, life simulation, and the original Music rhythm game. It adds a separate **Music Player** action that scans `/music` on a microSD card and plays MP3 files through an I2S DAC.
+This folder contains the complete v47 Tamachibi game logic, ported from the RP2040 ProMicro build to the Arduino ESP32 core. It keeps the two SSD1306 displays, buttons, rotary encoder, piezo, save/profile system, life simulation, and the original Music rhythm game. It adds a separate **Music Player** action that scans `/music` on the HW-261 VS1053 shield's TF card and plays MP3 files through the shield's decoder and headphone output.
 
 ## Hardware assumption
 
@@ -16,7 +16,7 @@ Open this folder as a PlatformIO project and build the `esp32u` environment. `pl
 
 1. Install the Espressif **esp32** board package.
 2. Install `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
-3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding.
+3. Install `Adafruit VS1053 Library` from Library Manager.
 4. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
 5. Select the flash size printed for your board and a partition scheme with at least a 2 MB app slot. The included PlatformIO config uses `min_spiffs.csv`, which keeps OTA support and provides more app space than the default scheme. v47 stores saves in ESP32 EEPROM emulation and does not need a filesystem partition.
 6. Upload over USB with the battery boost output switched off. Keep all `.cpp`, `.h`, and `.ino` files together.
@@ -30,9 +30,9 @@ In the Play menu, choose **Music Player**. The new player is independent from th
 - D0: previous track
 - D1: start or stop the selected MP3
 - D2: next track; hold D2 for about one second to exit
-- B10K dial: playback volume
+- Rotary encoder: cycles Pet / House / City in the main screen; controls music volume in Music Player
 
-The player reads up to 32 `.mp3` files from the top level of `/music` and sorts filenames alphabetically. It does not scan nested folders or playlists. Playback uses an external I2S DAC such as a PCM5102A; the DAC's analog output must feed powered speakers, an AUX input, or a headphone amplifier.
+The player reads up to 32 `.mp3` files from the top level of `/music` and sorts filenames alphabetically. It does not scan nested folders or playlists. The HW-261 shield handles MP3 decoding and provides a stereo headphone output, so this configuration does not need a separate microSD adapter or PCM5102A DAC. Use a separate amplifier for passive speakers.
 
 ## Hardware and card setup
 

@@ -1,17 +1,6 @@
 #include "MusicPlayer.h"
 #include <SPI.h>
 #include <SD.h>
-#include "Esp32Platform.h"
-
-#ifndef SD_MISO_PIN
-#define SD_MISO_PIN 19
-#define SD_CS_PIN 27
-#define SD_SCK_PIN 18
-#define SD_MOSI_PIN 23
-#define AUDIO_BCLK_PIN 14
-#define AUDIO_LRCLK_PIN 13
-#define AUDIO_DATA_PIN 4
-#endif
 
 namespace {
 constexpr uint32_t SD_SPI_HZ = 8000000UL;
@@ -19,25 +8,64 @@ constexpr uint32_t BUTTON_DEBOUNCE_MS = 35UL;
 constexpr uint32_t SCREEN_REFRESH_MS = 180UL;
 constexpr uint32_t RIGHT_HOLD_EXIT_MS = 900UL;
 constexpr const char *MUSIC_DIRECTORY = "/music";
+
+// GPIO connections for the HW-261 shield. These are ESP32 GPIO numbers;
+// the silk-screened D2/D6/D7/D8/D9/D11/D12/D13 numbers are Arduino Uno pins.
+constexpr uint8_t SD_CS_PIN = 27;          // Shield D9: TF-card chip select
+constexpr uint8_t SD_SCK_PIN = 18;          // Shield D13: SPI clock
+constexpr uint8_t SD_MISO_PIN = 19;         // Shield D12: SPI MISO
+constexpr uint8_t SD_MOSI_PIN = 23;         // Shield D11: SPI MOSI
+constexpr uint8_t VS1053_RESET_PIN = 4;     // Shield D8: X_RESET
+constexpr uint8_t VS1053_XDCS_PIN = 13;     // Shield D7: X_DCS
+constexpr uint8_t VS1053_XCS_PIN = 14;      // Shield D6: X_CS
+constexpr uint8_t VS1053_DREQ_PIN = 34;     // Shield D2: DREQ (input only is OK)
 }
 
 Esp32MusicPlayer::Esp32MusicPlayer(Adafruit_SSD1306 &display,
                                    uint8_t buttonLeft,
                                    uint8_t buttonSelect,
                                    uint8_t buttonRight,
-                                   uint8_t volumePin)
+                                   uint8_t volumeEncoderClk,
+                                   uint8_t volumeEncoderDt)
     : display_(display), buttonLeft_(buttonLeft), buttonSelect_(buttonSelect),
-      buttonRight_(buttonRight), volumePin_(volumePin), trackCount_(0),
-      selectedTrack_(0), spiStarted_(false), sdReady_(false),
-      playbackFinished_(false), gain_(0.0f), status_("STOPPED"),
-      source_(nullptr), decoder_(nullptr), output_(nullptr) {}
+      buttonRight_(buttonRight), volumeEncoderClk_(volumeEncoderClk),
+      volumeEncoderDt_(volumeEncoderDt),
+      codec_(VS1053_RESET_PIN, VS1053_XCS_PIN, VS1053_XDCS_PIN,
+             VS1053_DREQ_PIN, SD_CS_PIN),
+      trackCount_(0), selectedTrack_(0), encoderPreviousState_(0),
+      encoderTransitionCount_(0), lastVolumeAttenuation_(255),
+      spiStarted_(false), codecReady_(false), sdReady_(false),
+      playbackFinished_(false), volumeLevel_(0.55f), status_("STOPPED") {}
 
 bool Esp32MusicPlayer::initializeCard() {
   if (!spiStarted_) {
+    pinMode(SD_CS_PIN, OUTPUT);
+    digitalWrite(SD_CS_PIN, HIGH);
+    pinMode(volumeEncoderClk_, INPUT);
+    pinMode(volumeEncoderDt_, INPUT);
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     spiStarted_ = true;
+    encoderPreviousState_ =
+        (static_cast<uint8_t>(digitalRead(volumeEncoderClk_)) << 1) |
+        static_cast<uint8_t>(digitalRead(volumeEncoderDt_));
   }
-  if (!sdReady_) sdReady_ = SD.begin(SD_CS_PIN, SPI, SD_SPI_HZ);
+
+  if (!codecReady_) {
+    if (!codec_.begin()) {
+      status_ = "VS1053 NOT FOUND";
+      return false;
+    }
+    codecReady_ = true;
+    lastVolumeAttenuation_ = 255;
+    const uint8_t attenuation = volumeAttenuation();
+    codec_.setVolume(attenuation, attenuation);
+    lastVolumeAttenuation_ = attenuation;
+  }
+
+  if (!sdReady_) {
+    sdReady_ = SD.begin(SD_CS_PIN, SPI, SD_SPI_HZ);
+  }
+  if (!sdReady_) status_ = "SD CARD NOT READY";
   return sdReady_;
 }
 
@@ -90,59 +118,65 @@ String Esp32MusicPlayer::trackName(uint8_t index) const {
 }
 
 void Esp32MusicPlayer::stopPlayback(const char *status) {
-  if (decoder_) {
-    if (decoder_->isRunning()) decoder_->stop();
-    delete decoder_;
-    decoder_ = nullptr;
-  }
-  if (source_) {
-    source_->close();
-    delete source_;
-    source_ = nullptr;
-  }
-  if (output_) {
-    output_->stop();
-    delete output_;
-    output_ = nullptr;
-  }
+  if (codecReady_ && codec_.playingMusic) codec_.stopPlaying();
   status_ = status;
 }
 
 bool Esp32MusicPlayer::isPlaying() const {
-  return decoder_ && decoder_->isRunning();
+  return codecReady_ && codec_.playingMusic;
 }
 
 void Esp32MusicPlayer::startPlayback() {
-  if (trackCount_ == 0) return;
+  if (trackCount_ == 0 || !codecReady_) return;
   stopPlayback("OPENING TRACK");
-  source_ = new AudioFileSourceSD();
-  if (!source_ || !source_->open(tracks_[selectedTrack_].c_str())) {
-    stopPlayback("CANNOT OPEN FILE");
+  if (!codec_.startPlayingFile(tracks_[selectedTrack_].c_str())) {
+    status_ = "CANNOT OPEN FILE";
     return;
   }
-
-  output_ = new AudioOutputI2S();
-  if (!output_) {
-    stopPlayback("AUDIO OUT OF MEMORY");
-    return;
-  }
-  output_->SetPinout(AUDIO_BCLK_PIN, AUDIO_LRCLK_PIN, AUDIO_DATA_PIN);
-  output_->SetGain(gain_);
-
-  decoder_ = new AudioGeneratorMP3();
-  if (!decoder_ || !decoder_->begin(source_, output_)) {
-    stopPlayback("MP3 START FAILED");
-    return;
-  }
+  const uint8_t attenuation = volumeAttenuation();
+  codec_.setVolume(attenuation, attenuation);
+  lastVolumeAttenuation_ = attenuation;
   playbackFinished_ = false;
   status_ = "PLAYING";
 }
 
-void Esp32MusicPlayer::updateGain() {
-  const int raw = analogRead(volumePin_);
-  const int bounded = constrain(raw, 0, 1023);
-  gain_ = (static_cast<float>(bounded) / 1023.0f) * 0.90f;
-  if (output_) output_->SetGain(gain_);
+uint8_t Esp32MusicPlayer::volumeAttenuation() const {
+  // VS1053 volume bytes are attenuation: 0 is loudest and 255 is mute.
+  // A curved scale gives the encoder useful control over the listening range.
+  const float remaining = 1.0f - volumeLevel_;
+  int attenuation = static_cast<int>(remaining * remaining * 255.0f + 0.5f);
+  return static_cast<uint8_t>(constrain(attenuation, 0, 255));
+}
+
+void Esp32MusicPlayer::updateVolume() {
+  static const int8_t transitions[16] = {
+      0, -1, 1, 0, 1, 0, 0, -1,
+      -1, 0, 0, 1, 0, 1, -1, 0};
+  const uint8_t currentState =
+      (static_cast<uint8_t>(digitalRead(volumeEncoderClk_)) << 1) |
+      static_cast<uint8_t>(digitalRead(volumeEncoderDt_));
+  const uint8_t transition = (encoderPreviousState_ << 2) | currentState;
+  encoderTransitionCount_ += transitions[transition];
+  encoderPreviousState_ = currentState;
+
+  bool changed = false;
+  if (encoderTransitionCount_ >= 4) {
+    volumeLevel_ = min(0.95f, volumeLevel_ + 0.05f);
+    encoderTransitionCount_ = 0;
+    changed = true;
+  } else if (encoderTransitionCount_ <= -4) {
+    volumeLevel_ = max(0.0f, volumeLevel_ - 0.05f);
+    encoderTransitionCount_ = 0;
+    changed = true;
+  }
+
+  if (changed && codecReady_) {
+    const uint8_t attenuation = volumeAttenuation();
+    if (attenuation != lastVolumeAttenuation_) {
+      codec_.setVolume(attenuation, attenuation);
+      lastVolumeAttenuation_ = attenuation;
+    }
+  }
 }
 
 void Esp32MusicPlayer::drawPlayerScreen() const {
@@ -176,7 +210,7 @@ void Esp32MusicPlayer::drawPlayerScreen() const {
   display_.print(status_);
   display_.setCursor(0, 50);
   display_.print(F("VOL "));
-  const uint8_t bars = static_cast<uint8_t>(gain_ * 10.0f + 0.5f);
+  const uint8_t bars = static_cast<uint8_t>(volumeLevel_ * 10.0f + 0.5f);
   for (uint8_t i = 0; i < 10; ++i) display_.print(i < bars ? '|' : '.');
   display_.setCursor(0, 59);
   display_.print(F("D0 prev D1 play D2 next"));
@@ -200,7 +234,6 @@ void Esp32MusicPlayer::moveSelection(int8_t direction) {
 
 void Esp32MusicPlayer::run() {
   if (!initializeCard()) {
-    status_ = "SD CARD NOT READY";
     drawPlayerScreen();
     waitForButtonsReleased();
     while (digitalRead(buttonSelect_) == HIGH) delay(10);
@@ -209,7 +242,7 @@ void Esp32MusicPlayer::run() {
   }
   scanMusicDirectory();
   selectedTrack_ = trackCount_ == 0 ? 0 : selectedTrack_ % trackCount_;
-  updateGain();
+  updateVolume();
   drawPlayerScreen();
   waitForButtonsReleased();
 
@@ -219,17 +252,19 @@ void Esp32MusicPlayer::run() {
   bool rightHoldExited = false;
   uint32_t rightDownAt = 0;
   uint32_t lastDrawAt = 0;
-  uint32_t lastGainAt = 0;
+  uint32_t lastVolumeAt = 0;
 
   while (true) {
     const uint32_t now = millis();
-    if (isPlaying() && !decoder_->loop()) {
-      stopPlayback("FINISHED");
+    const bool wasPlaying = isPlaying();
+    if (wasPlaying) codec_.feedBuffer();
+    if (wasPlaying && !isPlaying()) {
+      status_ = "FINISHED";
       playbackFinished_ = true;
     }
-    if (now - lastGainAt >= 80UL) {
-      updateGain();
-      lastGainAt = now;
+    if (now - lastVolumeAt >= 4UL) {
+      updateVolume();
+      lastVolumeAt = now;
     }
 
     const bool left = digitalRead(buttonLeft_);

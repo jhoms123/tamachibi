@@ -2,9 +2,9 @@ Tamachibi v47 ESP32-WROOM-32U breakout port
 
 - Copied the complete v47 .cpp/.h game implementation into a separate ESP32 target folder.
 - Replaced RP2040 EEPROM/clock wrappers with ESP32-compatible wrappers.
-- Reassigned the two I2C buses, buttons, piezo, dial, SD SPI, and I2S pins for the reference classic ESP32-WROOM-32U breakout.
+- Reassigned the two I2C buses, buttons, piezo, rotary encoder, SD SPI, and VS1053 control pins for the reference classic ESP32-WROOM-32U breakout.
 - Replaced Arduino-Pico buzzer PWM calls with a helper covering Arduino-ESP32 core 2.x and 3.x.
-- Added a separate Music Player action that indexes up to 32 MP3 tracks from /music and sends decoded audio over I2S.
+- Added a separate Music Player action that indexes up to 32 MP3 tracks from /music and streams them to the HW-261 VS1053 shield over SPI.
 - Preserved the original Music rhythm mini-game and v47 game systems.
-- Added PlatformIO project configuration and hardware/card setup guides.
+- Added PlatformIO project configuration and hardware/card setup guides, including the shield's UNO-to-ESP32 GPIO mapping.
 - The optional battery monitor remains disabled; the charger/boost hardware must be identified before a final power diagram can be confirmed.
