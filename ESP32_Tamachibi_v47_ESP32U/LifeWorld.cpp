@@ -103,14 +103,14 @@ const uint8_t ACTION_TALK = 19;
 const uint8_t ACTION_CRAFT = 25;
 const uint8_t ACTION_FAMILY = 28;
 
-void rightText(Adafruit_SSD1306 &d, int right, int y, const char *text) {
+void rightText(GameDisplay &d, int right, int y, const char *text) {
   int w = static_cast<int>(strlen(text)) * 6;
   d.setCursor(max(0, right - w), y);
   d.print(text);
 }
 }
 
-LifeWorldSystem::LifeWorldSystem(size_t storageBase, Adafruit_SSD1306 &display,
+LifeWorldSystem::LifeWorldSystem(size_t storageBase, GameDisplay &display,
                                  uint8_t buttonLeft, uint8_t buttonSelect,
                                  uint8_t buttonRight)
     : storeA_(storageBase), storeB_(storageBase + sizeof(LifeWorldSave)),

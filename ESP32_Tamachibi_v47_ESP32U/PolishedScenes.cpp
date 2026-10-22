@@ -529,17 +529,17 @@ const uint8_t *const HOUSE_SCENES[POLISHED_HOUSE_SCENE_COUNT] = {
 };
 }
 
-void drawPolishedCityScene(Adafruit_SSD1306 &display, uint8_t place) {
+void drawPolishedCityScene(GameDisplay &display, uint8_t place) {
   display.drawBitmap(0, POLISHED_SCENE_Y, CITY_SCENES[place % POLISHED_CITY_SCENE_COUNT],
                      POLISHED_SCENE_W, POLISHED_SCENE_H, SSD1306_WHITE);
 }
 
-void drawPolishedHouseScene(Adafruit_SSD1306 &display, uint8_t room) {
+void drawPolishedHouseScene(GameDisplay &display, uint8_t room) {
   display.drawBitmap(0, POLISHED_SCENE_Y, HOUSE_SCENES[room % POLISHED_HOUSE_SCENE_COUNT],
                      POLISHED_SCENE_W, POLISHED_SCENE_H, SSD1306_WHITE);
 }
 
-void drawPolishedInteriorShell(Adafruit_SSD1306 &display, uint8_t style) {
+void drawPolishedInteriorShell(GameDisplay &display, uint8_t style) {
   // Consistent room architecture for the normal pet room and resident visits.
   // It deliberately leaves the center open for the 32x32 creature sprite.
   display.drawLine(0, 58, 127, 58, SSD1306_WHITE);

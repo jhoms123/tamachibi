@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint8_t AQUARIUM_FISH_SLOTS = 4;
@@ -39,7 +39,7 @@ struct AquariumSave {
 
 class AquariumSystem {
 public:
-  AquariumSystem(size_t storageBase, Adafruit_SSD1306 &display,
+  AquariumSystem(size_t storageBase, GameDisplay &display,
                  uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -69,7 +69,7 @@ public:
 private:
   Esp32EEPROMStorage<AquariumSave> storeA_;
   Esp32EEPROMStorage<AquariumSave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
 
   uint32_t sequence_;

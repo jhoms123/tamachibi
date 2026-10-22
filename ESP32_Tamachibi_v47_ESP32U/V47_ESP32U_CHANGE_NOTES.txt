@@ -10,3 +10,7 @@ Tamachibi v47 ESP32-WROOM-32U breakout port
 - Preserved the original Music rhythm mini-game and v47 game systems.
 - Added PlatformIO configuration and hardware/card setup guides.
 - The optional battery monitor remains disabled; the charger/boost hardware must be identified before its exact wiring can be confirmed.
+- Switched the main panel to a 128×128 SH1107 OLED using Adafruit SH110X; the separate 128×32 status display remains SSD1306.
+- Added a 128×128 home room, pet view, activity picker, splash screen, and I²C address detection for 0x3C/0x3D.
+- Added a lightweight legacy-display adapter so the existing 128×64 mini-games and activity pages fill the taller panel.
+- Kept original roster art and created new room and UI art from vector drawing primitives; no external image assets need to be copied to the SD card.

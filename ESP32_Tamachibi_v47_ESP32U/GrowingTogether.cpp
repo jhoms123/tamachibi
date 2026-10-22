@@ -117,7 +117,7 @@ void appendNumber(char *out, size_t outSize, int value) {
 } // namespace
 
 GrowingTogetherSystem::GrowingTogetherSystem(size_t storageBase,
-                                             Adafruit_SSD1306 &display,
+                                             GameDisplay &display,
                                              uint8_t buttonLeft,
                                              uint8_t buttonSelect,
                                              uint8_t buttonRight)

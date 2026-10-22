@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 #include "Esp32Platform.h"
 
 constexpr uint8_t BOTANY_GARDEN_PLOTS = 4;
@@ -41,7 +41,7 @@ struct BotanySave {
 
 class BotanySystem {
 public:
-  BotanySystem(size_t storageBase, Adafruit_SSD1306 &display,
+  BotanySystem(size_t storageBase, GameDisplay &display,
                uint8_t buttonLeft, uint8_t buttonSelect, uint8_t buttonRight);
 
   void reset();
@@ -95,7 +95,7 @@ public:
 private:
   Esp32EEPROMStorage<BotanySave> storeA_;
   Esp32EEPROMStorage<BotanySave> storeB_;
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
 
   uint32_t sequence_;

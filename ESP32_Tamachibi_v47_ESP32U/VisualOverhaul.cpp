@@ -2,27 +2,28 @@
 
 namespace {
 
-void printTwoDigits(Adafruit_SSD1306 &display, uint8_t value) {
+void printTwoDigits(GameDisplay &display, uint8_t value) {
   if (value < 10) display.print('0');
   display.print(value);
 }
 
-void drawWorldIcon(Adafruit_SSD1306 &display, uint8_t icon, int x, int y) {
+void drawWorldIcon(GameDisplay &display, uint8_t icon, int x, int y) {
+  const uint16_t ink = SSD1306_BLACK;
   if (icon == 0) {  // pet face
-    display.drawRoundRect(x, y + 1, 8, 6, 2, SSD1306_WHITE);
-    display.drawPixel(x + 2, y + 3, SSD1306_WHITE);
-    display.drawPixel(x + 5, y + 3, SSD1306_WHITE);
+    display.drawRoundRect(x, y + 1, 8, 6, 2, ink);
+    display.drawPixel(x + 2, y + 3, ink);
+    display.drawPixel(x + 5, y + 3, ink);
   } else if (icon == 1) {  // house
-    display.drawTriangle(x, y + 4, x + 4, y, x + 8, y + 4, SSD1306_WHITE);
-    display.drawRect(x + 1, y + 4, 7, 4, SSD1306_WHITE);
+    display.drawTriangle(x, y + 4, x + 4, y, x + 8, y + 4, ink);
+    display.drawRect(x + 1, y + 4, 7, 4, ink);
   } else {  // city
-    display.drawRect(x, y + 3, 3, 5, SSD1306_WHITE);
-    display.drawRect(x + 4, y + 1, 4, 7, SSD1306_WHITE);
-    display.drawPixel(x + 5, y + 3, SSD1306_WHITE);
+    display.drawRect(x, y + 3, 3, 5, ink);
+    display.drawRect(x + 4, y + 1, 4, 7, ink);
+    display.drawPixel(x + 5, y + 3, ink);
   }
 }
 
-void drawWindowWeather(Adafruit_SSD1306 &display, int x, int y, uint8_t hour, uint8_t weather, uint8_t anim) {
+void drawWindowWeather(GameDisplay &display, int x, int y, uint8_t hour, uint8_t weather, uint8_t anim) {
   display.drawRect(x, y, 22, 15, SSD1306_WHITE);
   display.drawLine(x + 11, y, x + 11, y + 15, SSD1306_WHITE);
   display.drawLine(x, y + 7, x + 22, y + 7, SSD1306_WHITE);
@@ -57,7 +58,7 @@ void drawWindowWeather(Adafruit_SSD1306 &display, int x, int y, uint8_t hour, ui
   }
 }
 
-void drawThickShell(Adafruit_SSD1306 &display, uint8_t hour, bool lightsOn) {
+void drawThickShell(GameDisplay &display, uint8_t hour, bool lightsOn) {
   // Thick cutaway architecture: ceiling beam, side posts, baseboard and floor.
   display.fillRect(0, 9, 128, 3, SSD1306_WHITE);
   display.fillRect(0, 9, 4, 46, SSD1306_WHITE);
@@ -79,7 +80,7 @@ void drawThickShell(Adafruit_SSD1306 &display, uint8_t hour, bool lightsOn) {
   }
 }
 
-void drawThemeEdgeProps(Adafruit_SSD1306 &display, uint8_t theme, uint8_t anim) {
+void drawThemeEdgeProps(GameDisplay &display, uint8_t theme, uint8_t anim) {
   switch (theme % 10) {
     case 0:  // starter cottage
       display.drawRoundRect(7, 39, 24, 10, 4, SSD1306_WHITE);
@@ -140,7 +141,7 @@ void drawThemeEdgeProps(Adafruit_SSD1306 &display, uint8_t theme, uint8_t anim) 
   }
 }
 
-void drawRoomSpecificProps(Adafruit_SSD1306 &display, uint8_t room, uint8_t anim, bool familyLayout) {
+void drawRoomSpecificProps(GameDisplay &display, uint8_t room, uint8_t anim, bool familyLayout) {
   if (room == 0) {  // bedroom/living room
     if (familyLayout) {
       // When a spouse or child is present, furniture hugs the walls and the
@@ -211,51 +212,54 @@ void drawRoomSpecificProps(Adafruit_SSD1306 &display, uint8_t room, uint8_t anim
 
 namespace V46UI {
 
-void drawHeader(Adafruit_SSD1306 &display,
+void drawHeader(GameDisplay &display,
                 const __FlashStringHelper *title,
                 uint8_t hour,
                 uint8_t minute,
                 bool showAlert,
                 uint8_t worldIcon) {
-  display.fillRect(0, 0, 128, HEADER_H, SSD1306_BLACK);
-  display.drawLine(0, HEADER_H - 1, 127, HEADER_H - 1, SSD1306_WHITE);
+  display.fillRoundRect(2, 0, 124, HEADER_H, 3, SSD1306_WHITE);
   drawWorldIcon(display, worldIcon, 1, 0);
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK);
   display.setCursor(12, 0);
   display.print(title);
-  display.setCursor(91, 0);
-  uint8_t shown = hour % 12;
-  if (shown == 0) shown = 12;
-  display.print(shown);
-  display.print(':');
-  printTwoDigits(display, minute);
+  int16_t x1 = 0, y1 = 0;
+  uint16_t titleWidth = 0, titleHeight = 0;
+  display.getTextBounds(title, 0, 0, &x1, &y1, &titleWidth, &titleHeight);
+  if (titleWidth <= 76) {
+    display.setCursor(91, 0);
+    uint8_t shown = hour % 12;
+    if (shown == 0) shown = 12;
+    display.print(shown);
+    display.print(':');
+    printTwoDigits(display, minute);
+  }
   if (showAlert) {
-    display.fillCircle(124, 3, 3, SSD1306_WHITE);
-    display.setTextColor(SSD1306_BLACK);
+    display.fillCircle(124, 4, 3, SSD1306_BLACK);
+    display.setTextColor(SSD1306_WHITE);
     display.setCursor(122, 0);
     display.print('!');
-    display.setTextColor(SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
   }
 }
 
-void drawFooter(Adafruit_SSD1306 &display,
+void drawFooter(GameDisplay &display,
                 const __FlashStringHelper *left,
                 const __FlashStringHelper *center,
                 const __FlashStringHelper *right) {
-  display.fillRect(0, FOOTER_Y, 128, 9, SSD1306_BLACK);
-  display.drawLine(0, FOOTER_Y, 127, FOOTER_Y, SSD1306_WHITE);
+  display.fillRoundRect(2, FOOTER_Y, 124, 9, 3, SSD1306_WHITE);
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(1, FOOTER_Y + 1);
+  display.setTextColor(SSD1306_BLACK);
+  display.setCursor(2, FOOTER_Y + 1);
   display.print(left);
-  display.setCursor(48, FOOTER_Y + 1);
+  display.setCursor(43, FOOTER_Y + 1);
   display.print(center);
-  display.setCursor(94, FOOTER_Y + 1);
+  display.setCursor(86, FOOTER_Y + 1);
   display.print(right);
 }
 
-void drawCarouselFrame(Adafruit_SSD1306 &display,
+void drawCarouselFrame(GameDisplay &display,
                        uint8_t selected,
                        uint8_t total,
                        bool locked,
@@ -288,7 +292,7 @@ void drawCarouselFrame(Adafruit_SSD1306 &display,
   }
 }
 
-void drawCutawayRoom(Adafruit_SSD1306 &display,
+void drawCutawayRoom(GameDisplay &display,
                      uint8_t room,
                      uint8_t theme,
                      uint8_t hour,
@@ -302,7 +306,7 @@ void drawCutawayRoom(Adafruit_SSD1306 &display,
   drawRoomSpecificProps(display, room, anim, familyLayout);
 }
 
-void drawPetRoomBackdrop(Adafruit_SSD1306 &display,
+void drawPetRoomBackdrop(GameDisplay &display,
                          uint8_t theme,
                          uint8_t hour,
                          uint8_t weather,
@@ -314,7 +318,7 @@ void drawPetRoomBackdrop(Adafruit_SSD1306 &display,
   display.drawLine(45, 49, 83, 49, SSD1306_WHITE);
 }
 
-void clearCharacterZone(Adafruit_SSD1306 &display,
+void clearCharacterZone(GameDisplay &display,
                         int16_t x,
                         int16_t y,
                         int16_t w,
@@ -324,7 +328,7 @@ void clearCharacterZone(Adafruit_SSD1306 &display,
   if (outline) display.drawRoundRect(x, y, w, h, 6, SSD1306_WHITE);
 }
 
-void drawNotificationToast(Adafruit_SSD1306 &display,
+void drawNotificationToast(GameDisplay &display,
                            const __FlashStringHelper *text,
                            uint8_t icon,
                            uint8_t anim) {
@@ -340,7 +344,7 @@ void drawNotificationToast(Adafruit_SSD1306 &display,
   display.print(text);
 }
 
-void drawTimeline(Adafruit_SSD1306 &display,
+void drawTimeline(GameDisplay &display,
                   uint8_t wakeHour,
                   uint8_t startHour,
                   uint8_t endHour,
@@ -373,7 +377,7 @@ void drawTimeline(Adafruit_SSD1306 &display,
   display.setCursor(99, 47); display.print(F("BED"));
 }
 
-void playCheckerTransition(Adafruit_SSD1306 &display,
+void playCheckerTransition(GameDisplay &display,
                            bool reducedMotion,
                            uint8_t direction) {
   if (reducedMotion) return;

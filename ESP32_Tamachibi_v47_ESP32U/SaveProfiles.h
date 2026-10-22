@@ -1,11 +1,11 @@
 #pragma once
 
 #include <Arduino.h>
-#include <Adafruit_SSD1306.h>
+#include "GameDisplay.h"
 
 class SaveProfileManager {
 public:
-  SaveProfileManager(Adafruit_SSD1306 &display, uint8_t buttonLeft,
+  SaveProfileManager(GameDisplay &display, uint8_t buttonLeft,
                      uint8_t buttonSelect, uint8_t buttonRight);
   bool begin();
   void runMenu();
@@ -15,7 +15,7 @@ public:
   bool filesystemReady() const { return ready_; }
 
 private:
-  Adafruit_SSD1306 &display_;
+  GameDisplay &display_;
   uint8_t btnL_, btnS_, btnR_;
   bool ready_;
   uint8_t activeProfile_;

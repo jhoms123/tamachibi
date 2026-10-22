@@ -762,7 +762,7 @@ const uint8_t PROGMEM INDOOR_GROWTH_SPRITES[10][5][48] = {
   }
 };
 
-void drawBottomBotanyStatus(Adafruit_SSD1306 &display,
+void drawBottomBotanyStatus(GameDisplay &display,
                             const __FlashStringHelper *name,
                             uint8_t water, uint8_t health) {
   // The name is kept in a 72-pixel column. Water and health are printed in
@@ -779,7 +779,7 @@ void drawBottomBotanyStatus(Adafruit_SSD1306 &display,
 }
 }
 
-BotanySystem::BotanySystem(size_t storageBase, Adafruit_SSD1306 &display,
+BotanySystem::BotanySystem(size_t storageBase, GameDisplay &display,
                            uint8_t buttonLeft, uint8_t buttonSelect,
                            uint8_t buttonRight)
     : storeA_(storageBase), storeB_(storageBase + sizeof(BotanySave)),
