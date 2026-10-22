@@ -1,4 +1,5 @@
 #include "CityWorld.h"
+#include "NativeUI.h"
 #include "PolishedScenes.h"
 #include <stddef.h>
 #include <string.h>
@@ -37,11 +38,6 @@ const uint8_t RESIDENT_SPECIES[CITY_RESIDENT_COUNT] = {
   2, 8, 19, 29, 42, 43, 48, 38
 };
 
-void printRight(GameDisplay &display, int right, int y, const char *text) {
-  const int width = static_cast<int>(strlen(text)) * 6;
-  display.setCursor(max(0, right - width + 1), y);
-  display.print(text);
-}
 }
 
 CityWorldSystem::CityWorldSystem(size_t storageBase, GameDisplay &display,
@@ -326,29 +322,12 @@ void CityWorldSystem::drawRoomFurniture(uint8_t style) const {
   }
 }
 
-void CityWorldSystem::drawResidentRoom(uint8_t id, uint8_t frame, bool showFooter) const {
-  id %= CITY_RESIDENT_COUNT;
-  display_.clearDisplay();
-  display_.setTextWrap(false);
-  display_.setTextSize(1);
-  display_.setTextColor(SSD1306_WHITE);
-  display_.setCursor(2, 0);
-  display_.print(residentName(id));
-  display_.setCursor(83, 0);
-  display_.print(F("ROOM"));
-  drawRoomFurniture(residentRoomStyle(id));
-  drawCurrentPetTiny(39, 31 + ((frame / 6) & 1));
-  drawResidentTiny(id, 73, 31 + ((frame / 7) & 1), (frame / 8) & 1);
-  display_.drawLine(62, 34, 66, 34, SSD1306_WHITE);
-  display_.drawPixel(64, 32, SSD1306_WHITE);
-  if (showFooter) {
-    char relationText[10];
-    snprintf(relationText, sizeof(relationText), "REL %u", relation_[id]);
-    display_.fillRect(0, 55, 128, 9, SSD1306_BLACK);
-    display_.setCursor(1, 56);
-    display_.print(F("VISITING"));
-    printRight(display_, 126, 56, relationText);
-  }
+void CityWorldSystem::drawResidentRoom(uint8_t id,uint8_t frame,bool showFooter) const {
+  id%=CITY_RESIDENT_COUNT;NativeUI::Scope native(display_);display_.clearDisplay();NativeUI::header(display_,residentName(id),"VISIT");
+  NativeUI::room(display_,0,residentRoomStyle(id),visualHour(),frame);drawCurrentPetTiny(48,64);
+  NativeUI::pet(display_,72,78,residentSpecies(id),4,frame);
+  NativeUI::text(display_,"FRIENDSHIP",5,104,60);NativeUI::meter(display_,71,105,52,relation_[id],100);
+  if(showFooter)NativeUI::footer(display_,"PREV","TALK","NEXT");
 }
 
 void CityWorldSystem::changeRelation(uint8_t id, int amount) {
@@ -463,14 +442,9 @@ void CityWorldSystem::residentInteractionMenu() {
 
     oldL = l; oldS = s; oldR = r;
     drawResidentRoom(selectedResident_, frame++, false);
-    display_.fillRoundRect(16, 51, 96, 13, 4, SSD1306_BLACK);
-    display_.drawRoundRect(16, 51, 96, 13, 4, SSD1306_WHITE);
-    display_.setCursor(31, 54);
-    if (pick == 0) display_.print(F("CHAT"));
-    else if (pick == 1) display_.print(F("PLAY TOGETHER"));
-    else if (pick == 2) display_.print(F("GIVE GIFT $3"));
-    else if (relation_[selectedResident_] >= 80) display_.print(F("MARRY / MOVE IN"));
-    else display_.print(F("DATE / PROPOSE"));
+    display_.fillRect(3,101,122,12,SSD1306_BLACK);
+    const char *label=pick==0?"CHAT":pick==1?"PLAY TOGETHER":pick==2?"GIVE GIFT $3":relation_[selectedResident_]>=80?"MARRY / MOVE IN":"DATE / PROPOSE";
+    NativeUI::text(display_,label,7,104,114);NativeUI::footer(display_,"PREV","CHOOSE","NEXT");
     display_.display();
     delay(70);
   }

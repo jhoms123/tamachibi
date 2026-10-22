@@ -8,26 +8,27 @@ This map assumes a classic ESP32-WROOM-32U development breakout. GPIO numbers ar
 |---|---|---:|
 | Main 128×128 SH1107 OLED | SDA / SCL | GPIO21 / GPIO22 |
 | Side 128×32 SSD1306 OLED | SDA / SCL | GPIO16 / GPIO17 |
-| Left / select / right buttons | one side of each switch | GPIO32 / GPIO33 / GPIO25 respectively |
-| Left / select / right buttons | other side of each switch | GND |
+| Optional left button (D0) | one side of switch | GPIO32 |
+| Existing button (Select / D1) | one side of switch | GPIO33 |
+| Optional left / existing select buttons | other side of each switch | GND |
 | Passive piezo | positive | GPIO26 |
 | Passive piezo | negative | GND |
 | Rotary encoder module | CLK | GPIO35 |
 | Rotary encoder module | DT | VN (GPIO39) |
+| Rotary encoder module | SW (push switch) | GPIO25 (Right / D2) |
 | Rotary encoder module | `+` | 3V3 |
 | Rotary encoder module | GND | common GND |
-| Rotary encoder module | SW | leave unconnected; firmware does not use the push switch |
 | Separate SPI microSD adapter | CS | GPIO27 |
 | Separate SPI microSD adapter | SCK | GPIO18 |
 | Separate SPI microSD adapter | MOSI | GPIO23 |
 | Separate SPI microSD adapter | MISO | GPIO19 |
 | I²S audio board, when selected | BCLK / LRCLK / DATA | GPIO14 / GPIO13 / GPIO4 |
 
-Wire the main screen's four pins as follows: **GND → GND, VCC → 3V3, SCL → GPIO22, SDA → GPIO21**. Keep the panel on 3.3V logic. The firmware uses Adafruit's open-source SH110X driver for the 128×128 SH1107 panel, and detects its address at `0x3C` or `0x3D`. The small status OLED remains on I²C pins GPIO16/GPIO17 and uses the SSD1306 driver. Both OLEDs may use address `0x3C` because they are on separate I²C buses. Each button is wired between its GPIO and GND; the firmware enables the ESP32 pull-up.
+Wire the main screen's four pins as follows: **GND → GND, VCC → 3V3, SCL → GPIO22, SDA → GPIO21**. Keep the panel on 3.3V logic. The firmware uses Adafruit's open-source SH110X driver for the 128×128 SH1107 panel, and detects its address at `0x3C` or `0x3D`. The small status OLED remains on I²C pins GPIO16/GPIO17 and uses the SSD1306 driver. Both OLEDs may use address `0x3C` because they are on separate I²C buses. For your two-control setup, wire the existing button between GPIO33 and GND for Select/D1, and the encoder SW between GPIO25 and GND for Right/D2. GPIO32 is the optional Left/D0 button. The firmware enables pull-ups for each switch input.
 
-The main display is assumed to use an SH1107 controller, as used by common 1.5-inch 128×128 OLED modules. If the I²C scan finds the module but the image remains blank or corrupted, check the controller marking on the back of the panel; some visually similar 128×128 modules use a different controller and need a different driver.
+The supplied photo confirms the main module as **MC01506, Driver: SH1107, Dots: 128×128**. The printed 0x78 / 0x7A address options are the 8-bit forms of the 7-bit 0x3C / 0x3D addresses used by the firmware. Leave the address jumper unchanged; the firmware checks both.
 
-The pictured black control is a **rotary encoder**, not an analog potentiometer. On your ESP32 board, GPIO39 is printed as `VN`; connect the encoder's DT wire to the header pin labeled `VN`. Espressif lists `SENSOR_VN` as GPIO39. In the main game the encoder cycles Pet / House / City; on the Music Player screen it changes volume. GPIO35 and GPIO39 are input-only and have no internal pull-ups, so connect the encoder's `+` to 3V3 and use its onboard pull-ups or add a 10 kΩ pull-up from each of CLK and DT to 3V3. Never power the encoder from 5V or feed 5V to an ESP32 GPIO. If turning it clockwise lowers the volume or cycles views backward, swap CLK and DT.
+The pictured black control is a **rotary encoder**, not an analog potentiometer. On your ESP32 board, GPIO39 is printed as `VN`; connect the encoder's DT wire to the header pin labeled `VN`. Espressif lists `SENSOR_VN` as GPIO39. In the main game the encoder cycles Pet / House / City; on the Music Player screen it changes volume. Pressing the encoder shaft acts as the Right/D2 button on GPIO25, including the hold-to-exit action. GPIO35 and GPIO39 are input-only and have no internal pull-ups, so connect the encoder's `+` to 3V3 and use its onboard pull-ups or add a 10 kΩ pull-up from each of CLK and DT to 3V3. Never power the encoder from 5V or feed 5V to an ESP32 GPIO. If turning it clockwise lowers the volume or cycles views backward, swap CLK and DT.
 
 ## Separate microSD adapter shown in your photo
 

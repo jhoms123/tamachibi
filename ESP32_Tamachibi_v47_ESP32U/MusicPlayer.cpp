@@ -1,4 +1,5 @@
 #include "MusicPlayer.h"
+#include "NativeUI.h"
 #include <SPI.h>
 #include <SD.h>
 #include "Esp32Platform.h"
@@ -172,41 +173,13 @@ void Esp32MusicPlayer::updateGain() {
 }
 
 void Esp32MusicPlayer::drawPlayerScreen() const {
-  display_.clearDisplay();
-  display_.setTextSize(1);
-  display_.setTextColor(SSD1306_WHITE);
-  display_.setTextWrap(false);
-  display_.setCursor(0, 0);
-  display_.print(F("SD MUSIC"));
-  display_.setCursor(83, 0);
-  if (trackCount_ > 0) {
-    display_.print(selectedTrack_ + 1);
-    display_.print('/');
-    display_.print(trackCount_);
-  }
-  display_.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-  if (trackCount_ > 0) {
-    String label = trackName(selectedTrack_);
-    if (label.length() > 20) label = label.substring(0, 20);
-    display_.setCursor(0, 17);
-    display_.print(label);
-  } else {
-    display_.setCursor(0, 18);
-    display_.print(F("Add .mp3 files to"));
-    display_.setCursor(0, 29);
-    display_.print(MUSIC_DIRECTORY);
-  }
-
-  display_.setCursor(0, 39);
-  display_.print(status_);
-  display_.setCursor(0, 50);
-  display_.print(F("VOL "));
-  const uint8_t bars = static_cast<uint8_t>(gain_ * 10.0f + 0.5f);
-  for (uint8_t i = 0; i < 10; ++i) display_.print(i < bars ? '|' : '.');
-  display_.setCursor(0, 59);
-  display_.print(F("D0 prev D1 play D2 next"));
-  display_.display();
+  NativeUI::Scope frame(display_);display_.clearDisplay();char counter[12];snprintf(counter,sizeof(counter),"%u/%u",trackCount_?selectedTrack_+1:0,trackCount_);
+  NativeUI::header(display_,"MUSIC",counter);NativeUI::icon(display_,6,56,25);
+  String name=trackCount_?trackName(selectedTrack_):String("Add MP3 files to /music");
+  NativeUI::paragraph(display_,name.c_str(),7,50,114,2);
+  NativeUI::text(display_,status_.c_str(),7,78,114);
+  NativeUI::text(display_,"VOL",7,101,18);NativeUI::meter(display_,32,102,91,static_cast<int>(gain_*100),90);
+  NativeUI::footer(display_,"PREV",isPlaying()?"PAUSE":"PLAY","NEXT");display_.display();
 }
 
 void Esp32MusicPlayer::waitForButtonsReleased() const {

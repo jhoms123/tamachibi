@@ -1,4 +1,5 @@
 #include "Botany.h"
+#include "NativeUI.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -1141,106 +1142,44 @@ void BotanySystem::drawIndoorCatalogSprite(uint8_t species, int x, int baseY,
   drawIndoorSprite(species, x, baseY, min(static_cast<uint8_t>(4), stage), false);
 }
 
-void BotanySystem::drawCropSprite(uint8_t species, int x, int groundY,
-                                  uint8_t stage, bool unhealthy) const {
-  const uint8_t safeSpecies = species % BOTANY_CROP_COUNT;
-  const uint8_t safeStage = min(static_cast<uint8_t>(4), stage);
-  display_.drawBitmap(x - 8, groundY - 23,
-                      &CROP_GROWTH_SPRITES[safeSpecies][safeStage][0],
-                      PLANT_SPRITE_W, PLANT_SPRITE_H, SSD1306_WHITE);
-
-  // A small wilt marker sits beside the sprite instead of drawing a slash
-  // through the artwork.
-  if (unhealthy) {
-    display_.drawCircle(x + 7, groundY - 21, 2, SSD1306_WHITE);
-    display_.drawPixel(x + 7, groundY - 22, SSD1306_WHITE);
-    display_.drawPixel(x + 7, groundY - 19, SSD1306_WHITE);
-  }
+void BotanySystem::drawCropSprite(uint8_t species,int x,int baseY,uint8_t stage,bool unhealthy) const {
+ NativeUI::plant(display_,x-8,baseY-21,species,stage,unhealthy);
 }
 
-void BotanySystem::drawIndoorSprite(uint8_t species, int x, int baseY,
-                                    uint8_t stage, bool unhealthy) const {
-  const uint8_t safeSpecies = species % BOTANY_INDOOR_COUNT;
-  const uint8_t safeStage = min(static_cast<uint8_t>(4), stage);
-  display_.drawBitmap(x - 8, baseY - 23,
-                      &INDOOR_GROWTH_SPRITES[safeSpecies][safeStage][0],
-                      PLANT_SPRITE_W, PLANT_SPRITE_H, SSD1306_WHITE);
-
-  if (unhealthy) {
-    display_.drawCircle(x + 7, baseY - 21, 2, SSD1306_WHITE);
-    display_.drawPixel(x + 7, baseY - 22, SSD1306_WHITE);
-    display_.drawPixel(x + 7, baseY - 19, SSD1306_WHITE);
-  }
+void BotanySystem::drawIndoorSprite(uint8_t species,int x,int baseY,uint8_t stage,bool unhealthy) const {
+ NativeUI::plant(display_,x-8,baseY-21,species+3,stage,unhealthy);
 }
 
 void BotanySystem::drawGardenOverview(uint8_t frame) const {
-  display_.clearDisplay();
-  display_.setTextWrap(false);
-  display_.setTextSize(1);
-  display_.setTextColor(SSD1306_WHITE);
-  display_.setCursor(42, 0); display_.print(F("GARDEN"));
-  display_.drawLine(0, 49, 127, 49, SSD1306_WHITE);
-  display_.drawCircle(112, 12, 5, SSD1306_WHITE);
-  for (uint8_t i = 0; i < gardenCapacity_; ++i) {
-    const int x = 16 + i * 31;
-    display_.drawLine(x - 12, 50, x + 12, 50, SSD1306_WHITE);
-    display_.drawLine(x - 10, 53, x + 10, 53, SSD1306_WHITE);
-    if (cropSpecies_[i] == EMPTY_PLANT) {
-      display_.drawPixel(x, 45, SSD1306_WHITE);
-    } else {
-      const bool bad = cropHealth_[i] <= 4 || cropWater_[i] <= 1;
-      drawCropSprite(cropSpecies_[i], x, 49, cropStage(i), bad);
-      if (cropReady(i) && ((frame / 4 + i) & 1) == 0) display_.drawPixel(x + 8, 19, SSD1306_WHITE);
-    }
-    if (i == selectedGarden_) {
-      display_.drawLine(x - 5, 53, x + 5, 53, SSD1306_WHITE);
-      display_.drawPixel(x, 52, SSD1306_WHITE);
-    }
+  (void)frame;NativeUI::Scope native(display_);display_.clearDisplay();
+  char counter[12];snprintf(counter,sizeof(counter),"%u/%u",selectedGarden_+1,gardenCapacity_);NativeUI::header(display_,"GARDEN",counter);
+  const uint8_t page=selectedGarden_/4;
+  for(uint8_t local=0;local<4;++local){uint8_t i=page*4+local;if(i>=gardenCapacity_)break;
+    int x=11+(local%2)*59,y=24+(local/2)*34;bool active=i==selectedGarden_;
+    display_.drawRoundRect(x,y,47,30,3,SSD1306_WHITE);
+    if(active){display_.drawFastHLine(x+2,y+28,43,SSD1306_WHITE);display_.drawPixel(x+3,y+3,SSD1306_WHITE);}
+    uint8_t sp=cropSpecies_[i];NativeUI::plant(display_,x+15,y+3,sp==EMPTY_PLANT?0:sp,sp==EMPTY_PLANT?0:cropStage(i),sp!=EMPTY_PLANT&&cropHealth_[i]<=4);
   }
-  if (cropSpecies_[selectedGarden_] == EMPTY_PLANT) {
-    display_.fillRect(0, 55, 128, 9, SSD1306_BLACK);
-    display_.setCursor(0, 56);
-    display_.print(F("Empty plot"));
-  } else {
-    drawBottomBotanyStatus(display_, cropName(cropSpecies_[selectedGarden_]),
-                            cropWater_[selectedGarden_],
-                            cropHealth_[selectedGarden_]);
-  }
+  NativeUI::text(display_,cropSpecies_[selectedGarden_]==EMPTY_PLANT?F("Empty planter"):cropName(cropSpecies_[selectedGarden_]),7,94,114);
+  NativeUI::text(display_,"W",7,105,6);NativeUI::meter(display_,17,105,43,cropWater_[selectedGarden_]);
+  NativeUI::text(display_,"H",70,105,6);NativeUI::meter(display_,80,105,43,cropHealth_[selectedGarden_]);
+  NativeUI::footer(display_,"PREV","TEND","NEXT");
 }
 
 void BotanySystem::drawPlantRoomOverview(uint8_t frame) const {
-  display_.clearDisplay();
-  display_.setTextWrap(false);
-  display_.setTextSize(1);
-  display_.setTextColor(SSD1306_WHITE);
-  display_.setCursor(31, 0); display_.print(F("PLANT ROOM"));
-  display_.drawLine(2, 50, 125, 50, SSD1306_WHITE);
-  display_.drawLine(8, 18, 120, 18, SSD1306_WHITE);
-  display_.drawRect(105, 5, 18, 11, SSD1306_WHITE);
-  display_.drawLine(114, 5, 114, 16, SSD1306_WHITE);
-  for (uint8_t i = 0; i < indoorCapacity_; ++i) {
-    const int x = 17 + i * 31;
-    if (indoorSpecies_[i] == EMPTY_PLANT) display_.drawRoundRect(x - 6, 44, 12, 6, 2, SSD1306_WHITE);
-    else {
-      const uint8_t sp = indoorSpecies_[i];
-      const bool bad = indoorHealth_[i] <= 4 || indoorWater_[i] + 1 < indoorIdealLow(sp) || indoorWater_[i] > indoorIdealHigh(sp) + 2;
-      drawIndoorSprite(sp, x, 49, indoorStage(i), bad);
-      if (indoorStage(i) >= 4 && ((frame / 6 + i) & 1) == 0) display_.drawPixel(x + 9, 20, SSD1306_WHITE);
-    }
-    if (i == selectedIndoor_) {
-      display_.drawLine(x - 5, 53, x + 5, 53, SSD1306_WHITE);
-      display_.drawPixel(x, 52, SSD1306_WHITE);
-    }
+  (void)frame;NativeUI::Scope native(display_);display_.clearDisplay();
+  char counter[12];snprintf(counter,sizeof(counter),"%u/%u",selectedIndoor_+1,indoorCapacity_);NativeUI::header(display_,"PLANT ROOM",counter);
+  const uint8_t page=selectedIndoor_/4;
+  for(uint8_t local=0;local<4;++local){uint8_t i=page*4+local;if(i>=indoorCapacity_)break;
+    int x=11+(local%2)*59,y=24+(local/2)*34;bool active=i==selectedIndoor_;
+    display_.drawRoundRect(x,y,47,30,3,SSD1306_WHITE);
+    if(active){display_.drawFastHLine(x+2,y+28,43,SSD1306_WHITE);display_.drawPixel(x+3,y+3,SSD1306_WHITE);}
+    uint8_t sp=indoorSpecies_[i];NativeUI::plant(display_,x+15,y+3,sp==EMPTY_PLANT?0:sp,sp==EMPTY_PLANT?0:indoorStage(i),sp!=EMPTY_PLANT&&indoorHealth_[i]<=4);
   }
-  if (indoorSpecies_[selectedIndoor_] == EMPTY_PLANT) {
-    display_.fillRect(0, 55, 128, 9, SSD1306_BLACK);
-    display_.setCursor(0, 56);
-    display_.print(F("Empty pot"));
-  } else {
-    drawBottomBotanyStatus(display_, indoorName(indoorSpecies_[selectedIndoor_]),
-                            indoorWater_[selectedIndoor_],
-                            indoorHealth_[selectedIndoor_]);
-  }
+  NativeUI::text(display_,indoorSpecies_[selectedIndoor_]==EMPTY_PLANT?F("Empty planter"):indoorName(indoorSpecies_[selectedIndoor_]),7,94,114);
+  NativeUI::text(display_,"W",7,105,6);NativeUI::meter(display_,17,105,43,indoorWater_[selectedIndoor_]);
+  NativeUI::text(display_,"H",70,105,6);NativeUI::meter(display_,80,105,43,indoorHealth_[selectedIndoor_]);
+  NativeUI::footer(display_,"PREV","TEND","NEXT");
 }
 
 void BotanySystem::drawGardenPreview(int x, int y, uint8_t frame) const {

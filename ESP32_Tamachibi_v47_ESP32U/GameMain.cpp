@@ -13,6 +13,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include "GameDisplay.h"
+#include "NativeUI.h"
 #include <EEPROM.h>
 #include <stddef.h>
 #include "Esp32Platform.h"
@@ -716,11 +717,6 @@ void enterCitySelection();
 // ---------- forward declarations ----------
 void drawScreen(bool doDisplay);
 void drawSquarePet();
-void drawSquareHeader(const __FlashStringHelper *title, bool alert);
-void drawSquareFooter(const __FlashStringHelper *left,
-                      const __FlashStringHelper *center,
-                      const __FlashStringHelper *right);
-void drawSquareRoomBackdrop();
 void petTone(unsigned int freq, unsigned int durationMs);
 void snd(unsigned int freq, byte dur);
 void serviceSoftBuzzer();
@@ -1087,39 +1083,14 @@ void developerUnlockEverything();
 
 // ---------- forward declarations ----------
 void drawScreen(bool doDisplay) {
-  if (screenSleeping) return;
-  display.setLegacyLayout(false);
+  if(screenSleeping)return;
+  NativeUI::Scope frame(display);
   display.clearDisplay();
-
-  // The encoder cycles the three world scales. Buttons navigate within the
-  // selected scale.
-  if (!menuVisible && dialWorldView == VIEW_HOUSE) {
-    display.setLegacyLayout(true);
-    drawHouseWorldView();
-    if (doDisplay) display.display();
-    display.setLegacyLayout(true);
-    return;
-  }
-  if (!menuVisible && dialWorldView == VIEW_CITY) {
-    display.setLegacyLayout(true);
-    drawCityWorldView();
-    if (doDisplay) display.display();
-    display.setLegacyLayout(true);
-    return;
-  }
-
-  if (menuVisible) {
-    display.setLegacyLayout(false);
-    drawMenu();
-    if (doDisplay) display.display();
-    display.setLegacyLayout(true);
-    return;
-  }
-
-  display.setLegacyLayout(false);
-  drawSquarePet();
-  if (doDisplay) display.display();
-  display.setLegacyLayout(true);
+  if(menuVisible)drawMenu();
+  else if(dialWorldView==VIEW_HOUSE)drawHouseWorldView();
+  else if(dialWorldView==VIEW_CITY)drawCityWorldView();
+  else drawSquarePet();
+  if(doDisplay)display.display();
 }
 
 
@@ -2875,20 +2846,9 @@ bool rightHoldExitCheck() {
 
 
 
-void popup(const __FlashStringHelper *line1, const __FlashStringHelper *line2, int hold) {
-  drawScreen(false);
-  display.fillRoundRect(12, 20, 104, 28, 5, BLACK);
-  display.drawRoundRect(12, 20, 104, 28, 5, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(20, 28);
-  display.print(line1);
-  if (line2 != NULL) {
-    display.setCursor(20, 38);
-    display.print(line2);
-  }
-  display.display();
-  delay(hold);
+void popup(const __FlashStringHelper *line1,const __FlashStringHelper *line2,int hold) {
+  char title[96],body[160];NativeUI::flashCopy(title,line1,sizeof(title));NativeUI::flashCopy(body,line2,sizeof(body));
+  NativeUI::message(display,title,body,"");delay(hold);
 }
 
 // ---------- menu icons ----------
@@ -3131,178 +3091,27 @@ void drawBatteryIcon(int x, int y) {
   for (byte i = 0; i < bars; i++) display.fillRect(x + 2 + i * 2, y + 2, 1, 2, WHITE);
 }
 
-void drawSquareHeader(const __FlashStringHelper *title, bool alert) {
-  display.drawRoundRect(1, 1, 126, 126, 10, WHITE);
-  display.fillRoundRect(5, 5, 118, 17, 5, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(10, 10);
-  display.print(title);
-  display.setCursor(78, 10);
-  uint8_t hour12 = visualHour() % 12;
-  if (hour12 == 0) hour12 = 12;
-  display.print(hour12);
-  display.print(':');
-  if (clockMinute() < 10) display.print('0');
-  display.print(clockMinute());
-  display.print(visualHour() < 12 ? 'a' : 'p');
-  if (alert) {
-    display.fillCircle(118, 13, 3, BLACK);
-    display.setTextColor(WHITE);
-    display.setCursor(116, 10);
-    display.print('!');
-  }
-  display.setTextColor(WHITE);
-}
 
-void drawSquareFooter(const __FlashStringHelper *left,
-                      const __FlashStringHelper *center,
-                      const __FlashStringHelper *right) {
-  display.fillRoundRect(4, 115, 120, 10, 4, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(7, 117); display.print(left);
-  display.setCursor(45, 117); display.print(center);
-  display.setCursor(84, 117); display.print(right);
-  display.setTextColor(WHITE);
-}
 
-void drawSquareCentered(const __FlashStringHelper *text, int16_t y,
-                        uint16_t color) {
-  int16_t x1 = 0, y1 = 0;
-  uint16_t w = 0, h = 0;
-  display.getTextBounds(text, 0, y, &x1, &y1, &w, &h);
-  display.setTextColor(color);
-  display.setCursor((128 - static_cast<int16_t>(w)) / 2, y);
-  display.print(text);
-}
 
-void drawSquareRoomBackdrop() {
-  display.drawRoundRect(5, 24, 118, 80, 7, WHITE);
-  display.drawLine(10, 31, 118, 31, WHITE);
-  display.drawLine(10, 88, 118, 88, WHITE);
-  display.drawLine(10, 92, 118, 92, WHITE);
 
-  // Original hand-drawn pixel window; the sun/moon and weather vary with the
-  // game's clock instead of relying on downloaded bitmap assets.
-  display.drawRoundRect(11, 36, 27, 24, 3, WHITE);
-  display.drawLine(24, 37, 24, 59, WHITE);
-  display.drawLine(12, 48, 37, 48, WHITE);
-  if (visualHour() < 7 || visualHour() >= 19) {
-    display.drawCircle(18, 42, 4, WHITE);
-    display.fillCircle(20, 40, 4, BLACK);
-    display.drawPixel(32, 41, WHITE);
-    display.drawPixel(34, 44, WHITE);
-  } else {
-    display.drawCircle(18, 42, 3, WHITE);
-    display.drawLine(18, 36, 18, 38, WHITE);
-    display.drawLine(13, 42, 15, 42, WHITE);
-  }
-  if (visualWeather() == 1) {
-    display.drawLine(15, 51, 13, 55, WHITE);
-    display.drawLine(22, 52, 20, 56, WHITE);
-    display.drawLine(31, 51, 29, 55, WHITE);
-  } else if (visualWeather() == 2) {
-    display.drawPixel(15, 54, WHITE);
-    display.drawPixel(29, 54, WHITE);
-    display.drawPixel(34, 53, WHITE);
-  }
 
-  // A small shelf and room-style details stay to the right of the character.
-  display.drawRect(98, 35, 19, 22, WHITE);
-  display.drawLine(100, 43, 115, 43, WHITE);
-  display.drawLine(100, 50, 115, 50, WHITE);
-  display.drawRect(102, 37, 5, 5, WHITE);
-  display.drawRoundRect(109, 37, 5, 5, 1, WHITE);
-  display.drawCircle(108, 47, 2, WHITE);
 
-  // Low furniture and the rug establish scale without crowding the pet.
-  display.drawRoundRect(8, 75, 24, 10, 4, WHITE);
-  display.drawLine(11, 85, 11, 88, WHITE);
-  display.drawLine(29, 85, 29, 88, WHITE);
-  display.drawRoundRect(35, 84, 58, 7, 3, WHITE);
-  display.drawLine(41, 88, 87, 88, WHITE);
-  for (uint8_t x = 17; x < 118; x += 17) {
-    display.drawLine(x, 93, x - 2, 98, WHITE);
-  }
 
-  switch (roomStyle % ROOM_STYLE_COUNT) {
-    case 1:  // cozy room: heart picture
-      display.drawCircle(52, 29, 2, WHITE);
-      display.drawCircle(57, 29, 2, WHITE);
-      display.drawLine(50, 30, 55, 35, WHITE);
-      display.drawLine(55, 35, 60, 30, WHITE);
-      break;
-    case 2:  // nature room: potted plant
-      display.drawLine(107, 83, 107, 68, WHITE);
-      display.drawCircle(102, 69, 4, WHITE);
-      display.drawCircle(112, 69, 4, WHITE);
-      display.drawRoundRect(101, 82, 13, 5, 2, WHITE);
-      break;
-    case 3:  // study room: desk lamp
-      display.drawLine(16, 74, 16, 66, WHITE);
-      display.drawLine(16, 66, 23, 62, WHITE);
-      display.drawLine(23, 62, 29, 65, WHITE);
-      display.drawLine(13, 74, 21, 74, WHITE);
-      break;
-    case 4:  // arcade room: tiny console on shelf
-      display.drawRoundRect(101, 63, 18, 13, 3, WHITE);
-      display.drawRect(104, 66, 8, 5, WHITE);
-      display.drawPixel(115, 67, WHITE);
-      display.drawPixel(115, 71, WHITE);
-      break;
-    case 5:  // space room: star map
-      display.drawCircle(58, 31, 4, WHITE);
-      display.drawPixel(58, 31, WHITE);
-      display.drawPixel(68, 28, WHITE);
-      display.drawPixel(73, 34, WHITE);
-      break;
-    default:
-      display.drawPixel(49, 31, WHITE);
-      display.drawPixel(72, 30, WHITE);
-      break;
-  }
-
-  if (roomOwned & (1UL << 1)) {
-    display.drawLine(108, 83, 108, 70, WHITE);
-    display.drawCircle(103, 70, 4, WHITE);
-    display.drawCircle(113, 69, 4, WHITE);
-  }
-  if (clean <= 3) {
-    display.drawLine(14, 86, 20, 83, WHITE);
-    display.drawPixel(27, 85, WHITE);
-    display.drawPixel(114, 85, WHITE);
-  }
-}
 
 void drawMenu() {
-  if (!menuVisible) return;
-
-  const bool alert = needsCare() || pendingCallType != 0 || sick;
-  drawSquareHeader(F("ACTIVITIES"), alert);
-  display.drawRoundRect(7, 26, 114, 77, 9, WHITE);
-  display.drawRoundRect(40, 31, 48, 42, 8, WHITE);
-  const int bob = (anim & 2) ? -1 : 0;
-  drawBigMenuEmoji(categoryIcon(mainCategory), 46, 35 + bob, false);
-
-  drawSquareCentered(categoryShortTitle(mainCategory), 78, WHITE);
-  drawSquareCentered(categoryDescription(mainCategory), 90, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(47, 99);
-  display.print(F("SECTION "));
-  display.print(mainCategory + 1);
-  display.print(F(" / "));
-  display.print(CATEGORY_COUNT);
-
-  const int trackX = 29;
-  const int trackY = 108;
-  for (uint8_t i = 0; i < CATEGORY_COUNT; ++i) {
-    const int x = trackX + i * 12;
-    if (i == mainCategory) display.fillRoundRect(x, trackY, 10, 3, 1, WHITE);
-    else display.drawRoundRect(x, trackY, 10, 3, 1, WHITE);
+  if(!menuVisible)return;
+  NativeUI::header(display,"ACTIVITIES");
+  static const char *labels[]={"FOOD","CARE","PLAY","BOND","WORLD","STATS"};
+  for(byte i=0;i<CATEGORY_COUNT;++i){
+    const int x=4+(i%2)*62,y=23+(i/2)*30;
+    const bool active=i==mainCategory;
+    if(active)display.fillRoundRect(x,y,58,26,4,WHITE);
+    else display.drawRoundRect(x,y,58,26,4,WHITE);
+    NativeUI::icon(display,i,x+4,y+5,active?BLACK:WHITE);
+    NativeUI::text(display,labels[i],x+24,y+10,30,active?BLACK:WHITE);
   }
-  drawSquareFooter(F("D0 PREV"), F("D1 OPEN"), F("D2 NEXT"));
+  NativeUI::footer(display,"PREV","OPEN","NEXT");
 }
 
 void drawMenuName() {
@@ -3541,13 +3350,9 @@ void drawMaskSprite(int x, int y, const uint32_t rows[32], byte scale) {
   }
 }
 
-void drawSprite32(byte id, int x, int y) {
-  drawMaskSprite(x, y, ROSTER_SPRITES[id % SPECIES_COUNT], 1);
-}
+void drawSprite32(byte id,int x,int y){NativeUI::pet(display,x,y,id,STAGE_ADULT,0,false,2);}
 
-void drawSprite16(byte id, int x, int y) {
-  drawMaskSprite(x, y, ROSTER_SPRITES[id % SPECIES_COUNT], 0);
-}
+void drawSprite16(byte id,int x,int y){NativeUI::pet(display,x,y,id,STAGE_ADULT,0);}
 
 
 byte favoriteFoodType() {
@@ -3999,9 +3804,7 @@ void drawCurrentPetMini(int x, int y, byte scale) {
 }
 
 
-void drawCurrentPetTiny(int x, int y) {
-  drawCurrentPetMini(x, y, 1);
-}
+void drawCurrentPetTiny(int x,int y){NativeUI::pet(display,x,y,speciesType,stage,anim,sleeping||lightOff);}
 
 
 void drawCurrentPetSleepMini(int x, int y, byte scale) {
@@ -5400,185 +5203,36 @@ void drawPet() {
   }
 }
 
-void drawSquareAdultFace(int x, int y, bool asleep) {
-  const int cx = x + 32;
-  const int eyeY = y + 25;
-  if (asleep || energy <= 2) {
-    display.drawLine(cx - 11, eyeY, cx - 5, eyeY, BLACK);
-    display.drawLine(cx + 5, eyeY, cx + 11, eyeY, BLACK);
-  } else if (sick || happy <= 2) {
-    display.drawLine(cx - 11, eyeY - 2, cx - 5, eyeY + 3, BLACK);
-    display.drawLine(cx - 5, eyeY - 2, cx - 11, eyeY + 3, BLACK);
-    display.drawLine(cx + 5, eyeY - 2, cx + 11, eyeY + 3, BLACK);
-    display.drawLine(cx + 11, eyeY - 2, cx + 5, eyeY + 3, BLACK);
-  } else {
-    display.fillRoundRect(cx - 10, eyeY - 2, 4, 7, 2, BLACK);
-    display.fillRoundRect(cx + 6, eyeY - 2, 4, 7, 2, BLACK);
-    if (happy >= 8) {
-      display.drawPixel(cx - 8, eyeY - 1, WHITE);
-      display.drawPixel(cx + 8, eyeY - 1, WHITE);
-    }
-  }
 
-  const int mouthY = eyeY + 13;
-  if (full <= 2) {
-    display.drawCircle(cx, mouthY, 3, BLACK);
-  } else if (happy >= 7) {
-    display.drawLine(cx - 5, mouthY - 1, cx - 3, mouthY + 2, BLACK);
-    display.drawLine(cx - 3, mouthY + 2, cx + 3, mouthY + 2, BLACK);
-    display.drawLine(cx + 3, mouthY + 2, cx + 5, mouthY - 1, BLACK);
-  } else {
-    display.drawLine(cx - 4, mouthY, cx + 4, mouthY, BLACK);
-  }
-}
 
-void drawSquareNeedBubble() {
-  if (dead || sleeping || lightOff || stage == STAGE_EGG) return;
-  byte need = pendingCallType;
-  if (need == 0) {
-    if (sick || conditionType != 0) need = 3;
-    else if (poop > 0 || clean <= 2) need = 2;
-    else if (full <= 2) need = 1;
-    else if (happy <= 2) need = 4;
-    else if (energy <= 2) need = 6;
-  }
-  if (need == 0) return;
 
-  display.fillRoundRect(7, 55, 23, 20, 5, BLACK);
-  display.drawRoundRect(7, 55, 23, 20, 5, WHITE);
-  display.drawLine(23, 73, 28, 78, WHITE);
-  if (need == 1) {
-    display.drawRoundRect(12, 64, 13, 6, 3, WHITE);
-    display.drawPixel(16, 61, WHITE);
-    display.drawPixel(20, 60, WHITE);
-  } else if (need == 2) {
-    display.drawCircle(15, 64, 3, WHITE);
-    display.drawCircle(22, 61, 2, WHITE);
-    display.drawCircle(23, 69, 2, WHITE);
-  } else if (need == 3) {
-    display.drawLine(18, 59, 18, 71, WHITE);
-    display.drawLine(12, 65, 24, 65, WHITE);
-  } else if (need == 4) {
-    display.drawCircle(14, 64, 3, WHITE);
-    display.drawCircle(21, 64, 3, WHITE);
-    display.drawLine(11, 65, 18, 72, WHITE);
-    display.drawLine(18, 72, 24, 65, WHITE);
-  } else {
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    display.setCursor(12, 61);
-    display.print(F("Zz"));
-  }
-}
 
-void drawSquarePetStatus() {
-  display.drawRoundRect(4, 106, 120, 8, 3, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(8, 107);
 
-  if (dead) {
-    display.print(F("D1 NEW EGG"));
-  } else if (petAway) {
-    display.print(F("AWAY - USE CALL"));
-  } else if (sick || conditionType != 0) {
-    display.print(F("NEEDS MEDICINE"));
-  } else if (poop > 0 || clean <= 2) {
-    display.print(F("ROOM NEEDS CLEANING"));
-  } else if (botany.needsCare()) {
-    display.print(F("PLANTS NEED CARE"));
-  } else if (aquarium.needsCare()) {
-    display.print(F("AQUARIUM NEEDS CARE"));
-  } else if (parentDialogue.hasPending() ||
-             (stage != STAGE_BABY && growingTogether.hasPending())) {
-    display.print(F("TALK IS READY"));
-  } else {
-    display.print(F("AGE "));
-    display.print(petAgeDays());
-    display.print(F("D  F"));
-    display.print(full);
-    display.print(F(" H"));
-    display.print(happy);
-  }
-}
 
 void drawSquarePet() {
-  // Keep the school/work cutaway art intact and scale it to the panel. The
-  // everyday room and pet are drawn natively at 128x128 below.
-  if (isScheduledAwayTime() && !dead && !petAway) {
-    display.setLegacyLayout(true);
-    drawScheduledAwayScene();
-    display.setLegacyLayout(false);
-    return;
+  char clock[8];snprintf(clock,sizeof(clock),"%02u:%02u",visualHour(),clockMinute());
+  NativeUI::header(display,petName,clock,needsCare()||sick);
+  NativeUI::room(display,0,roomStyle,visualHour(),anim);
+  if(dead){
+    display.fillRoundRect(51,54,26,31,8,BLACK);display.drawRoundRect(51,54,26,31,8,WHITE);
+    display.drawLine(64,60,64,75,WHITE);display.drawLine(58,65,70,65,WHITE);
+  }else if(petAway||isScheduledAwayTime()){
+    NativeUI::icon(display,4,56,63);
+  }else {
+    NativeUI::pet(display,sleeping||lightOff?15:57,sleeping||lightOff?36:63,speciesType,stage,anim,sleeping||lightOff);
+    if(stage>=STAGE_CHILD&&!sleeping&&!lightOff)NativeUI::accessory(display,57,63,outfit);
+    if(poop>0){display.drawCircle(85,88,2,WHITE);display.drawLine(82,90,89,90,WHITE);}
   }
-
-  drawSquareRoomBackdrop();
-  int petX = 32;
-  int petY = 30 + ((anim & 2) ? -1 : 0);
-
-  if (petAway && !dead) {
-    display.drawRoundRect(47, 34, 34, 53, 5, WHITE);
-    display.drawLine(64, 35, 64, 85, WHITE);
-    display.drawCircle(73, 61, 1, WHITE);
-    drawSquareCentered(F("AWAY"), 72, WHITE);
-  } else if (dead) {
-    display.drawRoundRect(39, 38, 50, 45, 14, WHITE);
-    display.drawLine(51, 51, 59, 59, WHITE);
-    display.drawLine(59, 51, 51, 59, WHITE);
-    display.drawLine(69, 51, 77, 59, WHITE);
-    display.drawLine(77, 51, 69, 59, WHITE);
-    display.drawLine(56, 73, 72, 73, WHITE);
-    drawSquareCentered(F("GOODNIGHT"), 88, WHITE);
-  } else {
-    const bool asleep = sleeping || lightOff;
-    if (stage < STAGE_ADULT) {
-      drawGrowthSprite(48, petY, 4, asleep);
-    } else {
-      petX += (speciesType % 2 == 0 && (anim & 4)) ? 1 : 0;
-      drawMaskSprite(petX, petY, ROSTER_SPRITES[speciesType % SPECIES_COUNT], 2);
-      drawSquareAdultFace(petX, petY, asleep);
-      if (stage == STAGE_ELDER) {
-        display.drawLine(petX + 61, petY + 38, petX + 61, petY + 62, WHITE);
-        display.drawCircle(petX + 58, petY + 38, 3, WHITE);
-        display.drawPixel(petX - 2, petY + 8, WHITE);
-      }
-    }
-    if (!asleep && stage >= STAGE_CHILD && outfit != 0) {
-      drawOutfitOnPet(petX, petY + 17, (anim & 1), 64, 64);
-    }
-    if (cityWorld.partnerLivesAtHome(partnerId, partnerBond)) {
-      cityWorld.drawPartnerAtHome(partnerId, 91, 72, (anim / 6) & 1);
-    }
-    if (poop > 0 || clean <= 6) drawPoopPile(13, 76);
-    if (poop > 1) drawPoopPile(102, 76);
-
-    if (asleep) {
-      display.setTextSize(1);
-      display.setTextColor(WHITE);
-      display.setCursor(91, 38); display.print('Z');
-      display.setCursor(99, 32); display.print('z');
-      if (anim & 1) { display.setCursor(106, 27); display.print('z'); }
-    } else {
-      drawSquareNeedBubble();
-    }
+  if(!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
+  const char *notice=dead?"GOODNIGHT":petAway?"AWAY":isScheduledAwayTime()?"AT SCHOOL / WORK":
+    sick?"NEEDS MEDICINE":full<=2?"HUNGRY":clean<=2||poop>0?"CLEAN UP":happy<=2?"LET'S PLAY":nullptr;
+  if(notice){display.fillRoundRect(10,101,108,10,2,WHITE);NativeUI::text(display,notice,16,103,96,BLACK);}
+  else {
+    NativeUI::text(display,"F",4,104,6);NativeUI::meter(display,13,105,27,full);
+    NativeUI::text(display,"H",47,104,6);NativeUI::meter(display,56,105,27,happy);
+    NativeUI::text(display,"E",90,104,6);NativeUI::meter(display,99,105,25,energy);
   }
-
-  // The nameplate and status strip sit below the room artwork, never on top
-  // of the eyes or the custom outfit.
-  display.fillRoundRect(39, 95, 50, 9, 3, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(BLACK);
-  display.setCursor(46, 96);
-  display.print(petName);
-  display.setTextColor(WHITE);
-
-  const bool alert = needsCare() || pendingCallType != 0 || sick || poop > 0 ||
-                     botany.needsCare() || aquarium.needsCare() ||
-                     parentDialogue.hasPending() ||
-                     (stage != STAGE_BABY && growingTogether.hasPending());
-  drawSquareHeader(F("TAMACHIBI"), alert);
-  drawSquarePetStatus();
-  drawSquareFooter(F("D0 MENU"), F("D1 OPEN"), F("D2 MENU"));
+  NativeUI::footer(display,"MENU","OPEN","MENU");
 }
 
 
@@ -5924,6 +5578,7 @@ void drawRightNumber(unsigned int a, byte y=0) {
 
 
 void starCatchGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","EXIT","RIGHT");
   waitButtonRelease();
 
   int basketX = 54;
@@ -6015,6 +5670,7 @@ int rpsWinner(byte player, byte cpu) {
 }
 
 void rpsGame() {
+  NativeUI::GameScope gameCanvas(display,"ROCK","PAPER","CUT");
   waitButtonRelease();
 
   byte pick = 0;
@@ -6105,6 +5761,7 @@ void rpsGame() {
 }
 
 void numberGame() {
+  NativeUI::GameScope gameCanvas(display,"LESS","GUESS","MORE");
   waitButtonRelease();
 
   byte target = random(0, 10);
@@ -6350,6 +6007,7 @@ void tbDrawBoard(bool board[12][8], int px, int py, byte shape, byte rot, byte n
 
 
 void tinyBlocksGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","TURN","RIGHT");
   waitButtonRelease();
 
   bool board[12][8];
@@ -6544,6 +6202,7 @@ void revealMineOpening(byte mines[5], byte revealed[5], byte sx, byte sy) {
 }
 
 void minesweeperGame() {
+  NativeUI::GameScope gameCanvas(display,"PREV","OPEN","NEXT");
   waitButtonRelease();
 
   byte mines[5] = {0, 0, 0, 0, 0};
@@ -6711,6 +6370,7 @@ void minesweeperGame() {
 
 
 void lookGuessGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","GUESS","RIGHT");
   waitButtonRelease();
 
   byte score = 0;
@@ -6769,6 +6429,7 @@ void lookGuessGame() {
 }
 
 void memoryGame() {
+  NativeUI::GameScope gameCanvas(display,"A","B","C");
   waitButtonRelease();
 
   byte score = 0;
@@ -6853,6 +6514,7 @@ void memoryGame() {
 }
 
 void sprintGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","GO","RIGHT");
   waitButtonRelease();
 
   byte taps = 0;
@@ -6896,6 +6558,7 @@ void sprintGame() {
 }
 
 void brickBreakerGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","SERVE","RIGHT");
   waitButtonRelease();
 
   bool bricks[3][8];
@@ -6994,6 +6657,7 @@ void brickBreakerGame() {
 
 
 void meteorPunchGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","PUNCH","RIGHT");
   waitButtonRelease();
 
   byte lane = 1;
@@ -7062,6 +6726,7 @@ void meteorPunchGame() {
 
 
 void doodleJumpGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","JUMP","RIGHT");
   waitButtonRelease();
 
   int px = random(20, 96);
@@ -7215,6 +6880,7 @@ void drawBurgerChoice(byte kind, int x, int y, bool selected) {
 }
 
 void burgerGame() {
+  NativeUI::GameScope gameCanvas(display,"PREV","STACK","NEXT");
   waitButtonRelease();
 
   byte choice = 0;
@@ -7361,6 +7027,7 @@ void drawMatchBoard(byte cards[12], uint16_t matchedMask, uint16_t faceUpMask, b
 
 
 void slidePuzzleGame() {
+  NativeUI::GameScope gameCanvas(display,"PREV","MOVE","NEXT");
   // v18.5: this is now a real matching card game instead of the confusing slide matcher.
   waitButtonRelease();
 
@@ -7667,21 +7334,15 @@ void miniGameMenu() {
     if (oldSel == HIGH && sBtn == LOW) { waitButtonRelease(); launchGame(g); lastInputAt = millis(); return; }
     oldLeft = l; oldSel = sBtn; oldRight = r;
 
-    display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
-    display.setCursor(31, 0); display.print(F("Pick Game")); drawRightScore(g + 1, gameCount);
-    display.drawRoundRect(4, 14, 120, 37, 5, WHITE);
-    drawGamePreviewIcon(g, 12, 24);
-    // v38: reserve the whole right side of this panel for text.
-    // Pet art appears during gameplay, but never behind menu labels.
-    display.drawFastVLine(34, 18, 29, WHITE);
-    display.setCursor(40, 20); display.print(gameName(g));
-    display.setCursor(40, 32);
-    int featured = featuredGameSlot(g);
-    if (g == favoriteGameId) display.print(F("Favorite +bond"));
-    else if (featured >= 0) display.print(F("Featured +2G"));
-    else if (g == dislikedGameId) display.print(F("Challenge game"));
-    else display.print(F("Normal play"));
-    display.setCursor(0, 55); display.print(F("D0 prev D1 play D2 next")); display.display(); delay(20);
+
+    {
+      NativeUI::Scope frame(display);display.clearDisplay();char counter[12];snprintf(counter,sizeof(counter),"%u/%u",g+1,gameCount);
+      NativeUI::header(display,"ARCADE",counter);NativeUI::icon(display,2,56,26);
+      char name[96];NativeUI::flashCopy(name,gameName(g),sizeof(name));NativeUI::paragraph(display,name,8,53,112,2);
+      const char *badge=g==favoriteGameId?"FAVORITE +BOND":featuredGameSlot(g)>=0?"FEATURED +2G":g==dislikedGameId?"CHALLENGE":"READY TO PLAY";
+      NativeUI::text(display,badge,8,90,112);NativeUI::footer(display,"PREV","PLAY","NEXT");display.display();
+    }
+    delay(20);
   }
 }
 
@@ -7836,6 +7497,7 @@ void stageRoutineReward(byte lifeStage, byte gameId, byte score, byte goal) {
 }
 
 void stageCatchGame(byte lifeStage) {
+  NativeUI::GameScope gameCanvas(display,"LEFT","CATCH","RIGHT");
   byte score = 0;
   int playerX = 56;
   for (byte item = 0; item < 12; ++item) {
@@ -7861,6 +7523,7 @@ void stageCatchGame(byte lifeStage) {
 }
 
 void stageDodgeGame(byte lifeStage) {
+  NativeUI::GameScope gameCanvas(display,"LEFT","DODGE","RIGHT");
   byte safe = 0;
   int playerX = 56;
   for (byte wave = 0; wave < 12; ++wave) {
@@ -7888,6 +7551,7 @@ void stageDodgeGame(byte lifeStage) {
 }
 
 void stageTimingGame(byte lifeStage) {
+  NativeUI::GameScope gameCanvas(display,"LEFT","STOP","RIGHT");
   byte score = 0;
   for (byte round = 0; round < 8; ++round) {
     byte target = random(24, 83);
@@ -7923,6 +7587,7 @@ void stageTimingGame(byte lifeStage) {
 }
 
 void stageMemoryGame(byte lifeStage) {
+  NativeUI::GameScope gameCanvas(display,"A","B","C");
   byte score = 0;
   for (byte round = 0; round < 5; ++round) {
     byte sequence[6];
@@ -7966,6 +7631,7 @@ void stageMemoryGame(byte lifeStage) {
 }
 
 void stageSortGame(byte lifeStage) {
+  NativeUI::GameScope gameCanvas(display,"LEFT","CHOOSE","RIGHT");
   byte score = 0;
   for (byte round = 0; round < 12; ++round) {
     byte kind = random(0, 2);
@@ -8024,20 +7690,15 @@ void stageRoutineGameMenu() {
     if (oldS == HIGH && sBtn == LOW) { waitButtonRelease(); launchStageRoutineGame(selected); return; }
     oldL = l; oldS = sBtn; oldR = r;
 
-    display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
-    display.setCursor(4, 0); display.print(stageRoutineTitle(stage));
-    drawRightScore(selected + 1, 5);
-    display.drawRoundRect(4, 13, 120, 38, 5, WHITE);
-    drawStageRoutineObject(stage, selected, 0, 14, 26);
-    display.drawFastVLine(34, 18, 28, WHITE);
-    display.setCursor(40, 19); display.print(stageRoutineGameName(stage, selected));
-    display.setCursor(40, 31);
-    if (stageRoutineBonusTime(stage)) display.print(F("Bonus active"));
-    else if (stage == STAGE_CHILD || stage == STAGE_TEEN) display.print(F("School prep"));
-    else if (stage == STAGE_ADULT) display.print(F("Work practice"));
-    else display.print(F("Daily activity"));
-    display.setCursor(0, 55); display.print(F("D0 prev D1 play D2 next"));
-    display.display(); delay(20);
+
+    {
+      NativeUI::Scope frame(display);display.clearDisplay();char counter[12];snprintf(counter,sizeof(counter),"%u/5",selected+1);
+      NativeUI::header(display,stageRoutineTitle(stage),counter);NativeUI::icon(display,selected%6,56,27);
+      char name[96];NativeUI::flashCopy(name,stageRoutineGameName(stage,selected),sizeof(name));NativeUI::paragraph(display,name,8,54,112,2);
+      NativeUI::text(display,stageRoutineBonusTime(stage)?"BONUS ACTIVE":"DAILY PRACTICE",8,91,112);
+      NativeUI::footer(display,"PREV","PLAY","NEXT");display.display();
+    }
+    delay(20);
   }
 }
 
@@ -8060,16 +7721,18 @@ void gameHubMenu() {
     }
     oldL = l; oldS = sBtn; oldR = r;
 
-    display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
-    display.setCursor(31, 0); display.print(F("GAME TYPE"));
-    display.drawRoundRect(8, 15, 112, 17, 5, WHITE);
-    display.drawRoundRect(8, 36, 112, 17, 5, WHITE);
-    if (selected == 0) display.fillRoundRect(10, 17, 108, 13, 4, WHITE);
-    if (selected == 1) display.fillRoundRect(10, 38, 108, 13, 4, WHITE);
-    display.setTextColor(selected == 0 ? BLACK : WHITE); display.setCursor(28, 20); display.print(F("ARCADE GAMES"));
-    display.setTextColor(selected == 1 ? BLACK : WHITE); display.setCursor(21, 41); display.print(F("LIFE-STAGE GAMES"));
-    display.setTextColor(WHITE); display.setCursor(0, 56); display.print(F("D0/D2 choose   D1 open"));
-    display.display(); delay(20);
+
+    {
+      NativeUI::Scope frame(display);display.clearDisplay();NativeUI::header(display,"PLAY TOGETHER");
+      const char *names[]={"ARCADE","LIFE STAGE"};const char *details[]={"Quick games","Daily games"};
+      for(byte row=0;row<2;++row){int y=27+row*42;bool active=selected==row;
+        if(active)display.fillRoundRect(4,y,120,35,4,WHITE);else display.drawRoundRect(4,y,120,35,4,WHITE);
+        uint16_t ink=active?BLACK:WHITE;NativeUI::icon(display,row==0?2:4,10,y+9,ink);
+        NativeUI::text(display,names[row],33,y+7,84,ink);NativeUI::text(display,details[row],33,y+21,84,ink);
+      }
+      NativeUI::footer(display,"CHOOSE","OPEN","CHOOSE");display.display();
+    }
+    delay(20);
   }
 }
 
@@ -8219,6 +7882,7 @@ bool walkCollision(unsigned int row, int px, int py, byte level, unsigned long n
 }
 
 void walkGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","HOP","RIGHT");
   clickSound();
   if (energy < 2) {
     popup(F("Too sleepy"), F("Rest first"));
@@ -8400,6 +8064,7 @@ void walkGame() {
 // ---------- discipline training ----------
 
 void trainGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","TRAIN","RIGHT");
   clickSound();
   if (sleeping) {
     popup(F("Sleeping..."), F("Wake first"));
@@ -8523,6 +8188,7 @@ void trainGame() {
 // ---------- extra activities ----------
 
 void studyGame() {
+  NativeUI::GameScope gameCanvas(display,"LESS","ANSWER","MORE");
   clickSound();
   if (sleeping) {
     popup(F("Sleeping..."), F("Wake first"));
@@ -8700,6 +8366,7 @@ void gardenActivity() {
 
 
 void musicGame() {
+  NativeUI::GameScope gameCanvas(display,"LEFT","HIT","RIGHT");
   clickSound();
   if (sleeping) {
     popup(F("Sleeping..."), F("Wake first"));
@@ -11663,45 +11330,37 @@ void settingsMenu() {
   }
 }
 
+
 void categoryMenu(byte category) {
-  if (dead) { startReplacementEgg(); return; }
-
-  byte count = categoryActionCount(category);
-  byte pick = 0;
-  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  if(dead){startReplacementEgg();return;}
+  byte count=categoryActionCount(category),pick=0;bool oldL=HIGH,oldS=HIGH,oldR=HIGH;
   waitButtonRelease();
-  while (true) {
-    if (rightHoldExitCheck()) return;
-    bool l = digitalRead(BTN_L), sBtn = digitalRead(BTN_S), r = digitalRead(BTN_R);
-    if (oldL == HIGH && l == LOW) { pick = (pick == 0) ? count - 1 : pick - 1; clickSound(); delay(120); }
-    if (oldR == HIGH && r == LOW) { pick++; if (pick >= count) pick = 0; clickSound(); delay(120); }
-    if (oldS == HIGH && sBtn == LOW) {
-      byte action = categoryActionAt(category, pick);
-      waitButtonRelease();
-      if (!actionUnlocked(action)) { badSound(); popup(F("Not unlocked"), unlockHint(action), 700); }
-      else { executeAction(action); return; }
+  while(true){
+    if(rightHoldExitCheck())return;
+    bool l=digitalRead(BTN_L),sel=digitalRead(BTN_S),r=digitalRead(BTN_R);
+    if(oldL==HIGH&&l==LOW){pick=pick==0?count-1:pick-1;clickSound();delay(120);}
+    if(oldR==HIGH&&r==LOW){pick=(pick+1)%count;clickSound();delay(120);}
+    if(oldS==HIGH&&sel==LOW){
+      byte action=categoryActionAt(category,pick);waitButtonRelease();
+      if(!actionUnlocked(action)){badSound();popup(F("Not unlocked"),unlockHint(action),700);}
+      else{executeAction(action);return;}
     }
-    oldL = l; oldS = sBtn; oldR = r;
-
-    byte action = categoryActionAt(category, pick);
-    const bool unlocked = actionUnlocked(action);
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-    V46UI::drawHeader(display, categoryShortTitle(category), visualHour(), clockMinute(), !unlocked, 0);
-    V46UI::drawCarouselFrame(display, pick, count, !unlocked, anim);
-    drawBigMenuEmoji(action, 6, 16 + ((anim & 2) ? -1 : 0), false);
-    display.setCursor(53, 17);
-    display.print(menuTitle(action));
-    display.setCursor(53, 29);
-    display.print(unlocked ? menuDescription(action) : menuUnlockShort(action));
-    display.setCursor(53, 41);
-    display.print(unlocked ? F("READY  ") : F("LOCKED "));
-    display.print(pick + 1);
-    display.print(F("/"));
-    display.print(count);
-    V46UI::drawFooter(display, F("D0 PREV"), F("D1 OPEN"), F("D2 NEXT"));
-    display.display(); delay(20);
+    oldL=l;oldS=sel;oldR=r;
+    {
+      NativeUI::Scope frame(display);display.clearDisplay();
+      char counter[10];snprintf(counter,sizeof(counter),"%u/%u",pick+1,count);
+      NativeUI::header(display,categoryShortTitle(category),counter);
+      for(byte row=0;row<3;++row){
+        byte index=(pick+count+row-1)%count,action=categoryActionAt(category,index);
+        bool unlocked=actionUnlocked(action),active=row==1;int y=23+row*29;
+        if(active)display.fillRoundRect(4,y,120,26,3,WHITE);
+        uint16_t ink=active?BLACK:WHITE;
+        NativeUI::text(display,menuTitle(action),9,y+4,108,ink);
+        NativeUI::text(display,unlocked?menuDescription(action):menuUnlockShort(action),9,y+15,108,ink);
+      }
+      NativeUI::footer(display,"PREV","OPEN","NEXT");display.display();
+    }
+    delay(20);
   }
 }
 
@@ -12783,102 +12442,21 @@ int8_t readWorldViewEncoderStep() {
 }
 
 void drawHouseWorldView() {
-  const byte room = cityWorld.houseRoom();
-  const bool spouseHome = room == 0 && cityWorld.partnerLivesAtHome(partnerId, partnerBond);
-  const bool childrenHome = room == 0 && deepLife.childCount() > 0;
-  const bool familyLayout = spouseHome || childrenHome;
-
-  V46UI::drawCutawayRoom(display, room, roomStyle, visualHour(), visualWeather(), anim,
-                         !lightOff && !sleeping, familyLayout);
-  lifeWorld.drawHomeDecor(room, anim);
-  deepLife.drawSeasonOverlay(false, room, anim);
-
-  const bool tamaHere = (room == 0) || (room == 4) ||
-                        (room == 2 && lifeWorld.currentLocation() == 6) ||
-                        (room == 3 && lifeWorld.currentLocation() == 6);
-  if (tamaHere && !dead) {
-    int px = room == 4 ? 48 : 49;
-    const int py = room == 4 ? 29 : 28;
-    if (room == 0) {
-      if (spouseHome && childrenHome) px = 23;
-      else if (spouseHome) px = 35;
-      else if (childrenHome) px = 40;
-      else px = 52;
-    }
-    V46UI::clearCharacterZone(display, px - 5, py - 4, 34, 27, true);
-    drawCurrentPetTiny(px, py + ((anim / 3) & 1));
-    if (lifeWorld.hasCompanion()) {
-      const int companionX = room == 0 && spouseHome ? 52 : px + 24;
-      lifeWorld.drawCompanion(companionX, py + 9, (anim / 5) & 1);
-    }
-    deepLife.drawContextPose(px, py, anim);
-  }
-  deepLife.drawFamilyActors(room, anim);
-
-  if (spouseHome) {
-    const int spouseX = 70;
-    V46UI::clearCharacterZone(display, spouseX - 3, 28, 28, 24, true);
-    cityWorld.drawPartnerAtHome(partnerId, spouseX, 30 + ((anim / 3) & 1), (anim / 7) & 1);
-  } else if (room == 1) {
-    aquarium.drawSmallIcon(53, 29, false);
-  } else if (room == 2) {
-    botany.drawPlantRoomPreview(45, 28, anim);
-  } else if (room == 3) {
-    botany.drawGardenPreview(31, 27, anim);
-  }
-
-  const bool alert = botany.needsCare() || aquarium.needsCare();
-  V46UI::drawHeader(display, cityWorld.houseRoomName(room), visualHour(), clockMinute(), alert, 1);
-  V46UI::drawFooter(display, F("D0 ROOM"), F("D1 ENTER"), F("D2 ROOM"));
+  byte room=cityWorld.houseRoom();char count[8];snprintf(count,sizeof(count),"%u/%u",room+1,HOUSE_ROOM_COUNT);
+  NativeUI::header(display,cityWorld.houseRoomName(room),count,botany.needsCare()||aquarium.needsCare());
+  NativeUI::room(display,room,roomStyle,visualHour(),anim);
+  if(!dead&&room!=1&&room!=2&&room!=3)NativeUI::pet(display,56,62,speciesType,stage,anim,sleeping);
+  if(room==0&&!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
+  NativeUI::text(display,"TURN DIAL: WORLD",16,104,102);
+  NativeUI::footer(display,"ROOM","ENTER","ROOM");
 }
 
 void drawCityWorldView() {
-  const byte place = cityWorld.cityPlace();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-
-  // v34 city scenes use cohesive, hand-authored pixel sprites rather than
-  // rectangles and triangles assembled at runtime.
-  drawPolishedCityScene(display, place);
-  lifeWorld.drawCommunityUpgrades(place, anim);
-  deepLife.drawSeasonOverlay(true, place, anim);
-
-  // Road/foreground layer stays separate so it remains crisp over every scene.
-  display.drawLine(0, 52, 127, 52, WHITE);
-  display.drawLine(0, 57, 127, 57, WHITE);
-  for (byte x = 5; x < 128; x += 24) display.drawLine(x, 55, x + 8, 55, WHITE);
-
-  // Small scene-specific animation gives the city a living feel.
-  if (place == 0 && (anim & 4)) {
-    display.fillRect(60, 23, 4, 3, WHITE);
-  } else if (place == 1 && ((anim / 3) & 1)) {
-    display.drawPixel(62, 18, WHITE);
-    display.drawPixel(66, 18, WHITE);
-  } else if (place == 2) {
-    display.drawPixel(112, 18 - ((anim / 3) % 3), WHITE);
-  } else if (place == 3 && (anim & 2)) {
-    display.drawLine(65, 9, 71, 11, WHITE);
-  } else if (place == 4) {
-    const byte splash = (anim / 2) % 3;
-    display.drawPixel(60 - splash, 24 - splash, WHITE);
-    display.drawPixel(68 + splash, 24 - splash, WHITE);
-  }
-
-  // The player's Tama can appear in its scheduled city location, but only on
-  // a dedicated high-contrast pad that never covers labels or architecture.
-  const byte loc = lifeWorld.currentLocation();
-  const bool showTama = (place == 0 && loc == 4) || (place == 1 && loc == 5) ||
-                        (place == 3 && loc == 3) || (place == 4 && loc == 2);
-  if (showTama && !dead) {
-    display.fillRoundRect(47, 27, 28, 24, 5, BLACK);
-    display.drawRoundRect(47, 27, 28, 24, 5, WHITE);
-    drawCurrentPetTiny(50, 30 + ((anim / 4) & 1));
-    if (lifeWorld.hasCompanion()) lifeWorld.drawCompanion(72, 39, (anim / 5) & 1);
-    deepLife.drawContextPose(50, 30, anim);
-  }
-
-  V46UI::drawHeader(display, cityWorld.cityPlaceName(place), visualHour(), clockMinute(), false, 2);
-  V46UI::drawFooter(display, F("D0 PLACE"), F("D1 ENTER"), F("D2 PLACE"));
+  byte place=cityWorld.cityPlace();char count[8];snprintf(count,sizeof(count),"%u/%u",place+1,CITY_PLACE_COUNT);
+  NativeUI::header(display,cityWorld.cityPlaceName(place),count);
+  NativeUI::town(display,place,anim);
+  NativeUI::text(display,"YOUR NEIGHBORHOOD",13,104,108);
+  NativeUI::footer(display,"PLACE","ENTER","PLACE");
 }
 
 void enterHouseSelection() {
@@ -13030,26 +12608,11 @@ void updateButtons() {
 // ---------- setup and main ----------
 
 void splash() {
-  display.setLegacyLayout(false);
-  display.clearDisplay();
-  display.drawRoundRect(1, 1, 126, 126, 12, WHITE);
-  display.drawRoundRect(8, 8, 112, 112, 10, WHITE);
-  display.drawCircle(64, 42, 17, WHITE);
-  display.drawCircle(57, 39, 2, WHITE);
-  display.drawCircle(71, 39, 2, WHITE);
-  display.drawLine(58, 49, 64, 52, WHITE);
-  display.drawLine(64, 52, 70, 49, WHITE);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(40, 72);
-  display.print(F("TAMACHIBI"));
-  display.setCursor(37, 87);
-  display.print(F("A LITTLE LIFE"));
-  display.setCursor(48, 101);
-  display.print(F("ESP32 v47"));
-  display.display();
-  display.setLegacyLayout(true);
-  delay(1000);
+  NativeUI::Scope frame(display);display.clearDisplay();
+  NativeUI::room(display,0,0,12,0);NativeUI::pet(display,56,63,0,4,0);
+  NativeUI::header(display,"TAMACHIBI");
+  NativeUI::text(display,"A LITTLE WORLD",22,104,90);NativeUI::footer(display,"","HELLO!","");
+  display.display();delay(900);
 }
 
 
