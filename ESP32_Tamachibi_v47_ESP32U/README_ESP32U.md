@@ -17,7 +17,7 @@ Open this folder as a PlatformIO project and build the `esp32u` environment. `pl
 1. Install the Espressif **esp32** board package.
 2. Install `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
 3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding.
-4. Open `Tamachibi_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
+4. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
 5. Select the flash size printed for your board and a partition scheme with at least a 2 MB app slot. The included PlatformIO config uses `min_spiffs.csv`, which keeps OTA support and provides more app space than the default scheme. v47 stores saves in ESP32 EEPROM emulation and does not need a filesystem partition.
 6. Upload over USB with the battery boost output switched off. Keep all `.cpp`, `.h`, and `.ino` files together.
 
