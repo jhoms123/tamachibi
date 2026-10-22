@@ -1,0 +1,219 @@
+PICO TAMACHIBI v44 REAL-DAY CLOCK
+==================================
+
+OPEN THIS SKETCH
+----------------
+Pico_Tamachibi_v44_Real_Day_Clock.ino
+
+Keep every .ino, .cpp, .h, and data header in this same folder. Do not copy only
+the .ino file into another folder.
+
+NEW CLOCK SETUP
+---------------
+A standard Raspberry Pi Pico has no battery-backed real-time clock. Each time
+the board is fully powered off and turned on again, v44 asks for:
+
+1. Current weekday
+2. Current hour
+3. Current minute (5-minute steps)
+4. AM or PM
+
+Controls in the clock editor:
+- D0: decrease
+- D2: increase
+- D1: accept and move to the next field
+
+The clock can also be corrected later through Settings > Set real clock.
+
+REAL DAILY SCHEDULE
+-------------------
+Baby:  sleep 7:00 PM to 7:00 AM
+Child: sleep 8:00 PM to 7:00 AM; school Monday-Friday, 8:00 AM-3:00 PM
+Teen:   sleep 10:00 PM to 7:00 AM; school Monday-Friday, 8:00 AM-3:00 PM
+Adult:  sleep 11:00 PM to 6:00 AM; work Monday-Friday, 9:00 AM-5:00 PM when a career is selected
+Elder:  sleep 9:00 PM to 6:00 AM
+
+During school or work, the pet is shown in a readable classroom/office scene.
+Normal care calls and poop are paused while away, and a simple noon meal prevents
+unavoidable hunger mistakes. School develops intelligence and discipline; work
+provides modest career experience and pay.
+
+SLEEP CHANGES
+-------------
+- The former daytime quick-rest energy shortcut is removed.
+- Bedtime starts automatically from the real clock.
+- Night sleep cannot be skipped from the Light/Sleep menu.
+- A proper night raises energy and waking after enough sleep guarantees at least
+  9/10 energy.
+- If the Pico was powered off overnight, entering the morning time counts the
+  crossed bedtime hours as sleep recovery. It does not create artificial hunger,
+  sickness, poop, or care misses while the board had no clock.
+- Food, treatment, plants, and special bonuses may still give small energy gains,
+  but they cannot cancel the required nightly sleep schedule.
+
+OPTIONAL DS3231
+---------------
+The existing ENABLE_DS3231_RTC option remains available for a future external
+battery-backed RTC. With a DS3231 enabled and detected, the manual boot prompt is
+not required and true powered-off elapsed time can be replayed. No new hardware
+is required for the manual-clock version.
+
+SAVE COMPATIBILITY
+------------------
+The EEPROM layout and checksummed save structures are unchanged from v43c. Existing
+v43c saves can load in v44. The clock's last epoch is already part of the main save.
+
+
+--- PREVIOUS PROJECT SETUP NOTES ---
+
+IMPORTANT v43c COMPILE / DIALOGUE NOTE
+=======================================
+Open Pico_Tamachibi_v43c_Age_Coherent_Dialogue.ino from inside the folder
+Pico_Tamachibi_v43c_Age_Coherent_Dialogue. Do not compile the older v43,
+v43a, or v43b folder after extracting this package.
+
+v43c includes both previous compile hotfixes:
+- GrowingTogetherData.h uses an Arduino-supported .h extension.
+- No constrain<int>(...) expressions remain.
+
+PICO TAMACHIBI v43 — GROWING UP TOGETHER
+==================================================================
+
+WHAT THIS BUILD IS
+------------------
+v43 keeps the complete v42 game and adds a second persistent relationship and
+family narrative layer. It includes 27 feature families with 300 distinct base
+prompts each, four-day follow-up stories, promises, family values, rupture and
+repair, bedtime rituals, consent, keepsakes, language growth, school reports,
+chores, family meetings, co-parenting, privacy, apologies, shared hobbies,
+milestones, grief, intergenerational effects, false beliefs, temperament,
+relationship memories, traditions, rules, unsolicited behavior, reflection
+and narrative diagnostics.
+
+FILES THAT MUST STAY TOGETHER
+-----------------------------
+Extract the complete folder and open:
+
+  Pico_Tamachibi_v43_Growing_Up_Together.ino
+
+Arduino IDE compiles every .ino, .cpp, .h and included data file in the same
+folder. Do not copy only the .ino file and do not drag source files directly
+to the RPI-RP2 boot drive.
+
+ARDUINO SOFTWARE
+----------------
+Board core:
+  Raspberry Pi Pico/RP2040 by Earle F. Philhower, III
+
+Board selection:
+  Tools > Board > Raspberry Pi RP2040 Boards > Raspberry Pi Pico
+
+Required libraries:
+  Adafruit SSD1306
+  Adafruit GFX Library
+  Adafruit BusIO
+
+Flash setting:
+  Choose a Tools > Flash Size option that reserves at least 64 KB for FS.
+  LittleFS stores MAIN, TEST, manual, automatic and last-good snapshots.
+
+MAIN HARDWARE WIRING
+--------------------
+128x64 SSD1306 I2C OLED, normally address 0x3C:
+  OLED VCC -> Pico 3V3(OUT), physical pin 36
+  OLED GND -> Pico GND
+  OLED SDA -> Pico GP4, physical pin 6
+  OLED SCL -> Pico GP5, physical pin 7
+
+Buttons, each connected between GPIO and GND:
+  Left / D0   -> GP10, physical pin 14
+  Select / D1 -> GP11, physical pin 15
+  Right / D2  -> GP12, physical pin 16
+
+Passive piezo buzzer:
+  Positive -> GP15, physical pin 20
+  Negative -> GND
+
+DIALOGUE CONTROLS
+-----------------
+D0: scroll upward or move to the previous response.
+D2: scroll downward or move to the next response.
+D1: continue, confirm an answer, or close the final reply.
+
+Dialogue has no timeout. A long page stays visible until D1 is pressed. When
+there are more than five wrapped lines, the footer shows the current position.
+
+OPENING THE SYSTEMS
+-------------------
+Talk > Parent check-in
+  Answers the oldest waiting v43 or v42 conversation.
+
+Talk > Parent bond journal
+  Shows the original v42 developmental profile.
+
+Talk > Growing Together
+  Opens relationship state, rupture/repair, promises, language, school,
+  keepsakes, traditions, co-parenting, chores, family mood, active story arcs,
+  grief, parent reflection and narrative diagnostics.
+
+SAVE ARCHITECTURE
+-----------------
+The v43 Growing Together layer uses two alternating checksummed 269-byte save
+slots. Total EEPROM use is 3,714 of 4,096 bytes, leaving 382 bytes. Existing
+v42 saves preserve all older systems and initialize only the new v43 block.
+
+LittleFS profile snapshots still contain the complete 4,096-byte EEPROM image:
+  MAIN profile
+  TEST sandbox
+  Manual restore point
+  Automatic boot backup
+  Last successful load
+
+Developer Full Save Reset erases the entire EEPROM area and all LittleFS
+profile files after two confirmations.
+
+VALIDATION NOTE
+---------------
+The complete source passed a host-side C++17 compile and link harness. The
+8,100-prompt database, choice lengths, line wrapping, save boundary and ZIP
+were audited. A genuine Arduino-Pico compile and physical OLED, button,
+buzzer, EEPROM and LittleFS test were not available here. Keep a backup of the
+last working firmware before flashing.
+
+V43A ARDUINO INCLUDE HOTFIX
+---------------------------
+This package uses GrowingTogetherData.h instead of the unsupported .inc
+extension. Keep GrowingTogetherData.h in the same sketch folder as
+GrowingTogether.cpp. Do not open or compile only the .ino file from a different
+folder; extract the entire folder first.
+
+
+V45 GAME ACCESS NOTE
+--------------------
+At home, select Games and choose Arcade Games or Life-Stage Games. While the pet is at school or work, selecting Games opens the five stage-specific schedule games directly. Games remain blocked during scheduled sleep.
+
+V46 VISUAL OVERHAUL AND PROJECT STRUCTURE
+=========================================
+Open Pico_Tamachibi_v46_Visual_Overhaul.ino, but keep GameMain.cpp and every
+other .cpp/.h file in the same folder. The .ino is intentionally tiny to avoid
+Arduino automatic-prototype errors.
+
+The GP26 potentiometer remains the exclusive Tamagotchi/Home/City selector.
+Buttons navigate only within the selected view.
+
+V47 SECOND 128x32 NEEDS OLED
+============================
+The new status display uses the Pico's second I2C controller:
+
+128x32 OLED SDA -> GP6, physical pin 9
+128x32 OLED SCL -> GP7, physical pin 10
+128x32 OLED VCC -> 3V3 OUT, physical pin 36
+128x32 OLED GND -> any Pico GND
+Address          -> 0x3C
+Bus              -> Wire1 / I2C1
+
+The main 128x64 OLED remains:
+SDA GP4, SCL GP5, address 0x3C, Wire / I2C0.
+
+Do not connect both displays to the same SDA/SCL pair unless one module has
+been changed to a different I2C address and the code is modified accordingly.

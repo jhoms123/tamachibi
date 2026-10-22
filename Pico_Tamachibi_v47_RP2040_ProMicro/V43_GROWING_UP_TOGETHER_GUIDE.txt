@@ -1,0 +1,147 @@
+PICO TAMACHIBI v43 — GROWING UP TOGETHER
+==================================================================
+
+OVERVIEW
+--------
+v43 expands v42 into a persistent parent-child and family narrative system. It integrates every relationship-focused suggestion from the v42 follow-up: multi-day stories, family values, rupture and repair, promises, bedtime rituals, affection and consent, drawings and letters, keepsakes, language development, communication style, school reports, chores, family meetings, co-parenting, secrets and privacy, meaningful apologies, shared hobbies, milestone ceremonies, grief, intergenerational parenting, false beliefs, temperament-sensitive support, relationship memories, family traditions, household rules, unsolicited behavior, parent reflection, a structured authoring format, and narrative debugging.
+
+The expansion does not replace the existing 240 procedural life events or the 54,720-combination Parent Bond Dialogue system. It adds a second relationship database and connects it to the existing pet, family, garden, companion, school, rival, career, weather, generation, and save systems.
+
+DIALOGUE DATABASE
+-----------------
+There are 27 feature families. Every family contains 12 authored scenario roots, five openings, and five question endings. The cross-product is exactly 300 distinct base prompts per feature and 8,100 distinct base prompts overall. Live age, stage, trust, emotion, school, partner, child, rival, companion, garden, weather, location, promise, grief, and story-branch context is appended at runtime, so the number of complete in-game conversations is substantially larger.
+
+Every feature also has three context-specific response options and three immediate reply lines. Choices alter real saved systems rather than only showing different text.
+
+READABILITY AND CONTROLS
+------------------------
+All new and existing parent-dialogue pages use the same persistent reader:
+  • Text is wrapped at word boundaries to 21 characters per line.
+  • Five lines are shown at a time.
+  • D0 scrolls upward and D2 scrolls downward.
+  • The footer shows the current scroll position.
+  • D1 advances, answers, or closes.
+  • Dialogue never closes on a timer and cannot be silently cut off.
+  • The three response boxes remain on screen until D1 confirms a selection.
+  • Older Talk-menu conversations were moved into the same reader.
+
+PERSISTENT STORY BEHAVIOR
+-------------------------
+Multi-day stories last up to four follow-up steps. The game remembers whether the previous response listened and connected, created a practical plan, or pulled away. The next day uses the original feature's scenario bank and applies the real underlying system effects again. Promise deadlines, school reports, privacy concerns, grief, apologies, co-parenting disagreements, false beliefs, and ruptures can all generate follow-ups.
+
+FEATURES
+--------
+1. Story Arc
+   Four-step stories return on later in-game days, remember the earlier response branch, and apply the real effects of the underlying school, privacy, grief, relationship, or apology topic.
+
+2. Family Values
+   Tracks twelve family values and separate consistency scores so the Tamagotchi can notice contradictions between what the parent says and what the parent repeatedly rewards.
+
+3. Rupture and Repair
+   Models secure, distant, clingy, guarded, rebellious, resentful, reconnecting, and deeply trusting relationship states with explicit rupture and repair progress.
+
+4. Promises
+   Stores four concrete promises with action types and due days. Real actions such as playing, talking, gardening, bedtime, school, cooking, cleaning, and family time fulfill them; missed deadlines create follow-up conversations.
+
+5. Bedtime Rituals
+   Builds eight bedtime rituals, repetition streaks, and eventual family traditions around stories, songs, the best or hardest part of the day, goodnight, a night-light, family history, or quiet company.
+
+6. Affection and Consent
+   Tracks consent respect, affection bond, and changing preferences for hugs, hand-holding, high-fives, quiet closeness, playful contact, and space.
+
+7. Drawings and Letters
+   Creates drawings, cards, apology letters, invitations, family pictures, and handmade gifts that can become keepsakes and relationship memories.
+
+8. Keepsake Box
+   Maintains twelve keepsake categories, counts, milestone items, ancestor objects, repaired keepsakes, and loss-remembrance objects across generations.
+
+9. Language Growth
+   Advances vocabulary and speech patterns by stage, emotional coaching, school, talking, hobbies, and career. Baby sounds mature into child questions, teen humor, adult reflection, and elder storytelling.
+
+10. Parent Communication
+   Counts warm listening, comfort, coaching, boundaries, encouragement, independence support, dismissal, and mischief, then describes the current pattern without permanently labeling the player.
+
+11. School Reports
+   Tracks effort, cooperation, confidence, report days, learning difficulties, peer problems, honesty, and whether the parent praises effort, practices together, or focuses only on scores.
+
+12. Chores
+   Assigns daily responsibilities, records completed and missed chores, tracks fairness, and connects care, cleaning, gardening, and companion actions to responsibility development.
+
+13. Family Meetings
+   Schedules weekly family meetings, records whether the family was heard, compromised, or overruled, and changes family mood and decision history.
+
+14. Co-Parenting
+   Tracks co-parent style, agreement, disagreement, private problem-solving, shared plans, and the effect of adult conflict on partner harmony and child security.
+
+15. Secrets and Privacy
+   Stores a current secret, privacy trust, and safety confidence. Choices distinguish ordinary privacy from situations where a trusted adult must check safety.
+
+16. Meaningful Apology
+   Separates naming harm, making an apology, offering repair, forgiveness, and changed behavior. Apology and repair skills improve independently.
+
+17. Shared Hobbies
+   Tracks ten shared hobbies and bond levels. Repeated cooking, gardening, fishing, music, reading, stargazing, drawing, exercise, exploring, or pet care can become traditions.
+
+18. Milestone Ceremony
+   Records stage transitions and major life moments as ceremonies and keepsakes instead of allowing them to pass as a one-line notification.
+
+19. Grief and Remembrance
+   Carries a real family loss into the next generation, progresses through grief stages, creates remembrance keepsakes, and supports stories, memorials, and continuing bonds.
+
+20. Intergenerational
+   Carries eight learned parenting patterns into later generations, allowing a securely or harshly raised Tamagotchi to repeat, soften, or intentionally change what it experienced.
+
+21. False Beliefs
+   Creates mistaken interpretations about friendship, failure, attention, courage, and self-worth, then lets the parent check evidence, offer another explanation, or reinforce the fear.
+
+22. Temperament
+   Changes how support is interpreted according to temperament; sensitive, curious, independent, energetic, shy, and stubborn pets benefit from different combinations of reassurance, reasons, choices, and space.
+
+23. Relationship Memories
+   Stores eight relationship-specific memory channels covering kept promises, parents, siblings, partner, rival, companion, grandparents, and loss.
+
+24. Family Traditions
+   Recognizes eight repeated rituals or shared hobbies as family traditions that future generations can request, update, continue, or grieve when missed.
+
+25. Household Rules
+   Stores twelve household-rule flags and a consistency score so the Tamagotchi can ask why a rule exists, request a fair exception, or point out inconsistent enforcement.
+
+26. Unsolicited Behavior
+   Generates one daily independent behavior such as helping, hiding a mistake, practicing, inviting someone, caring for a pet, or neglecting a task; the parent responds to both intention and consequence.
+
+27. Just Listen
+   Lets the Tamagotchi explicitly ask for listening without advice and tracks whether that request was respected, building openness and empathy when the parent stays with the feeling.
+
+REAL GAMEPLAY CONNECTIONS
+-------------------------
+• Talk, care, play, bedtime, gardening, companion care, school, work, exploration, cooking, cleaning, family time, apologies, and hobbies are recorded as narrative actions.
+• Promise completion is checked against those real actions and due days.
+• School dialogue changes effort and confidence and also adjusts the existing Parent Bond development profile.
+• Garden responses water, tend, or damage the real garden plots.
+• Companion responses change the existing companion's bond, mood, energy, and experience.
+• Co-parenting and family-meeting choices change partner harmony, child bond, and family mood in Deep Life.
+• Rival, child, and relationship-memory effects are written into the existing family simulation.
+• Stage changes automatically create milestone keepsakes.
+• A real pet death or departure seeds a remembrance arc for the following generation.
+• Repeated bedtime rituals and shared hobbies become traditions.
+• The existing MAIN, TEST, manual-backup, automatic-backup, and last-good save profiles include the entire new narrative layer because they snapshot the full EEPROM image.
+
+WHERE TO FIND IT
+----------------
+Talk > Parent check-in: answers a waiting v43 or v42 conversation.
+Talk > Parent bond journal: opens the v42 developmental journal.
+Talk > Growing Together: opens the eight-page v43 relationship hub.
+
+The Growing Together hub shows relationship state, rupture and repair, consent and privacy, apology and rule consistency, active promises, language and school development, keepsakes and traditions, co-parenting, chores, active story arcs, grief, database totals, parent reflection, and narrative diagnostics.
+
+SAVE LAYOUT
+-----------
+GrowingTogetherSave is 269 bytes and uses two alternating checksummed EEPROM slots. The previous v42 data ended at byte 3,176. v43 ends at byte 3,714, leaving 382 bytes inside the Pico core's 4,096-byte EEPROM emulation area. Existing v42 saves initialize only the new v43 block and preserve all older progress.
+
+DEVELOPER SUPPORT
+-----------------
+Developer Max fills the relationship systems with high values for testing. Developer Full Save Reset erases the new block together with every older EEPROM block and LittleFS profile. Narrative Debug reports the last selected feature, weight, rejected-feature mask, active arc, stage, bond, trust, family mood, garden health, companion bond, and database formula.
+
+IMPORTANT TEST NOTE
+-------------------
+The full source passed a host-side C++17 compile and link harness plus database, line-length, save-boundary, and ZIP-integrity audits. The actual Arduino-Pico core and physical OLED, buttons, buzzer, EEPROM emulation, and LittleFS were not available in this environment, so compile the extracted folder in Arduino IDE and keep a known-good firmware backup before flashing.

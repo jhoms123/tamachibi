@@ -1,0 +1,61 @@
+V43 NARRATIVE AUTHORING GUIDE
+==================================================================
+
+The v43 narrative database is separated from the engine:
+  GrowingTogetherData.h  authored text and response labels
+  GrowingTogether.cpp      weighting, context, scrolling, effects and saves
+  GrowingTogether.h        public API, context, outcomes and save schema
+
+DATABASE SHAPE
+--------------
+GT_FEATURE_COUNT             27
+GT_SCENARIOS_PER_FEATURE     12
+GT_LEADS_PER_FEATURE          5
+GT_ENDINGS_PER_FEATURE        5
+GT_PROMPTS_PER_FEATURE      300
+Total base prompts         8,100
+
+A complete prompt is built as:
+  opening + scenario root + live context sentence + question ending
+
+This keeps flash use practical while still guaranteeing 300 distinct prompt
+strings for every feature. Do not lower the scenario/opening/ending constants
+without also changing the compile-time arrays.
+
+ADDING OR EDITING A SCENARIO
+----------------------------
+1. Edit the appropriate 12-line block in GrowingTogetherData.h.
+2. Keep every root self-contained and understandable at its eligible stages.
+3. Keep choice labels at 20 characters or fewer so they fit the 128-pixel OLED.
+4. Keep result replies concise; the result page scrolls, so they may be longer.
+5. Add or adjust the feature's weight in featureWeight().
+6. Add real saved consequences in applyFeatureChoice().
+7. Add live context in appendContextLine() when the feature benefits from it.
+8. Add the relevant real-world action hook to recordAction() or the main sketch.
+9. Run the database audit and full host build.
+
+MULTI-DAY STORIES
+-----------------
+A supported feature starts an arc in advanceArc(). Follow-ups occur on later
+in-game days. During a follow-up, v43 uses the original feature's scenario,
+choices, replies, and gameplay effects, then advances the four-step arc. The
+saved branch records whether the earlier response connected, planned, or
+withdrew.
+
+READABILITY CONTRACT
+--------------------
+All narrative text must use showScrollableText() or showReadableMessage().
+Never draw a long sentence directly onto the OLED. The reader provides:
+  21 characters per wrapped line
+  5 visible lines
+  up to 48 stored lines
+  D0/D2 scrolling
+  a visible scroll counter
+  D1-only advance and close
+
+SAVE MIGRATION
+--------------
+GrowingTogetherSave is versioned and checksummed. Adding new saved fields
+requires either consuming the remaining 382 EEPROM bytes or introducing a
+versioned migration. Do not reorder existing fields without changing the save
+version and adding migration logic.

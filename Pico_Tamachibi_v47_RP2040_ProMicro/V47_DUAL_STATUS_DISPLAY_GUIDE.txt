@@ -1,0 +1,52 @@
+PICO TAMACHIBI v47 - DUAL STATUS DISPLAY GUIDE
+================================================
+
+PURPOSE
+-------
+The main 128x64 SSD1306 remains the gameplay screen. A second 128x32 SSD1306
+is now a dedicated status display that remains useful when the main OLED has
+turned off from inactivity.
+
+SECOND DISPLAY WIRING
+---------------------
+128x32 OLED VCC -> Pico 3V3 OUT, physical pin 36
+128x32 OLED GND -> Pico GND
+128x32 OLED SDA -> Pico GP6, physical pin 9
+128x32 OLED SCL -> Pico GP7, physical pin 10
+
+The second OLED uses Wire1 and address 0x3C. The main 128x64 OLED remains on
+Wire using GP4/GP5 and address 0x3C. Because the displays are on separate I2C
+controllers, their identical addresses do not conflict.
+
+LIVE NEEDS SCREEN
+-----------------
+FD = food/fullness
+FN = fun/happiness
+EN = energy
+CL = cleanliness
+HP = health
+PP = visible poop count
+
+Each value includes a small 0-10 bar. PP uses a 0-3 bar.
+
+BLINKING
+--------
+Value 5-10: steady
+Value 3-4: slow attention blink
+Value 0-2: fast urgent blink
+
+Health also fast-blinks during sickness or a serious condition. Cleanliness
+fast-blinks when there are two or more poop piles. A single poop pile blinks
+slowly.
+
+SCHEDULE SCREENS
+----------------
+During school: AT SCHOOL / CARE COVERED / BACK 3:00 PM
+During work:   AT WORK / CARE COVERED / BACK 5:00 PM
+During sleep:  ZZZ SLEEPING / ENERGY RECOVERING / wake time
+With sitter:   WITH SITTER / NEEDS ARE COVERED / hours remaining
+Egg/death states receive dedicated pages.
+
+The smaller display is informational only. It does not use buttons and does
+not change the potentiometer behavior. GP26 remains exclusively responsible
+for Tamagotchi/Home/City view selection.

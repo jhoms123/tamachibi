@@ -1,0 +1,38 @@
+PICO TAMACHIBI v45 CHANGE NOTES
+================================
+
+MAIN REQUEST
+------------
+School and work no longer remove gameplay. The pet remains unavailable for
+ordinary care while following its real schedule, but the Games action stays
+available at every awake life stage.
+
+ADDED
+-----
+- 25 life-stage games: five each for Baby, Child, Teen, Adult, and Elder.
+- A Game Type screen at home: Arcade Games or Life-Stage Games.
+- Direct access to life-stage games while the pet is at school or work.
+- Schedule bonuses for school, work, baby routine, and elder routine hours.
+- High-contrast game objects and protected player silhouettes.
+- Stage-specific rewards connected to intelligence, fitness, kindness,
+  discipline, Study Stars, career XP, reputation, coins, bonding, and trust.
+
+SLEEP AND ENERGY
+----------------
+- Sleeping still blocks every game.
+- Games do not wake the pet.
+- Games never restore energy.
+- Every completed life-stage game removes 1 energy.
+- If bedtime arrives during gameplay, scheduled sleep begins after the game.
+- School and work games do not replace the required night-sleep recovery.
+
+SCHEDULE LOCK CHANGE
+--------------------
+The away-time action gate now permits M_GAME while retaining the lock on food,
+cleaning, medicine, travel, shopping, and other actions that should require the
+pet to be home.
+
+SAVE COMPATIBILITY
+------------------
+No save structure, EEPROM address, checksum, or profile format was changed.
+Existing v44 and compatible older saves continue to load.

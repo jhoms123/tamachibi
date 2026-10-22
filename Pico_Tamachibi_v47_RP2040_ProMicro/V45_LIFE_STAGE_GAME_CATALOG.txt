@@ -1,0 +1,110 @@
+PICO TAMACHIBI v45 LIFE-STAGE GAME CATALOG
+============================================
+
+ACCESS RULES
+------------
+- Sleeping is the only state that blocks games.
+- At home, Games opens a choice between Arcade Games and Life-Stage Games.
+- During school or work, Games opens the current stage's five schedule games.
+- Stage games can also be practiced outside scheduled hours.
+- Playing never restores energy and therefore cannot replace night sleep.
+- Every completed stage game costs 1 energy.
+- Games played during the stage's scheduled activity window receive a bonus.
+
+BABY: FIVE EARLY-DEVELOPMENT GAMES
+----------------------------------
+1. Toy Catch
+   Move under falling toys. Builds bonding, attention, and gentle coordination.
+2. Crawl Around
+   Move around soft obstacles. Builds movement skill without using sleep recovery.
+3. Clap Along
+   Press Select when the moving marker enters the target zone.
+4. Peekaboo
+   Memorize and repeat left/right patterns.
+5. Shape Sort
+   Sort circles and squares into matching bins.
+
+Baby routine bonus: 9:00-11:00 AM and 2:00-4:00 PM.
+
+CHILD: FIVE SCHOOL-DAY GAMES
+-----------------------------
+1. Pencil Catch
+   Catch falling classroom supplies.
+2. Hallway Dodge
+   Avoid backpacks and hallway obstacles.
+3. Recess Jump
+   Time jumps inside the safe target zone.
+4. Spelling Steps
+   Memorize and repeat left/right spelling patterns.
+5. Lunch Sort
+   Sort lunch items into the correct category.
+
+School bonus: weekdays from 8:00 AM to 3:00 PM.
+Successful school-time play can increase intelligence, discipline, and Study Stars.
+
+TEEN: FIVE ADVANCED SCHOOL GAMES
+--------------------------------
+1. Note Catch
+   Catch falling notes and study pages.
+2. Locker Rush
+   Dodge lockers and crowded hallway obstacles.
+3. Band Timing
+   Hit the rhythm target at the correct moment.
+4. Quiz Pattern
+   Memorize longer left/right answer sequences.
+5. Group Project
+   Sort project materials into the correct side.
+
+School bonus: weekdays from 8:00 AM to 3:00 PM.
+Teen games develop intelligence, fitness, kindness, discipline, and school confidence.
+
+ADULT: FIVE WORKPLACE GAMES
+----------------------------
+1. Supply Catch
+   Catch falling office and job supplies.
+2. Coworker Dodge
+   Avoid rude or distracting coworkers and workplace hazards.
+3. Meeting Timing
+   Speak or act when the timing marker enters the target zone.
+4. Inbox Order
+   Memorize the correct sequence for messages and tasks.
+5. Commute Sort
+   Sort commute and work decisions into the correct path.
+
+Work bonus: weekdays from 9:00 AM to 5:00 PM when the adult has a career.
+Work-time wins provide extra career XP, reliability reputation, and Gotchi Points.
+
+ELDER: FIVE ACTIVE-AGING GAMES
+-------------------------------
+1. Herb Basket
+   Catch useful herbs and keepsakes.
+2. Garden Stroll
+   Avoid garden obstacles during a gentle walk.
+3. Gentle Stretch
+   Time stretches safely inside the target zone.
+4. Story Order
+   Remember and repeat the order of a family story.
+5. Tea Sort
+   Sort tea and table items into their correct places.
+
+Elder routine bonus: 8:00-11:00 AM and 3:00-5:00 PM.
+Elder games develop fitness, wisdom, kindness, bonding, and family mentoring.
+
+CONTROLS
+--------
+Menus:
+- D0: previous
+- D1: select/play
+- D2: next
+- Hold D2: exit
+
+Catch/Dodge:
+- Hold or tap D0/D2 to move.
+
+Timing:
+- D1 stops the marker.
+
+Memory/Sort:
+- D0 chooses left.
+- D2 chooses right.
+- Hold D2 for about three seconds to leave the game.

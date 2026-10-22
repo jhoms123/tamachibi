@@ -1,0 +1,13 @@
+V47 RP2040 PROMICRO CHANGE NOTES
+================================
+
+1. Renamed sketch and folder for the RP2040 ProMicro target.
+2. Changed board documentation from Raspberry Pi Pico to Generic RP2040.
+3. Reserved GP17 for the onboard RGB LED and drive it LOW at startup.
+4. Kept the supplied dual-OLED mapping: GP4/5 and GP6/7.
+5. Kept buttons GP10/11/12, buzzer GP15 and dial GP26.
+6. Reserved GP0-3 for SD and GP20-22 for future I2S audio.
+7. Moved the optional disabled battery monitor enable from GP22 to GP29.
+8. Changed the splash label to v47 PROMICRO.
+9. Added ProMicro-specific Arduino IDE and upload instructions.
+10. No gameplay, save layout, dialogue, growth, scheduling or visual logic was removed.

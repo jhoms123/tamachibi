@@ -1,0 +1,42 @@
+PICO TAMACHIBI v46a FOCUSED MENU + DYNAMIC HOME
+================================================
+
+MENU CONTROLS
+-------------
+D0: previous item
+D1: open selected item
+D2: next item
+Hold D2: return from supported submenus
+
+Only the selected item is shown as a large icon. The right panel explains the
+selection and shows its position. The small side-icon previews were removed.
+
+HOME LAYOUT
+-----------
+The Pet Room changes according to who actually lives there:
+
+SOLO
+- Main Tamagotchi is centered.
+- Former family space becomes a reading nook.
+- No spouse-shaped empty panel is reserved.
+
+WITH SPOUSE
+- Main Tamagotchi moves left.
+- Spouse receives a separate protected pad.
+- Companion is placed between them without covering either sprite.
+
+WITH CHILDREN
+- Child uses the far-right family pad.
+- Main Tamagotchi shifts left enough to keep both visible.
+
+WITH SPOUSE AND CHILDREN
+- Pet, companion, spouse and child each use separate horizontal zones.
+
+WORLD CONTROL
+-------------
+The GP26 potentiometer still exclusively selects:
+- Low: Tamagotchi
+- Middle: Home
+- High: City
+
+Buttons do not switch between those three world scales.

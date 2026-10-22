@@ -1,0 +1,43 @@
+PICO TAMACHIBI v46a VALIDATION REPORT
+=====================================
+
+SOURCE STRUCTURE
+----------------
+- Matching sketch folder and .ino filename: PASS
+- Full game remains in GameMain.cpp: PASS
+- setup() definitions: 1
+- loop() definitions: 1
+- Unsupported .inc source files: 0
+- Invalid constrain<int>(...) expressions: 0
+
+HOST-SIDE BUILD
+---------------
+All .cpp modules compiled as C++17 using the Arduino/SSD1306 compatibility
+harness. Complete project link result: PASS.
+
+MENU AUDIT
+----------
+- Miniature previous/next icons removed from both menu levels.
+- One large selected icon is drawn per menu screen.
+- All new category descriptions are 11 characters or fewer.
+- All new action descriptions fit the focused information panel.
+- Locked states use short age requirement text.
+
+HOME OCCUPANCY AUDIT
+--------------------
+- No spouse and no children: centered solo layout plus reading nook.
+- Spouse present: family layout activates and spouse actor is drawn.
+- Children present: child actor pad remains available.
+- Spouse plus children: distinct pet, companion, spouse and child positions.
+- No unconditional spouse placeholder is drawn.
+
+SAVE COMPATIBILITY
+------------------
+No save data structures, checksums, EEPROM addresses or LittleFS snapshot
+formats were changed.
+
+LIMITATIONS
+-----------
+A genuine Arduino-Pico board-package compile and physical OLED inspection were
+not available. The host build verifies source compatibility and linking, but
+final appearance should still be checked on the 128x64 OLED or Wokwi.

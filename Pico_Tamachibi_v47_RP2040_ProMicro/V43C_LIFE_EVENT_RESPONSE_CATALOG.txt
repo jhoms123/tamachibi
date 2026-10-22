@@ -1,0 +1,1202 @@
+PICO TAMACHIBI v43c - 240 LIFE EVENT RESPONSE CATALOG
+====================================================================
+
+001. CLASSIC - Lost Package
+Prompt: A lost package needs help.
+A: find the owner
+B: take to office
+
+002. CLASSIC - Sudden Storm
+Prompt: A storm reaches the town.
+A: help outside
+B: shelter family
+
+003. CLASSIC - Rival Challenge
+Prompt: Your rival challenges you.
+A: play fairly
+B: talk first
+
+004. CLASSIC - Sick Neighbor
+Prompt: A neighbor feels unwell.
+A: bring supplies
+B: call the clinic
+
+005. CLASSIC - Mystery Egg
+Prompt: A mystery egg appears.
+A: guard and watch
+B: tell the lab
+
+006. CLASSIC - Garden Trouble
+Prompt: The garden is damaged.
+A: tend the plants
+B: inspect first
+
+007. CLASSIC - Club Invitation
+Prompt: A club invites you in.
+A: join a meeting
+B: ask questions
+
+008. CLASSIC - Family Picnic
+Prompt: The family plans a meal.
+A: picnic together
+B: quiet meal
+
+009. CLASSIC - Stray Companion
+Prompt: A stray pet needs help.
+A: offer safe care
+B: find its home
+
+010. CLASSIC - Work Emergency
+Prompt: Work needs an urgent choice.
+A: help solve it
+B: set a limit
+
+011. CLASSIC - Old Map
+Prompt: An old map shows a route.
+A: explore safely
+B: study it first
+
+012. CLASSIC - Festival Practice
+Prompt: A festival is coming.
+A: practice now
+B: plan a routine
+
+013. CLASSIC - Sibling Dispute
+Prompt: Two children disagree.
+A: hear both sides
+B: set fair turns
+
+014. CLASSIC - Rare Visitor
+Prompt: A rare visitor arrives.
+A: welcome them
+B: watch politely
+
+015. CLASSIC - Broken Toy
+Prompt: A favorite toy broke.
+A: repair together
+B: reuse the parts
+
+016. CLASSIC - Ancestor Letter
+Prompt: An ancestor left a letter.
+A: read together
+B: save for later
+
+017. First Laugh
+Prompt: Baby laughs at you.
+A: laugh back
+B: cuddle close
+
+018. Blanket Fort
+Prompt: Baby crawls inside.
+A: join the fort
+B: make it safe
+
+019. Bottle Refusal
+Prompt: Baby turns from bottle.
+A: check needs
+B: try again later
+
+020. Nap Trouble
+Prompt: Baby cannot settle.
+A: soothe now
+B: quiet routine
+
+021. Tiny Footsteps
+Prompt: Baby tries to walk.
+A: hold hands
+B: cheer nearby
+
+022. Bath Splash
+Prompt: Baby splashes wildly.
+A: play gently
+B: calm the bath
+
+023. New Sound
+Prompt: Baby tries a new sound.
+A: babble back
+B: name the sound
+
+024. Lost Pacifier
+Prompt: Comfort item is missing.
+A: search together
+B: offer a cuddle
+
+025. Night Fright
+Prompt: Baby wakes up afraid.
+A: hold close
+B: use soft light
+
+026. Mirror Friend
+Prompt: Baby sees a reflection.
+A: wave together
+B: name the face
+
+027. Soft Toy Choice
+Prompt: Baby reaches for a toy.
+A: let baby choose
+B: rotate the toys
+
+028. First Crawl
+Prompt: Baby starts to crawl.
+A: clear a path
+B: cheer gently
+
+029. High Chair Mess
+Prompt: Food covers the tray.
+A: clean calmly
+B: let baby help
+
+030. Doorway Wonder
+Prompt: Baby studies a doorway.
+A: explore safely
+B: carry closer
+
+031. Clap Along
+Prompt: Baby copies your clap.
+A: clap back
+B: sing softly
+
+032. Sleepy Cuddle
+Prompt: Baby is ready to rest.
+A: cuddle now
+B: tuck in gently
+
+033. School Project
+Prompt: A project feels difficult.
+A: plan the steps
+B: ask for help
+
+034. Playground Dare
+Prompt: A dare feels unsafe.
+A: say no clearly
+B: tell an adult
+
+035. Lost Crayon
+Prompt: A crayon went missing.
+A: help search
+B: share another
+
+036. Class Pet
+Prompt: The class pet needs care.
+A: help gently
+B: learn the routine
+
+037. Library Card
+Prompt: A first library visit.
+A: choose a book
+B: ask librarian
+
+038. Show and Tell
+Prompt: It is show-and-tell day.
+A: practice first
+B: bring a helper
+
+039. Rainy Recess
+Prompt: Recess moved indoors.
+A: invent a game
+B: invite a friend
+
+040. Secret Club
+Prompt: A secret club forms.
+A: ask the rules
+B: make it fair
+
+041. Lunch Trade
+Prompt: Someone wants your lunch.
+A: trade fairly
+B: say no kindly
+
+042. Science Seed
+Prompt: A seed is a class test.
+A: care each day
+B: record growth
+
+043. Art Contest
+Prompt: Your art is in a contest.
+A: submit proudly
+B: ask feedback
+
+044. New Classmate
+Prompt: A new child looks lonely.
+A: say hello
+B: invite them in
+
+045. Homework Help
+Prompt: Homework feels too hard.
+A: do one step
+B: ask for support
+
+046. Treehouse Plan
+Prompt: Friends plan a treehouse.
+A: make safe rules
+B: draw the plan
+
+047. Music Lesson
+Prompt: A music lesson is hard.
+A: practice slowly
+B: try a rhythm
+
+048. Field Trip
+Prompt: A field trip is coming.
+A: prepare a bag
+B: ask questions
+
+049. Style Debate
+Prompt: Friends judge your style.
+A: be yourself
+B: hear them out
+
+050. Rival Rumor
+Prompt: A rumor involves your rival.
+A: check the facts
+B: speak privately
+
+051. Club Election
+Prompt: Your club needs a leader.
+A: run fairly
+B: support someone
+
+052. Late Curfew
+Prompt: You came home too late.
+A: explain honestly
+B: make a new plan
+
+053. First Crush
+Prompt: You like someone new.
+A: go slowly
+B: ask for advice
+
+054. Big Audition
+Prompt: A big audition is near.
+A: practice calmly
+B: manage nerves
+
+055. Team Tryout
+Prompt: A team tryout is today.
+A: give full effort
+B: encourage others
+
+056. Identity Journal
+Prompt: Your identity feels new.
+A: write honestly
+B: talk safely
+
+057. Friend Fallout
+Prompt: A friendship has broken.
+A: ask what hurt
+B: set a boundary
+
+058. Career Shadow
+Prompt: A career visit interests you.
+A: ask questions
+B: observe closely
+
+059. Solo Journey
+Prompt: You want a solo outing.
+A: plan it safely
+B: start smaller
+
+060. Public Speech
+Prompt: You must speak publicly.
+A: rehearse first
+B: breathe slowly
+
+061. Secret Talent
+Prompt: A hidden talent appears.
+A: practice it
+B: share carefully
+
+062. Peer Pressure
+Prompt: Friends pressure you.
+A: refuse clearly
+B: leave and tell
+
+063. Future Choice
+Prompt: The future feels uncertain.
+A: compare choices
+B: try one step
+
+064. Graduation Plan
+Prompt: Graduation needs a plan.
+A: mark the moment
+B: plan what follows
+
+065. Busy Shift
+Prompt: A work shift is too busy.
+A: prioritize tasks
+B: ask for help
+
+066. New Contract
+Prompt: A new contract arrives.
+A: read carefully
+B: seek advice
+
+067. Work Mistake
+Prompt: You made a work mistake.
+A: admit and repair
+B: review the cause
+
+068. Team Conflict
+Prompt: Your team is in conflict.
+A: hear each side
+B: set a plan
+
+069. Promotion Talk
+Prompt: A promotion is discussed.
+A: state your goals
+B: ask expectations
+
+070. Client Request
+Prompt: A client asks too much.
+A: set a boundary
+B: offer options
+
+071. Night Shift
+Prompt: A night shift is offered.
+A: protect your rest
+B: plan support
+
+072. Career Change
+Prompt: You may change careers.
+A: compare paths
+B: test a skill
+
+073. Mentor Request
+Prompt: Someone asks for mentoring.
+A: teach patiently
+B: set a schedule
+
+074. Big Deadline
+Prompt: A deadline is close.
+A: focus priorities
+B: request support
+
+075. Office Party
+Prompt: A work party feels awkward.
+A: attend briefly
+B: connect quietly
+
+076. Skill Course
+Prompt: A course could help you.
+A: enroll now
+B: plan the time
+
+077. Side Project
+Prompt: A side project inspires you.
+A: make a prototype
+B: protect balance
+
+078. Work Travel
+Prompt: Work travel is offered.
+A: discuss family
+B: plan carefully
+
+079. Ethics Choice
+Prompt: A work choice feels wrong.
+A: speak honestly
+B: seek guidance
+
+080. Dream Venture
+Prompt: A dream business calls.
+A: start small
+B: build a plan
+
+081. Old Photograph
+Prompt: An old photo returns.
+A: share the story
+B: save it safely
+
+082. Family Recipe
+Prompt: A recipe holds memories.
+A: cook together
+B: write it down
+
+083. Garden Lesson
+Prompt: A child asks about gardens.
+A: teach gently
+B: show one step
+
+084. Legacy Speech
+Prompt: The family wants a speech.
+A: speak from heart
+B: tell a memory
+
+085. Quiet Morning
+Prompt: A quiet morning arrives.
+A: sit together
+B: take a slow walk
+
+086. Heirloom Repair
+Prompt: An heirloom needs repair.
+A: restore it
+B: explain its marks
+
+087. Story Circle
+Prompt: The family gathers for tales.
+A: tell a story
+B: invite questions
+
+088. Final Project
+Prompt: One final project matters.
+A: begin together
+B: leave a guide
+
+089. Old Rival Visit
+Prompt: An old rival visits.
+A: remember kindly
+B: repair old hurt
+
+090. City Tribute
+Prompt: The city honors your work.
+A: thank everyone
+B: share the credit
+
+091. Wisdom Letter
+Prompt: You want to leave a letter.
+A: write honestly
+B: add advice
+
+092. Memory Walk
+Prompt: A memory walk is planned.
+A: revisit places
+B: bring family
+
+093. Grandchild Ask
+Prompt: A grandchild asks a lot.
+A: teach one thing
+B: listen first
+
+094. Ancient Song
+Prompt: An old song is remembered.
+A: sing together
+B: record the words
+
+095. Retirement Plan
+Prompt: Retirement needs meaning.
+A: choose a purpose
+B: rest and reflect
+
+096. Starry Farewell
+Prompt: The stars bring reflection.
+A: share gratitude
+B: name a legacy
+
+097. Forgotten Hello
+Prompt: A greeting was forgotten.
+A: reconnect now
+B: explain gently
+
+098. Long Cuddle
+Prompt: You both need closeness.
+A: cuddle together
+B: sit and listen
+
+099. Quiet Distance
+Prompt: The bond feels distant.
+A: ask what changed
+B: give safe space
+
+100. Shared Snack
+Prompt: A snack could be shared.
+A: eat together
+B: save their share
+
+101. Care Promise
+Prompt: A care promise is due.
+A: keep it now
+B: set exact time
+
+102. Favorite Game
+Prompt: A favorite game is asked for.
+A: play together
+B: schedule it
+
+103. Trust Test
+Prompt: Trust is being tested.
+A: tell the truth
+B: repair the miss
+
+104. Bedtime Talk
+Prompt: A bedtime talk begins.
+A: listen fully
+B: soothe first
+
+105. Unexpected Gift
+Prompt: A gift appears for you.
+A: thank warmly
+B: ask its meaning
+
+106. Missed Routine
+Prompt: A routine was missed.
+A: apologize
+B: rebuild routine
+
+107. Comfort Needed
+Prompt: Comfort is needed.
+A: ask what helps
+B: stay nearby
+
+108. Proud Moment
+Prompt: Your Tama feels proud.
+A: celebrate effort
+B: ask the story
+
+109. Hard Goodbye
+Prompt: A goodbye feels hard.
+A: name the feeling
+B: plan reunion
+
+110. Welcome Home
+Prompt: Someone returns home.
+A: welcome warmly
+B: listen first
+
+111. Private Joke
+Prompt: A private joke returns.
+A: laugh together
+B: add a new one
+
+112. Loyal Choice
+Prompt: Loyalty needs a choice.
+A: show up kindly
+B: speak honestly
+
+113. Anniversary Plan
+Prompt: An anniversary is near.
+A: plan together
+B: make a keepsake
+
+114. Chore Dispute
+Prompt: Chores cause an argument.
+A: divide fairly
+B: trade tasks
+
+115. Dinner Date
+Prompt: You want time as partners.
+A: share dinner
+B: take a walk
+
+116. Money Talk
+Prompt: Money is causing stress.
+A: review together
+B: set priorities
+
+117. Old Friend
+Prompt: An old friend returns.
+A: welcome openly
+B: discuss limits
+
+118. Parenting Plan
+Prompt: Parents need one plan.
+A: talk privately
+B: agree on rules
+
+119. Career Balance
+Prompt: Work strains the marriage.
+A: protect time
+B: share duties
+
+120. Quiet Evening
+Prompt: A quiet evening opens.
+A: sit close
+B: talk gently
+
+121. Jealous Moment
+Prompt: Jealousy appears.
+A: reassure honestly
+B: name the need
+
+122. Shared Hobby
+Prompt: A hobby could be shared.
+A: practice together
+B: alternate turns
+
+123. Family Visit
+Prompt: Relatives are visiting.
+A: plan boundaries
+B: welcome help
+
+124. Big Decision
+Prompt: A major choice is due.
+A: hear both views
+B: compromise
+
+125. Home Repair
+Prompt: The home needs repair.
+A: work together
+B: hire support
+
+126. Travel Dream
+Prompt: A travel dream returns.
+A: plan the trip
+B: save gradually
+
+127. Apology Note
+Prompt: An apology note arrives.
+A: read and talk
+B: ask for repair
+
+128. Promise Renewed
+Prompt: A vow needs renewal.
+A: say it clearly
+B: show it in action
+
+129. Sibling Toy
+Prompt: Two siblings want one toy.
+A: set fair turns
+B: hear both sides
+
+130. Bedtime Story
+Prompt: A child asks for a story.
+A: read together
+B: invent one
+
+131. School Worry
+Prompt: School feels frightening.
+A: listen first
+B: make a plan
+
+132. Shared Chore
+Prompt: A family chore is shared.
+A: work together
+B: assign steps
+
+133. Talent Show
+Prompt: A talent show is coming.
+A: practice gently
+B: cheer them on
+
+134. Broken Keepsake
+Prompt: A keepsake was broken.
+A: repair together
+B: admit feelings
+
+135. Secret Snack
+Prompt: A snack was hidden.
+A: ask honestly
+B: set a fair rule
+
+136. Parent Choice
+Prompt: A parent choice is hard.
+A: explain the reason
+B: offer choices
+
+137. Sibling Praise
+Prompt: One sibling did well.
+A: praise without compare
+B: celebrate all
+
+138. Family Game
+Prompt: The family wants a game.
+A: choose together
+B: take turns
+
+139. First Lesson
+Prompt: A first lesson begins.
+A: teach one step
+B: let them try
+
+140. Rainy Tantrum
+Prompt: Rain caused a meltdown.
+A: comfort first
+B: name the feeling
+
+141. Lost Homework
+Prompt: Homework is missing.
+A: search calmly
+B: tell teacher
+
+142. Big Question
+Prompt: A child asks a big question.
+A: answer honestly
+B: explore together
+
+143. Heirloom Turn
+Prompt: Two children want heirloom.
+A: make fair turns
+B: explain history
+
+144. Group Hug
+Prompt: The family needs comfort.
+A: group hug
+B: sit together
+
+145. Pet Won't Eat
+Prompt: Your pet will not eat.
+A: check health
+B: offer later
+
+146. Mud Tracks
+Prompt: Mud tracks cover the floor.
+A: clean together
+B: teach the route
+
+147. New Trick
+Prompt: Your pet learns a trick.
+A: reward gently
+B: practice once
+
+148. Hidden Treasure
+Prompt: Your pet found an object.
+A: inspect safely
+B: return it
+
+149. Vet Scare
+Prompt: Your pet seems unwell.
+A: visit clinic
+B: rest and watch
+
+150. Jealous Pet
+Prompt: Your pet wants attention.
+A: reassure it
+B: share turns
+
+151. Runaway Scare
+Prompt: Your pet ran away briefly.
+A: search calmly
+B: secure the area
+
+152. Favorite Spot
+Prompt: Your pet chose a safe spot.
+A: respect the spot
+B: make it cozy
+
+153. Pet Birthday
+Prompt: It is your pet's birthday.
+A: celebrate gently
+B: make a treat
+
+154. Strange Bark
+Prompt: Your pet makes a new sound.
+A: observe calmly
+B: check its needs
+
+155. Night Watch
+Prompt: Your pet guards at night.
+A: praise calmly
+B: help it rest
+
+156. Garden Dig
+Prompt: Your pet dug in the garden.
+A: redirect gently
+B: give dig spot
+
+157. Companion Race
+Prompt: A companion race starts.
+A: play fairly
+B: cheer both pets
+
+158. Cozy Nap
+Prompt: Your pet needs a quiet nap.
+A: protect quiet
+B: sit nearby
+
+159. Wild Friend
+Prompt: Your pet meets a wild friend.
+A: watch safely
+B: give them space
+
+160. Loyal Rescue
+Prompt: Your pet helped in danger.
+A: comfort and praise
+B: check injuries
+
+161. Dry Seedlings
+Prompt: Seedlings need water.
+A: water gently
+B: check the soil
+
+162. First Bud
+Prompt: The first bud opens.
+A: celebrate it
+B: record growth
+
+163. Garden Pests
+Prompt: Pests found the garden.
+A: remove safely
+B: protect plants
+
+164. Overgrown Vines
+Prompt: Vines cover nearby plants.
+A: trim gently
+B: add support
+
+165. Rare Blossom
+Prompt: A rare flower appears.
+A: protect it
+B: study it
+
+166. Heavy Harvest
+Prompt: The harvest is very large.
+A: gather together
+B: share extras
+
+167. Broken Trellis
+Prompt: A trellis has broken.
+A: repair it
+B: move the vine
+
+168. Mystery Sprout
+Prompt: An unknown sprout grows.
+A: observe it
+B: research it
+
+169. Compost Heat
+Prompt: The compost is too hot.
+A: turn the pile
+B: add dry matter
+
+170. Bird Visitors
+Prompt: Birds visit the crops.
+A: share a corner
+B: protect harvest
+
+171. Moon Bloom
+Prompt: A flower opens at night.
+A: watch quietly
+B: record the bloom
+
+172. Flooded Bed
+Prompt: A garden bed is flooded.
+A: drain the water
+B: move seedlings
+
+173. Prize Vegetable
+Prompt: A vegetable may win a prize.
+A: enter it
+B: save its seeds
+
+174. Weed Invasion
+Prompt: Weeds spread quickly.
+A: pull together
+B: mulch the soil
+
+175. Seed Exchange
+Prompt: A neighbor offers seeds.
+A: trade fairly
+B: share advice
+
+176. Autumn Harvest
+Prompt: Autumn crops are ready.
+A: harvest now
+B: save for feast
+
+177. Wilting Leaves
+Prompt: Leaves are wilting.
+A: check water
+B: change the light
+
+178. New Cutting
+Prompt: A cutting may grow roots.
+A: place in water
+B: use fresh soil
+
+179. Pot Cracked
+Prompt: A plant pot cracked.
+A: repot it
+B: repair the pot
+
+180. Window Light
+Prompt: Light shifts at the window.
+A: move the plant
+B: watch one day
+
+181. Root Bound
+Prompt: Roots fill the whole pot.
+A: repot larger
+B: divide gently
+
+182. Tiny Flowers
+Prompt: Tiny flowers appear.
+A: enjoy the bloom
+B: record it
+
+183. Moldy Soil
+Prompt: Mold appears in soil.
+A: remove bad soil
+B: improve airflow
+
+184. Rare Fragrance
+Prompt: A rare scent fills the room.
+A: identify it
+B: share the moment
+
+185. Fallen Shelf
+Prompt: A shelf has fallen.
+A: rescue plants
+B: rebuild safely
+
+186. Plant Gift
+Prompt: Someone gives a plant.
+A: find its needs
+B: choose a spot
+
+187. Leaf Pattern
+Prompt: Leaves show a new pattern.
+A: inspect health
+B: photograph it
+
+188. Warm Draft
+Prompt: Warm air dries the leaves.
+A: move from draft
+B: add humidity
+
+189. Water Leak
+Prompt: Water leaks near plants.
+A: stop the leak
+B: move the pots
+
+190. New Planter
+Prompt: A new planter is empty.
+A: choose a plant
+B: plan a grouping
+
+191. Night Bloom
+Prompt: A flower opens at night.
+A: watch quietly
+B: note the time
+
+192. Indoor Jungle
+Prompt: Plants crowd the whole room.
+A: rearrange them
+B: gift a cutting
+
+193. Sudden Rainbow
+Prompt: A rainbow fills the sky.
+A: go look
+B: make a memory
+
+194. Thick Fog
+Prompt: Fog hides the paths.
+A: stay close
+B: wait for clearing
+
+195. Heat Wave
+Prompt: The day is dangerously hot.
+A: rest indoors
+B: bring water
+
+196. First Snow
+Prompt: The first snow arrives.
+A: play safely
+B: watch together
+
+197. Meteor Shower
+Prompt: Meteors cross the sky.
+A: make a wish
+B: record the event
+
+198. Thunder Night
+Prompt: Thunder shakes the house.
+A: comfort everyone
+B: prepare safely
+
+199. Windy Morning
+Prompt: Strong wind moves objects.
+A: secure outdoors
+B: stay inside
+
+200. Spring Rain
+Prompt: Spring rain begins.
+A: check garden
+B: enjoy the sound
+
+201. Dry Spell
+Prompt: A dry spell continues.
+A: conserve water
+B: water priorities
+
+202. Frost Warning
+Prompt: Frost may hurt crops.
+A: cover plants
+B: move pots in
+
+203. Cloud Shapes
+Prompt: Clouds form strange shapes.
+A: imagine together
+B: sketch them
+
+204. Long Sunset
+Prompt: Sunset lasts a long time.
+A: sit and watch
+B: take a walk
+
+205. Hail Surprise
+Prompt: Hail starts suddenly.
+A: shelter quickly
+B: protect plants
+
+206. Moon Halo
+Prompt: A halo circles the moon.
+A: observe it
+B: tell a story
+
+207. Storm Cleanup
+Prompt: The storm left a mess.
+A: clean together
+B: help neighbors
+
+208. Season Turn
+Prompt: The season is changing.
+A: adjust routines
+B: mark the change
+
+209. Scratchy Throat
+Prompt: A throat feels scratchy.
+A: rest and drink
+B: check symptoms
+
+210. Tired Eyes
+Prompt: Eyes feel very tired.
+A: take a break
+B: lower the light
+
+211. Stomach Flutter
+Prompt: The stomach feels nervous.
+A: breathe slowly
+B: eat gently
+
+212. Restless Night
+Prompt: Sleep was restless.
+A: rest today
+B: change bedtime
+
+213. Sore Muscles
+Prompt: Muscles feel sore.
+A: stretch gently
+B: take a rest
+
+214. Low Appetite
+Prompt: Appetite is low.
+A: offer simple food
+B: check health
+
+215. Happy Burst
+Prompt: Energy feels joyful.
+A: celebrate safely
+B: use it kindly
+
+216. Lonely Morning
+Prompt: The morning feels lonely.
+A: stay and listen
+B: plan company
+
+217. Nervous Habit
+Prompt: A nervous habit appears.
+A: name the feeling
+B: use a calm tool
+
+218. Proud Glow
+Prompt: Pride feels very strong.
+A: praise effort
+B: share credit
+
+219. Jealous Mood
+Prompt: Jealousy is growing.
+A: hear the need
+B: avoid comparison
+
+220. Grumpy Spell
+Prompt: Everything feels annoying.
+A: offer space
+B: check basic needs
+
+221. Inspired Rush
+Prompt: Inspiration is rushing.
+A: start one idea
+B: write ideas down
+
+222. Embarrassed Fall
+Prompt: A fall caused embarrassment.
+A: comfort first
+B: try again later
+
+223. Quiet Recovery
+Prompt: Recovery is going well.
+A: rest a bit more
+B: resume slowly
+
+224. Health Check
+Prompt: It is time for a checkup.
+A: visit clinic
+B: review habits
+
+225. Park Cleanup
+Prompt: The park needs cleaning.
+A: help directly
+B: organize a team
+
+226. Missing Poster
+Prompt: An important poster is gone.
+A: search nearby
+B: make a new one
+
+227. Cafe Rush
+Prompt: The cafe is overwhelmed.
+A: help serve
+B: organize orders
+
+228. School Fund
+Prompt: The school needs support.
+A: donate time
+B: plan a fundraiser
+
+229. Clinic Queue
+Prompt: The clinic has a long line.
+A: help patients
+B: improve the queue
+
+230. Market Dispute
+Prompt: The market has a dispute.
+A: hear both sides
+B: set fair rules
+
+231. Museum Find
+Prompt: The museum found an item.
+A: study it
+B: display carefully
+
+232. Festival Booth
+Prompt: A festival booth needs help.
+A: take a shift
+B: gather supplies
+
+233. Lost Tourist
+Prompt: A tourist is lost.
+A: guide them
+B: find a map
+
+234. Neighbor Move
+Prompt: A neighbor is moving in.
+A: welcome them
+B: offer practical help
+
+235. Street Garden
+Prompt: The street needs plants.
+A: plant together
+B: design first
+
+236. Power Outage
+Prompt: The town loses power.
+A: check neighbors
+B: conserve supplies
+
+237. Town Meeting
+Prompt: A town meeting begins.
+A: speak calmly
+B: listen first
+
+238. Charity Drive
+Prompt: A charity needs support.
+A: donate goods
+B: volunteer time
+
+239. Public Mural
+Prompt: A public mural is planned.
+A: add an idea
+B: invite everyone
+
+240. City Award
+Prompt: The city gives an award.
+A: accept humbly
+B: share credit

@@ -1,0 +1,22 @@
+PICO TAMACHIBI v47 SOURCE MANIFEST
+==================================
+
+New files:
+- NeedsDisplay.h
+- NeedsDisplay.cpp
+- V47_DUAL_STATUS_DISPLAY_GUIDE.txt
+- V47_CHANGE_NOTES.txt
+- V47_VALIDATION_REPORT.txt
+- V47_STATUS_DISPLAY_PREVIEW.png
+
+Modified files:
+- GameMain.cpp
+- Pico_Tamachibi_v47_Dual_Status_Display.ino
+- README_SETUP_AND_WIRING.txt
+
+Core hardware allocation:
+- GP4 / GP5: main 128x64 SSD1306 on Wire
+- GP6 / GP7: secondary 128x32 SSD1306 on Wire1
+- GP10 / GP11 / GP12: buttons
+- GP15: passive buzzer
+- GP26: view potentiometer

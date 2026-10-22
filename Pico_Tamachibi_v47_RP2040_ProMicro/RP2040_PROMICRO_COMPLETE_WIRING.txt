@@ -1,0 +1,460 @@
+CODE COMPATIBILITY NOTE FOR v47 RP2040 PROMICRO EDITION
+========================================================
+The active v47 firmware uses the two OLEDs, three buttons, buzzer and GP26 dial.
+The SD and PCM5102A pins in this wiring diagram are reserved and safe to wire,
+but this uploaded v47 source does not yet contain MP3 playback code.
+
+GP17 is reserved for the board's onboard RGB LED.
+The optional disabled battery-monitor gate is GP29, not GP22.
+
+PICO TAMACHIBI — COMPLETE TEXT WIRING DIAGRAM
+RP2040 ProMicro + Dual OLED + SD + PCM5102A + LiPo Power
+======================================================================
+
+IMPORTANT
+----------------------------------------------------------------------
+This diagram assumes:
+
+1. RP2040 ProMicro board shown in your image.
+2. Two I2C SSD1306 OLED displays:
+   - Main display: 128x64
+   - Side status display: 128x32
+3. Passive microSD adapter or SD-to-microSD adapter.
+4. PCM5102A I2S stereo DAC.
+5. USB-C single-cell LiPo charger + 5V boost module.
+6. One-cell 3.7V lithium-polymer battery.
+7. One physical on/off switch.
+8. Three pushbuttons.
+9. One B10K linear potentiometer.
+10. One passive piezo buzzer.
+
+The exact charger/boost module should have:
+- USB-C socket = charging input
+- Unmarked + and - pads = battery connection
+- Pads marked 5V+ and 5V- = boosted output
+
+If your board markings are different, stop and verify them before connecting
+the battery. Never guess the battery pads.
+
+
+======================================================================
+1. MASTER POWER DIAGRAM
+======================================================================
+
+                    5V USB WALL CHARGER
+                             |
+                             | USB-C cable
+                             v
+                +--------------------------+
+                |  USB-C CHARGER / BOOST   |
+                |                          |
+LiPo RED  ------|  BAT+ or unmarked +      |
+LiPo BLACK -----|  BAT- or unmarked -      |
+                |                          |
+                |  5V+ OUTPUT -------------+----> ON/OFF SWITCH
+                |  5V- OUTPUT -------------------> COMMON GROUND
+                +--------------------------+
+                                                   |
+                                                   v
+                                         SWITCHED 5V RAIL
+                                                   |
+                    +------------------------------+------------------+
+                    |                              |                  |
+                    v                              v                  v
+          RP2040 ProMicro 5V             PCM5102A VIN       Headphone amp VCC
+                                                             if amp accepts 5V
+
+
+COMMON GROUND connects to:
+- RP2040 ProMicro GND
+- Main OLED GND
+- Side OLED GND
+- SD adapter GND
+- PCM5102A GND
+- Headphone amplifier GND
+- All three button ground legs
+- Buzzer negative
+- Potentiometer ground
+- Charger/boost 5V- output
+
+
+POWER-SWITCH WIRING
+----------------------------------------------------------------------
+Charger/boost 5V+ output ----> switch terminal 1
+Switch terminal 2 -----------> RP2040 ProMicro 5V pin
+                               PCM5102A VIN
+                               headphone amplifier VCC, when compatible
+
+Charger/boost 5V- output ----> common GND directly
+
+Put the switch in the 5V POSITIVE output wire.
+Do not put the switch in the battery-negative wire.
+
+This arrangement normally allows the battery to charge while the device
+is switched off.
+
+
+======================================================================
+2. BATTERY AND CHARGER/BOOST CONNECTIONS
+======================================================================
+
+LITHIUM BATTERY:
+Battery red wire (+)   ---> BAT+ or the unmarked + pad
+Battery black wire (-) ---> BAT- or the unmarked - pad
+
+BOOSTED OUTPUT:
+Pad marked 5V+ ---> physical power switch ---> switched 5V rail
+Pad marked 5V- ---> common ground rail
+
+CHARGING INPUT:
+USB-C socket ---> regulated 5V USB wall charger
+
+DO NOT:
+- Connect the battery to the pads marked 5V.
+- Connect 5V output to any 3V3 pin.
+- Use 4.35V charging mode unless the battery specifically says 4.35V.
+- Reverse the battery polarity.
+- Solder or test the battery while metal tools can short its wires.
+- Use a damaged, swollen, punctured, or hot LiPo battery.
+
+
+======================================================================
+3. RP2040 PROMICRO POWER CONNECTIONS
+======================================================================
+
+RP2040 ProMicro 5V pin  ---> switched 5V rail
+RP2040 ProMicro GND     ---> common ground
+RP2040 ProMicro 3V3 pin ---> 3.3V peripheral rail
+
+The 3.3V peripheral rail powers:
+- Main 128x64 OLED VCC
+- Side 128x32 OLED VCC
+- Passive SD adapter VCC
+- Potentiometer high outer leg
+
+Do not power the passive SD adapter from 5V.
+
+
+======================================================================
+4. COMPLETE GPIO ASSIGNMENT
+======================================================================
+
+GP0  = SD MISO / DO / DAT0
+GP1  = SD CS / SS / DAT3
+GP2  = SD SCK / CLK
+GP3  = SD MOSI / DI / CMD
+
+GP4  = Main 128x64 OLED SDA
+GP5  = Main 128x64 OLED SCL
+
+GP6  = Side 128x32 OLED SDA
+GP7  = Side 128x32 OLED SCL
+
+GP10 = Left button D0
+GP11 = Middle/select button D1
+GP12 = Right button D2
+
+GP15 = Passive piezo buzzer positive
+
+GP20 = PCM5102A BCLK / BCK
+GP21 = PCM5102A LRCLK / LCK / WS
+GP22 = PCM5102A DIN / DATA
+
+GP26 = Potentiometer center/wiper, ADC0
+
+
+======================================================================
+5. MAIN 128x64 OLED WIRING
+======================================================================
+
+Main OLED VCC ---> RP2040 ProMicro 3V3
+Main OLED GND ---> common GND
+Main OLED SDA ---> GP4
+Main OLED SCL ---> GP5
+
+Expected I2C address: 0x3C
+Bus used by code: Wire / I2C0
+
+
+======================================================================
+6. SIDE 128x32 OLED WIRING
+======================================================================
+
+Side OLED VCC ---> RP2040 ProMicro 3V3
+Side OLED GND ---> common GND
+Side OLED SDA ---> GP6
+Side OLED SCL ---> GP7
+
+Expected I2C address: 0x3C
+Bus used by code: Wire1 / I2C1
+
+The two displays may both use address 0x3C because they are connected
+to separate I2C controllers.
+
+
+======================================================================
+7. BUTTON WIRING
+======================================================================
+
+LEFT BUTTON:
+One contact ---> GP10
+Opposite contact ---> common GND
+
+MIDDLE/SELECT BUTTON:
+One contact ---> GP11
+Opposite contact ---> common GND
+
+RIGHT BUTTON:
+One contact ---> GP12
+Opposite contact ---> common GND
+
+The code uses INPUT_PULLUP:
+- Released button = HIGH
+- Pressed button = LOW
+
+Do not wire the second button contact to 3.3V.
+
+For a four-leg tactile button:
+- The two legs on one side are already connected together.
+- Use one leg from one side and one leg from the opposite side.
+
+
+======================================================================
+8. POTENTIOMETER WIRING
+======================================================================
+
+Use a B10K linear potentiometer.
+
+Outer leg 1 ---> RP2040 ProMicro 3V3
+Center/wiper ---> GP26 / ADC0
+Outer leg 2 ---> common GND
+
+Normal game:
+- Potentiometer selects Tamagotchi / Home / City views.
+
+Music mode:
+- Potentiometer controls volume.
+
+If the direction is backward, swap the two outer legs.
+Never connect the center/wiper to 5V.
+
+
+======================================================================
+9. PASSIVE BUZZER WIRING
+======================================================================
+
+Passive piezo buzzer positive ---> GP15
+Passive piezo buzzer negative ---> common GND
+
+Use a passive piezo buzzer for game tones.
+
+Do not directly drive a large magnetic speaker from GP15.
+A larger speaker requires a transistor or amplifier.
+
+
+======================================================================
+10. SD / MICROSD ADAPTER WIRING
+======================================================================
+
+SD MISO / DO / DAT0 ---> GP0
+SD CS / SS / DAT3 ---> GP1
+SD SCK / CLK       ---> GP2
+SD MOSI / DI / CMD ---> GP3
+SD VCC             ---> RP2040 ProMicro 3V3
+SD GND             ---> common GND
+
+RECOMMENDED CAPACITORS NEAR THE SD ADAPTER:
+- 10 uF between SD VCC and GND
+- 0.1 uF ceramic between SD VCC and GND
+
+Keep SD clock and data wires short.
+
+If using a bare full-size SD adapter:
+
+Contact 1 DAT2      ---> not connected
+Contact 2 DAT3 / CS ---> GP1
+Contact 3 CMD/MOSI  ---> GP3
+Contact 4 VDD       ---> 3.3V
+Contact 5 CLK       ---> GP2
+Contact 6 GND       ---> common GND
+Contact 7 DAT0/MISO ---> GP0
+Contact 8 DAT1      ---> not connected
+
+
+======================================================================
+11. PCM5102A I2S DAC WIRING
+======================================================================
+
+PCM5102A BCK / BCLK ---> GP20
+PCM5102A LCK / LRCK / WS ---> GP21
+PCM5102A DIN / DATA ---> GP22
+PCM5102A GND ---> common GND
+PCM5102A VIN ---> switched 5V rail, if the module accepts 5V
+PCM5102A SCK ---> GND for internal PLL operation, when required
+
+COMMON CONFIGURATION:
+FMT  ---> LOW / GND for standard I2S
+DEMP ---> LOW / GND
+FLT  ---> LOW / GND
+XSMT ---> HIGH / 3.3V to unmute
+
+Many modules already have configuration resistors.
+Do not change solder bridges unless you understand the markings.
+
+
+======================================================================
+12. AUDIO OUTPUT OPTIONS
+======================================================================
+
+IMPORTANT:
+The PCM5102A produces LINE-LEVEL audio.
+It is not designed to directly power normal low-impedance headphones.
+
+OPTION A — POWERED SPEAKERS OR AUX INPUT:
+PCM5102A L ---> 3.5 mm jack TIP
+PCM5102A R ---> 3.5 mm jack RING
+PCM5102A G ---> 3.5 mm jack SLEEVE
+
+This is a line-output jack.
+
+OPTION B — NORMAL HEADPHONES:
+PCM5102A L ---> headphone amplifier LEFT INPUT
+PCM5102A R ---> headphone amplifier RIGHT INPUT
+PCM5102A G ---> headphone amplifier INPUT GND
+
+Headphone amplifier LEFT OUT  ---> headphone jack TIP
+Headphone amplifier RIGHT OUT ---> headphone jack RING
+Headphone amplifier GND       ---> headphone jack SLEEVE
+
+Suggested amplifier type:
+- TPA6132A2 stereo headphone amplifier
+- MAX97220 stereo headphone amplifier
+- Another true stereo headphone amplifier rated for 16–64 ohm headphones
+
+Do not use a mono speaker amplifier such as MAX98357A for stereo headphones.
+
+
+======================================================================
+13. 3.5 MM TRS HEADPHONE JACK
+======================================================================
+
+TRS stereo jack:
+
+TIP    = left audio
+RING   = right audio
+SLEEVE = ground
+
+PCM5102A direct connection is suitable for line output only.
+
+For ordinary headphones, connect the jack after a stereo headphone
+amplifier.
+
+
+======================================================================
+14. COMPLETE CONNECTION SUMMARY
+======================================================================
+
+POWER:
+LiPo +  ---> charger/boost BAT+
+LiPo -  ---> charger/boost BAT-
+USB-C   ---> charger input
+5V+ OUT ---> switch ---> switched 5V rail
+5V- OUT ---> common GND
+
+SWITCHED 5V:
+---> RP2040 ProMicro 5V
+---> PCM5102A VIN
+---> headphone amplifier VCC if compatible
+
+RP2040 3V3:
+---> main OLED VCC
+---> side OLED VCC
+---> SD adapter VCC
+---> potentiometer outer leg
+
+MAIN OLED:
+SDA GP4
+SCL GP5
+
+SIDE OLED:
+SDA GP6
+SCL GP7
+
+BUTTONS:
+Left GP10 to GND
+Middle GP11 to GND
+Right GP12 to GND
+
+BUZZER:
+GP15 to buzzer +
+GND to buzzer -
+
+SD:
+MISO GP0
+CS GP1
+SCK GP2
+MOSI GP3
+
+PCM5102A:
+BCLK GP20
+LRCLK GP21
+DIN GP22
+
+POTENTIOMETER:
+3V3 --- outer leg
+GP26 -- center/wiper
+GND --- outer leg
+
+
+======================================================================
+15. POWER-UP CHECKLIST
+======================================================================
+
+Before installing the battery:
+
+[ ] Check that no 5V wire connects to a 3V3 pin.
+[ ] Check that SD VCC connects to 3.3V, not 5V.
+[ ] Check battery polarity twice.
+[ ] Check PCM5102A ground.
+[ ] Check both display grounds.
+[ ] Check all button contacts idle HIGH.
+[ ] Check potentiometer center goes only to GP26.
+[ ] Check no exposed battery wire can touch another pad.
+[ ] Check the power switch is in the 5V+ output wire.
+[ ] Check charger mode is 4.2V for a normal 3.7V LiPo.
+
+FIRST TEST ORDER:
+
+1. Test the RP2040 board using USB only.
+2. Test the main OLED.
+3. Test all three buttons.
+4. Test the potentiometer.
+5. Test the side OLED.
+6. Test the SD card.
+7. Test the PCM5102A into powered speakers or AUX.
+8. Add the headphone amplifier and headphone jack.
+9. Test the charger/boost output without the RP2040 attached.
+10. Connect battery power only after confirming the output polarity.
+
+
+======================================================================
+16. IMPORTANT USB POWER WARNING
+======================================================================
+
+The exact USB power-isolation design of the RP2040 ProMicro clone is not
+fully documented.
+
+Safer development procedure:
+
+1. Turn the battery-output switch OFF.
+2. Connect the RP2040 ProMicro USB-C cable.
+3. Upload and test code.
+4. Disconnect USB before turning battery power ON.
+
+For a polished final PCB, use proper USB/external-power isolation or a
+power multiplexer rather than directly joining two separate 5V sources.
+
+
+======================================================================
+END OF WIRING DIAGRAM
+======================================================================

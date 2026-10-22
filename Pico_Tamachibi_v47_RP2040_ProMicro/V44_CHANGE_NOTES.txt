@@ -1,0 +1,21 @@
+PICO TAMACHIBI v44 CHANGE NOTES
+================================
+
+- Added mandatory weekday/hour/minute/AM-PM setup after a full power cycle.
+- Added Settings > Set real clock.
+- Replaced age-tick visual time with the real software clock.
+- Added stage-specific automatic bedtime and wake times.
+- Added weekday school for children and teens.
+- Added weekday work for employed adults.
+- Added classroom and office scenes with protected sprite zones.
+- Removed the daytime quick-rest energy action.
+- Prevented manual sleep skipping.
+- Made a sufficiently long night restore the pet to at least 9/10 energy.
+- Made overnight manual-clock power-offs count as safe sleep recovery.
+- Prevented care calls, care-call mistakes, and poop while school/work locks care.
+- Added a simple automatic noon meal while away.
+- Added school learning/discipline progress and work pay/career progress.
+- Added real-clock status information and next bedtime/wake information.
+- Updated LifeWorld routines to respect weekdays and the same stage schedule.
+- Disabled the previous always-awake developer behavior.
+- Preserved the v43c EEPROM/save layout.

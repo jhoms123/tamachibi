@@ -1,0 +1,87 @@
+PICO TAMACHIBI v44 - REAL-DAY CLOCK GUIDE
+==========================================
+
+PURPOSE
+-------
+v44 connects the Tamagotchi's routine to the player's actual day. The pet no
+longer recovers through repeatable daytime quick rests. It sleeps, wakes, attends
+school, and works according to the weekday and time entered at startup.
+
+WHY THE CLOCK IS ENTERED AFTER POWER-ON
+---------------------------------------
+The standard RP2040/Pico cannot remember the current time while completely
+unpowered. The saved game remembers the last known epoch, but the player must
+provide the current weekday and clock time after a full power cycle. While the
+board remains powered, the software clock advances normally even when the OLED
+is off.
+
+BOOT CLOCK FLOW
+---------------
+The editor has four persistent screens:
+  Day -> Hour -> Minute -> AM/PM
+D0 decreases, D2 increases, and D1 confirms. Minutes use five-minute steps to
+make entry fast with three buttons. The saved timestamp anchors the week so an
+overnight shutdown moves forward to the following day rather than backward.
+
+SCHEDULE TABLE
+--------------
+Stage   Bedtime    Wake       Weekday daytime obligation
+Baby    7:00 PM    7:00 AM    Home
+Child   8:00 PM    7:00 AM    School 8:00 AM-3:00 PM
+Teen    10:00 PM   7:00 AM    School 8:00 AM-3:00 PM
+Adult   11:00 PM   6:00 AM    Work 9:00 AM-5:00 PM if employed
+Elder   9:00 PM    6:00 AM    Home
+
+Saturday and Sunday do not schedule school or work. An adult without a selected
+career stays home.
+
+SLEEP RULES
+-----------
+1. Bedtime is automatic.
+2. Wake time is automatic.
+3. The Sleep/Light action cannot begin a daytime rest.
+4. Selecting it during daytime displays the next bedtime.
+5. Selecting it at night displays the wake time; it cannot skip sleep.
+6. Normal sleep restores one energy point per in-game hour.
+7. Four or more hours of real sleep guarantees at least 9/10 energy on waking.
+8. Powering off overnight and entering the morning time safely credits the
+   crossed sleep window without applying artificial powered-off neglect.
+
+SCHOOL AND WORK
+---------------
+The pet is unavailable for ordinary care actions while scheduled away. The pet
+remains visible in a high-contrast classroom or office scene, with furniture
+kept outside the protected character zone.
+
+School effects:
+- Intelligence growth
+- Discipline growth
+- School location shown until 3:00 PM
+
+Work effects:
+- Career experience
+- Modest pay
+- Work location shown until 5:00 PM
+
+Away-time protection:
+- No impossible care calls
+- No poop generation while away
+- A noon meal provides limited fullness
+- Night sleep remains required; school/work never grants sleep energy
+
+CLOCK SCREENS
+-------------
+Settings > Set real clock reopens the editor.
+Status includes a dedicated clock page showing:
+- Weekday and time
+- Current location
+- Bedtime and wake time
+- Weekday or weekend schedule
+
+POWER-OFF LIMITATION
+--------------------
+Without an external RTC, a manual weekday/time entry cannot prove how many whole
+weeks passed if the Pico was off for more than seven days. v44 therefore uses the
+nearest forward matching weekday and safely credits only schedule/sleep recovery.
+The optional DS3231 mode remains the accurate solution for long powered-off
+periods.

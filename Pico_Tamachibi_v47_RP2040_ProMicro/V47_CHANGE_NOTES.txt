@@ -1,0 +1,12 @@
+PICO TAMACHIBI v47 CHANGE NOTES
+================================
+
+- Added a second 128x32 SSD1306 status OLED.
+- Added a dedicated Wire1 bus on GP6 SDA and GP7 SCL.
+- Both OLEDs may use address 0x3C because they are on separate controllers.
+- Added live food, fun, energy, cleanliness, health, and poop bars.
+- Added slow blinking for attention and fast blinking for urgent needs.
+- Added special School, Work, Sleep, Sitter, Egg, and Memory Star screens.
+- The secondary display stays active when the main OLED times out.
+- Main 128x64 gameplay, buttons, saves, and GP26 potentiometer view switching
+  are unchanged.

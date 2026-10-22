@@ -1,0 +1,29 @@
+PICO TAMACHIBI v47 VALIDATION REPORT
+=====================================
+
+SOURCE STRUCTURE
+- Tiny matching .ino retained.
+- Full setup()/loop() remain in GameMain.cpp.
+- One setup() definition and one loop() definition.
+- New NeedsDisplay.cpp / NeedsDisplay.h module added.
+- No save structures, EEPROM addresses, or profile formats changed.
+
+DUAL I2C AUDIT
+- Main SSD1306: Wire / I2C0, SDA GP4, SCL GP5, address 0x3C.
+- Needs SSD1306: Wire1 / I2C1, SDA GP6, SCL GP7, address 0x3C.
+- Two identical addresses are valid because the displays use separate buses.
+- Missing secondary OLED does not intentionally stop the main game.
+
+DISPLAY LOGIC AUDIT
+- Normal page includes food, fun, energy, cleanliness, health, and poop.
+- Slow attention blink: values 3-4 or one poop pile.
+- Fast urgent blink: values 0-2, serious sickness, or two-plus poop piles.
+- School, work, sleep, sitter, egg, and end-of-life pages suppress inaccessible care needs.
+- Status OLED remains active while the main OLED is idle/off.
+
+COMPILATION CHECKS
+- NeedsDisplay.cpp passed C++17 -Wall -Wextra -Werror syntax validation using
+  an Arduino/Adafruit compatibility stub.
+- GameMain integration was audited for declaration order and unique setup/loop.
+- Genuine Arduino-Pico board-package compilation and physical two-OLED testing
+  were not available in this environment.

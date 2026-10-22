@@ -1,0 +1,31 @@
+PICO TAMACHIBI v46a CHANGE NOTES
+================================
+
+DYNAMIC HOME OCCUPANCY
+----------------------
+- The Pet Room no longer reserves a permanent empty spouse position.
+- When no spouse or children are present, the Tamagotchi is centered and the
+  right side becomes a bookshelf, lamp, books and reading cushion.
+- When a spouse or children are present, the room automatically switches to a
+  family layout and moves furniture to the walls.
+- Pet, spouse, child and companion positions reflow so the actors do not share
+  the same protected sprite pad.
+- The partner sprite is only drawn when a real partner has sufficient bond to
+  live at home.
+
+FOCUSED MENU
+------------
+- Removed the miniature previous/next icon cards.
+- Main and category menus now show exactly one large selected icon.
+- A separate information panel shows the title, plain-language purpose,
+  availability and position in the menu.
+- D0 and D2 chevrons remain as navigation cues, but no adjacent items are shown
+  as misleading miniature choices.
+- The old row of tiny page dots was replaced with a simple progress track.
+
+UNCHANGED
+---------
+- The potentiometer remains the only control for Tamagotchi / Home / City.
+- No save structures, EEPROM addresses, checksums or profile formats changed.
+- All v46 gameplay, dialogue, schedule, family, city, garden, aquarium and
+  Paradise systems remain present.

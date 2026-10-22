@@ -1,0 +1,56 @@
+PICO TAMACHIBI v46a SOURCE MANIFEST
+==================================
+
+Primary sketch: Pico_Tamachibi_v46a_Focused_Menu_Dynamic_Home.ino
+Main implementation: GameMain.cpp
+Visual module: VisualOverhaul.cpp / VisualOverhaul.h
+
+FILES
+-----
+Aquarium.cpp
+Aquarium.h
+Botany.cpp
+Botany.h
+CityWorld.cpp
+CityWorld.h
+DeepLife.cpp
+DeepLife.h
+DeepLifeDialogueData.h
+GameMain.cpp
+GrowingTogether.cpp
+GrowingTogether.h
+GrowingTogetherData.h
+LifeWorld.cpp
+LifeWorld.h
+ParadiseSystem.cpp
+ParadiseSystem.h
+ParentDialogue.cpp
+ParentDialogue.h
+ParentDialogueResponseData.h
+PicoPlatform.h
+Pico_Tamachibi_v46a_Focused_Menu_Dynamic_Home.ino
+PolishedScenes.cpp
+PolishedScenes.h
+README_SETUP_AND_WIRING.txt
+SaveProfiles.cpp
+SaveProfiles.h
+V43C_CHANGE_NOTES.txt
+V43C_DIALOGUE_COHERENCE_CATALOG.txt
+V43C_LIFE_EVENT_RESPONSE_CATALOG.txt
+V43C_VALIDATION_REPORT.txt
+V43_DIALOGUE_SCROLL_PREVIEW.png
+V43_GROWING_UP_TOGETHER_GUIDE.txt
+V43_NARRATIVE_AUTHORING_GUIDE.txt
+V44_CHANGE_NOTES.txt
+V44_REAL_DAY_CLOCK_GUIDE.txt
+V44_VALIDATION_REPORT.txt
+V45_CHANGE_NOTES.txt
+V45_LIFE_STAGE_GAME_CATALOG.txt
+V45_VALIDATION_REPORT.txt
+V46A_CHANGE_NOTES.txt
+V46A_FOCUSED_MENU_DYNAMIC_HOME_GUIDE.txt
+V46A_FOCUSED_MENU_DYNAMIC_HOME_PREVIEW.png
+V46A_SOURCE_MANIFEST.txt
+V46A_VALIDATION_REPORT.txt
+VisualOverhaul.cpp
+VisualOverhaul.h

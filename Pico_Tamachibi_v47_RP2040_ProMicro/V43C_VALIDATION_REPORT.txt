@@ -1,0 +1,28 @@
+PICO TAMACHIBI v43c - VALIDATION REPORT
+====================================================================
+
+Source-level database checks:
+- Parent Dialogue topics: 65
+- Exact Parent Dialogue choices: 195
+- Exact Parent Dialogue remembered replies: 195
+- Classic Life Events: 16
+- Procedural Life Events: 224
+- Exact Life Event prompts: 240
+- Exact Life Event choices: 480
+- Longest Parent Dialogue choice: 18 characters (limit 18)
+- Growing Together baby gate present: yes
+- Starting-school baby milestone removed: yes
+- Stale pending topic rejection: Parent Dialogue and Growing Together
+- Unsupported .inc files: none
+- Invalid constrain<int> calls: none
+
+Build checks:
+- Full host-side C++17 compile: PASS
+- Full host-side link: PASS
+- Fatal errors: 0
+- Patched modules with -Wall -Wextra: 0 new warnings
+- Compile-time EEPROM boundary assertion: PASS
+
+The genuine Arduino-Pico board package and physical Pico/OLED were not
+available in this environment, so upload and hardware behavior still need
+to be confirmed on the real device.

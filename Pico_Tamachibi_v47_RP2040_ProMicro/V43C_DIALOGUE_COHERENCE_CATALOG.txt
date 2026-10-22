@@ -1,0 +1,459 @@
+PICO TAMACHIBI v43c - AGE-COHERENT DIALOGUE CATALOG
+====================================================================
+Every Parent Dialogue topic now owns its exact question, three exact choices,
+and three exact remembered replies. It no longer borrows a vaguely related set.
+
+00. BABY ONLY
+Prompt root: I made a new sound and wanted you to hear it.
+Question: How should I answer the new sound?
+A. Babble back -> Ba-ba! You answered me!
+B. Smile and listen -> Mmm! You heard my sound.
+C. Cuddle close -> Warm... I feel safe close.
+
+01. BABY ONLY
+Prompt root: I reached for you when the room felt big.
+Question: What should I do when baby reaches up?
+A. Pick baby up -> Up! Safe in your arms.
+B. Sit close by -> You stayed near. I relaxed.
+C. Cheer the reach -> I tried reaching again!
+
+02. BABY ONLY
+Prompt root: You went away and I wondered if you return.
+Question: How can I show that I return?
+A. Return and greet -> You came back! Ba-ba!
+B. Play peekaboo -> There you are! Again!
+C. Ignore the cry -> I am still unsure you return.
+
+03. BABY ONLY
+Prompt root: My eyes feel heavy but I do not want to miss you.
+Question: How should I help with sleep?
+A. Rock gently -> Mmm... my body is calm.
+B. Sleep routine -> The same routine feels safe.
+C. Keep playing -> I am more tired and fussy now.
+
+04. BABY ONLY
+Prompt root: My tummy is asking for something.
+Question: How should I answer the hungry cue?
+A. Feed baby now -> Mmm! My tummy feels better.
+B. Check the need -> You checked what my body needed.
+C. Delay the food -> My hungry feeling grew louder.
+
+05. BABY ONLY
+Prompt root: I made a mess and watched your face.
+Question: How should I react to the mess?
+A. Clean calmly -> The mess is gone and I feel safe.
+B. Let baby help -> I copied you while we cleaned.
+C. Scold the mess -> I became afraid of making mistakes.
+
+06. BABY ONLY
+Prompt root: I copied the way you smiled at me.
+Question: How should I answer the copied smile?
+A. Smile back -> Hee! We smiled together.
+B. Name happy face -> Happy! I am learning that word.
+C. Look away -> My smile faded when no one answered.
+
+07. BABY ONLY
+Prompt root: The little companion came near me.
+Question: How should baby meet the companion?
+A. Hold baby close -> I watched from a safe place.
+B. Show pet gently -> Soft pet... gentle hello.
+C. Let pet crowd in -> The pet came too close and scared me.
+
+08. CHILD ONLY
+Prompt root: A new classmate sat alone today.
+Question: How should I welcome the new classmate?
+A. Say hello -> I can begin with a simple hello.
+B. Invite to play -> Inviting them may help both of us feel included.
+C. Leave them alone -> Leaving them alone may make the lonely feeling continue.
+
+09. CHILD ONLY
+Prompt root: Someone laughed at the way I answered.
+Question: How should I respond to the teasing?
+A. Say stop clearly -> I can say clearly that the teasing is not okay.
+B. Tell safe adult -> A safe adult can help if it continues.
+C. Laugh along -> Laughing along would hide that I was hurt.
+
+10. CHILD ONLY
+Prompt root: Two friends wanted the same toy.
+Question: How can we solve the toy conflict?
+A. Take fair turns -> Taking turns gives everyone a chance.
+B. Find second toy -> A second toy may solve the problem peacefully.
+C. Grab it first -> Grabbing it would make the conflict bigger.
+
+11. CHILD ONLY
+Prompt root: The teacher gave a rule I did not like.
+Question: What should I do about the school rule?
+A. Ask why calmly -> I can ask for the reason respectfully.
+B. Follow then ask -> I can follow it now and discuss it later.
+C. Break it secretly -> Breaking it secretly would damage trust.
+
+12. CHILD ONLY
+Prompt root: I broke something by accident.
+Question: How should I handle what I broke?
+A. Tell the truth -> I will tell the truth about the accident.
+B. Repair together -> Repairing it shows responsibility.
+C. Hide it -> Hiding it would make me more afraid to be honest.
+
+13. CHILD ONLY
+Prompt root: My school work felt too hard.
+Question: How can I handle the hard schoolwork?
+A. Break into steps -> Smaller steps make the work feel possible.
+B. Ask for help -> Asking for help can teach me what I missed.
+C. Avoid the work -> Avoiding it would make tomorrow harder.
+
+14. CHILD ONLY
+Prompt root: The group played without asking me.
+Question: What should I do when I am left out?
+A. Ask to join -> I can ask calmly whether I may join.
+B. Find kind friend -> I can look for someone who treats me kindly.
+C. Hurt them back -> Hurting them back would not solve the loneliness.
+
+15. CHILD ONLY
+Prompt root: The teacher corrected me in front of everyone.
+Question: How should I handle the public correction?
+A. Talk to teacher -> I can explain privately that the correction embarrassed me.
+B. Learn then recover -> I can learn from the mistake without calling myself bad.
+C. Insult teacher -> Insulting the teacher would create another problem.
+
+16. CHILD ONLY
+Prompt root: A loud sound scared me at school.
+Question: What should I do after the loud alarm?
+A. Breathe with me -> Breathing with you helps my body settle.
+B. Tell adult scared -> I can tell an adult that the sound frightened me.
+C. Hide the fear -> Hiding the fear would leave me alone with it.
+
+17. CHILD ONLY
+Prompt root: I know who made the mess, but nobody asked yet.
+Question: What should I do with what I know?
+A. Tell what I saw -> I can honestly say only what I saw.
+B. Help friend admit -> I can encourage my friend to tell the truth.
+C. Cover for them -> Covering for them would make me part of the lie.
+
+18. CHILD ONLY
+Prompt root: One garden sprout looks weaker than the others.
+Question: How should I help the weak sprout?
+A. Check water/light -> Checking its needs may show what is wrong.
+B. Tend together -> We can care for it gently together.
+C. Pull it out -> Pulling it out now would remove its chance to recover.
+
+19. CHILD ONLY
+Prompt root: My companion would not listen to me.
+Question: How should I guide my companion?
+A. Train calmly -> Calm practice can teach the companion what to do.
+B. Check its needs -> Its behavior may be telling me about a need.
+C. Yell at pet -> Yelling would make the companion afraid.
+
+20. TEEN ONLY
+Prompt root: Friends wanted me to do something that felt wrong.
+Question: What should I do about the peer pressure?
+A. Say no clearly -> I can refuse without arguing about my worth.
+B. Leave and call -> Leaving and calling for help protects me.
+C. Go along -> Going along would ignore my own safety and values.
+
+21. TEEN ONLY
+Prompt root: I like things they say are strange.
+Question: How should I handle being seen as strange?
+A. Be yourself -> I can be myself without treating others badly.
+B. Find safe group -> A safe group may appreciate the real me.
+C. Pretend to fit -> Pretending all the time would hide what I need.
+
+22. TEEN ONLY
+Prompt root: My rival beat me and bragged about it.
+Question: How should I respond to my rival bragging?
+A. Practice and retry -> Practice gives me a fair next step.
+B. Congratulate them -> I can respect the win without liking the bragging.
+C. Cheat next time -> Cheating would make any victory meaningless.
+
+23. TEEN ONLY
+Prompt root: I studied but my score was still low.
+Question: What should I do after the low score?
+A. Review mistakes -> Reviewing mistakes can show what to practice.
+B. Ask for help -> Asking for help does not erase my effort.
+C. Give up -> Giving up would let one score decide too much.
+
+24. TEEN ONLY
+Prompt root: My closest friend shared my secret.
+Question: How should I handle the broken confidence?
+A. Explain the hurt -> I can explain exactly why sharing the secret hurt.
+B. Set a boundary -> A boundary can protect me while trust is rebuilt.
+C. End it now -> Ending everything immediately may close off repair.
+
+25. TEEN ONLY
+Prompt root: I want some space, but I do not want to hurt you.
+Question: How can I ask for space without disappearing?
+A. Ask kindly -> I can ask for space and still show I care.
+B. Set check-in time -> A check-in time reassures both of us.
+C. Disappear -> Disappearing would make the relationship feel unsafe.
+
+26. TEEN ONLY
+Prompt root: Everyone asks what I will become.
+Question: How should I handle pressure about my future?
+A. Explore choices -> I can compare options without choosing forever today.
+B. Try one path -> Trying one path can teach me what fits.
+C. Choose to please -> Choosing only for approval could hide my own goals.
+
+27. TEEN ONLY
+Prompt root: I tripped and everyone noticed.
+Question: What should I do after the embarrassing fall?
+A. Laugh gently -> A gentle laugh can make the moment smaller.
+B. Talk it through -> Talking about it helps me recover without pretending.
+C. Hide away -> Hiding away would give the embarrassment more power.
+
+28. TEEN ONLY
+Prompt root: I promised to finish a chore and forgot.
+Question: How should I repair the forgotten chore?
+A. Admit it -> I will admit that I forgot.
+B. Do it now -> Doing it now is a real repair.
+C. Make an excuse -> An excuse would delay the responsibility again.
+
+29. TEEN ONLY
+Prompt root: The family keeps treating me like a little kid.
+Question: How can I ask the family for more freedom?
+A. Explain my growth -> I can show how I have become more responsible.
+B. Suggest freedoms -> A specific freedom with limits may feel fair.
+C. Break the rules -> Breaking rules would make trust harder to build.
+
+30. ADULT ONLY
+Prompt root: A coworker blamed me for their mistake.
+Question: How should I respond to the false blame?
+A. State the facts -> I can document the facts without attacking.
+B. Ask mediator -> A neutral person may help the team hear both sides.
+C. Blame them back -> Blaming them back would turn the issue into a fight.
+
+31. ADULT ONLY
+Prompt root: I keep working even when I am exhausted.
+Question: What should I do about the exhaustion?
+A. Set work limit -> A clear limit protects my health and relationships.
+B. Ask for support -> Sharing the load may prevent resentment.
+C. Keep overworking -> Continuing this pace could make the burnout worse.
+
+32. ADULT ONLY
+Prompt root: My partner and I disagree about a family choice.
+Question: How should my partner and I decide?
+A. Listen to partner -> Listening may reveal the need under the disagreement.
+B. Find compromise -> A compromise can protect what matters to both of us.
+C. Demand my way -> Demanding my way would weaken our teamwork.
+
+33. ADULT ONLY
+Prompt root: One child keeps testing every rule.
+Question: How should I respond to the repeated rule testing?
+A. Stay calm -> Staying calm keeps the lesson clear.
+B. Set same limit -> A consistent limit helps the child know what to expect.
+C. Shame the child -> Shame would attack the child instead of the behavior.
+
+34. ADULT ONLY
+Prompt root: I want something the family cannot easily afford.
+Question: How should the family handle the cost?
+A. Make a budget -> A budget lets us see what is actually possible.
+B. Choose alternative -> An alternative may meet the need with less strain.
+C. Spend anyway -> Spending anyway could increase the family's stress.
+
+35. ADULT ONLY
+Prompt root: The neighborhood needs help, but I am already busy.
+Question: How can I help the neighborhood without neglecting home?
+A. Take small role -> A limited role lets me contribute without overcommitting.
+B. Organize others -> Organizing others shares the responsibility.
+C. Ignore everyone -> Ignoring everyone would leave the need unchanged.
+
+36. ADULT ONLY
+Prompt root: I have ignored signs that I need rest.
+Question: What should I do after ignoring my need for rest?
+A. Rest today -> Rest today is part of responsible care.
+B. Change schedule -> Changing the schedule may prevent the same pattern.
+C. Push through -> Pushing through would keep teaching my body to be ignored.
+
+37. ADULT ONLY
+Prompt root: My old dream does not match my current life.
+Question: What should I do with the old dream?
+A. Adapt the dream -> The dream may still fit in a different form.
+B. Make time for it -> A small protected time can test whether it still matters.
+C. Give it up angry -> Abandoning it with resentment may keep the loss unresolved.
+
+38. ELDER ONLY
+Prompt root: I remembered the first day you cared for me.
+Question: How should we hold the first-care memory?
+A. Tell me more -> Telling the details makes the memory feel alive again.
+B. Save the memory -> Saving it gives the family a place to return to it.
+C. Change subject -> Changing the subject would leave the feeling unfinished.
+
+39. ELDER ONLY
+Prompt root: I wonder what our family will remember about me.
+Question: What should I leave for the family to remember?
+A. Name my values -> Naming my values tells the family what guided me.
+B. Make a keepsake -> A keepsake can carry the story forward.
+C. Avoid the topic -> Avoiding the topic may leave important things unsaid.
+
+40. ELDER ONLY
+Prompt root: A younger relative asked about an old family argument.
+Question: How should I explain the old family argument?
+A. Tell both sides -> Telling both sides protects the truth from becoming simple blame.
+B. Focus on repair -> Focusing on repair can stop old hurt from being inherited.
+C. Pick a villain -> Choosing a villain would pass the conflict forward.
+
+41. ELDER ONLY
+Prompt root: There is something I wish I had done differently.
+Question: What can I do with this regret now?
+A. Make repair now -> One repair now can give the regret a useful direction.
+B. Share the lesson -> Sharing the lesson may help someone avoid the same harm.
+C. Dwell alone -> Dwelling alone would keep the regret isolated.
+
+42. ELDER ONLY
+Prompt root: Someone young wants me to teach them everything at once.
+Question: How should I teach someone who wants everything now?
+A. Teach one step -> One clear step respects the learner's pace.
+B. Let them try -> Trying it themselves will help the skill become theirs.
+C. Take over -> Taking over would finish the task but not teach it.
+
+43. ELDER ONLY
+Prompt root: The city is changing faster than I expected.
+Question: How should I respond to the changing city?
+A. Visit old places -> Visiting old places can honor what shaped me.
+B. Welcome the new -> Welcoming the new does not erase the old city.
+C. Reject all change -> Rejecting every change would leave me disconnected.
+
+44. CHILD THROUGH ELDER
+Prompt root: A strong feeling is making it hard to think.
+Question: What will help with this strong feeling?
+A. Name the feeling -> Naming it makes the feeling less confusing.
+B. Breathe together -> Breathing together helps my body slow down.
+C. Push it away -> Pushing it away may make it return stronger.
+
+45. CHILD THROUGH ELDER
+Prompt root: I need care, but part of me wants to do it alone.
+Question: How can I receive help without losing independence?
+A. Help right now -> Getting help now does not erase my ability.
+B. Teach next step -> Learning the next step builds independence.
+C. Refuse all help -> Refusing every kind of help may leave the need unresolved.
+
+46. CHILD THROUGH ELDER
+Prompt root: The weather changed all of our plans.
+Question: How should we respond to the changed weather plans?
+A. Make new plan -> A new plan helps us adapt to what we cannot control.
+B. Enjoy indoors -> Indoor time can still become a good memory.
+C. Blame someone -> Blaming someone would not change the weather.
+
+47. CHILD THROUGH ELDER
+Prompt root: Something in the garden needs attention.
+Question: What should we do about the garden need?
+A. Check the cause -> Checking first may show the right kind of care.
+B. Tend together -> Tending together gives the plant support now.
+C. Ignore the plant -> Ignoring it may allow the problem to worsen.
+
+48. CHILD THROUGH ELDER
+Prompt root: My companion is acting different today.
+Question: How should we understand the companion's behavior?
+A. Check its needs -> Its behavior may be communicating a need.
+B. Observe calmly -> Calm observation can reveal a pattern.
+C. Ignore the pet -> Ignoring the pet would leave it without guidance.
+
+49. CHILD THROUGH ELDER
+Prompt root: The family mood feels tense.
+Question: How can the family lower the tension?
+A. Hear everyone -> Hearing everyone may reveal what each person needs.
+B. Plan calm meeting -> A calm meeting gives the family a safer structure.
+C. Choose sides -> Choosing sides too quickly could deepen the conflict.
+
+50. CHILD THROUGH ELDER
+Prompt root: I did something I am proud of.
+Question: How should I hold this proud moment?
+A. Celebrate effort -> Celebrating the effort lets me enjoy what I did.
+B. Ask what I learned -> Naming what I learned helps the success become useful.
+C. Downplay it -> Downplaying it would make the achievement feel invisible.
+
+51. CHILD THROUGH ELDER
+Prompt root: I tried hard and still failed.
+Question: What should I do after trying hard and failing?
+A. Comfort first -> Comfort helps me face the failure without hiding.
+B. Plan another try -> A new plan gives me a real next step.
+C. Blame someone -> Blaming someone would keep me from learning.
+
+52. CHILD THROUGH ELDER
+Prompt root: I do not feel well and I am worried.
+Question: What should I do about feeling unwell?
+A. Check symptoms -> Checking symptoms helps us choose safe care.
+B. Rest and care -> Rest and care give my body time to recover.
+C. Ignore it -> Ignoring it could allow the problem to grow.
+
+53. CHILD THROUGH ELDER
+Prompt root: I cannot settle down enough to sleep.
+Question: How should I handle not being able to sleep?
+A. Calm routine -> A calm routine tells my body the day is ending.
+B. Talk about worry -> Talking about the worry may help my mind settle.
+C. Stay awake -> Staying awake would make tomorrow harder.
+
+54. CHILD THROUGH ELDER
+Prompt root: I want my favorite food again.
+Question: How should we handle the favorite-food request?
+A. Balanced serving -> A balanced serving lets me enjoy it and care for my body.
+B. Plan favorite day -> A planned favorite day gives me something to anticipate.
+C. Only eat favorite -> Eating only one favorite would reduce needed variety.
+
+55. CHILD THROUGH ELDER
+Prompt root: I noticed the room is getting messy.
+Question: How should I start cleaning the messy room?
+A. Clean together -> Cleaning together makes the first step easier.
+B. Make small plan -> A small plan helps me know where to begin.
+C. Shame the mess -> Shame would make me want to hide the mess.
+
+56. ADULT / ELDER
+Prompt root: A career decision is coming soon.
+Question: How should I approach the career decision?
+A. Compare values -> Comparing values may show which path fits my life.
+B. Try small step -> A small test can provide real information.
+C. Choose by pressure -> Choosing only from pressure may create resentment.
+
+57. CHILD / TEEN
+Prompt root: Something happened at school that I cannot stop replaying.
+Question: How should I respond to the school event I keep replaying?
+A. Listen whole story -> Thank you for letting me tell the whole story.
+B. Plan next step -> A next step helps me feel less trapped by the event.
+C. Forget about it -> Being told to forget it would leave the feeling unheard.
+
+58. CHILD THROUGH ELDER
+Prompt root: My rival wants another challenge.
+Question: How should I prepare for the rival's challenge?
+A. Set fair rules -> Fair rules make the challenge about skill.
+B. Practice first -> Practice gives me a constructive way to prepare.
+C. Cheat -> Cheating would damage both the result and the relationship.
+
+59. CHILD THROUGH ELDER
+Prompt root: Two siblings are angry with each other.
+Question: How should I help the angry siblings?
+A. Hear both sides -> Hearing both sides may show what each person experienced.
+B. Set fair turns -> Fair turns give both siblings a concrete plan.
+C. Pick a favorite -> Picking a favorite would increase the resentment.
+
+60. CHILD THROUGH ELDER
+Prompt root: The season is changing and I feel different too.
+Question: How should I respond to feeling different with the season?
+A. Adjust routine -> Adjusting the routine respects what my body needs now.
+B. Make tradition -> A tradition can give the change a familiar meaning.
+C. Ignore the change -> Ignoring the change may make the routine stop fitting.
+
+61. CHILD THROUGH ELDER
+Prompt root: Sometimes I worry I am not good enough.
+Question: What should I do with the thought that I am not good enough?
+A. Name my strengths -> Naming real strengths gives the thought more evidence to consider.
+B. Plan practice -> Practice can target a skill without judging my worth.
+C. Agree with fear -> Agreeing with the fear would make one result define me.
+
+62. CHILD THROUGH ELDER
+Prompt root: Someone helped me and I do not know how to thank them.
+Question: How can I show sincere gratitude?
+A. Thank them clearly -> Specific thanks tells them exactly what mattered.
+B. Return kindness -> Returning kindness turns gratitude into action.
+C. Say nothing -> Saying nothing may leave them unsure I noticed.
+
+63. CHILD THROUGH ELDER
+Prompt root: I hurt someone and now I feel ashamed.
+Question: How should I respond after hurting someone?
+A. Apologize fully -> A full apology names what I did and its effect.
+B. Repair the harm -> Repairing the harm shows that the apology has action behind it.
+C. Hide it -> Hiding it would protect me instead of the person I hurt.
+
+64. CHILD THROUGH ELDER
+Prompt root: I saw something unsafe and froze.
+Question: What is the safest response after freezing?
+A. Leave and tell -> Leaving and telling protects me from staying in danger.
+B. Find safe adult -> A safe adult can help decide the next step.
+C. Handle alone -> Handling danger alone could make the situation less safe.

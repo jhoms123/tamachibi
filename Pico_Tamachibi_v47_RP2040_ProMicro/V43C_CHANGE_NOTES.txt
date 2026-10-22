@@ -1,0 +1,65 @@
+PICO TAMACHIBI v43c - AGE-COHERENT DIALOGUE FIX
+=================================================
+
+ROOT CAUSES FIXED
+1. The separate Growing Together engine could open during the baby stage.
+2. Its baby milestone was incorrectly linked to the Starting School scenario.
+3. Sixty-five Parent Dialogue topics shared only twenty-one response sets.
+   Several sets were unrelated to the prompt, such as a lonely new classmate
+   receiving apology/end-friendship choices.
+4. The 240 Life Events reused generic category actions instead of actions tied
+   to the exact event.
+5. A pending conversation saved before an evolution could survive into a life
+   stage for which it was not written.
+6. The basic Talk menu used adult-like actions such as Ask Secret and Give
+   Advice even while the character was a baby.
+
+AGE RULES
+- Egg: no conversation.
+- Baby: short babble, attachment, food, sleep, mess, imitation, safe affection,
+  and first companion contact only. Growing Together is locked.
+- Child: school, sharing, honesty, simple responsibility, play, safety, and
+  child-level family questions.
+- Teen: identity, peer pressure, privacy, rivalry, grades, future planning,
+  embarrassment, boundaries, and increased independence.
+- Adult: work, partnership, parenting, money, community responsibility,
+  burnout, and long-term goals.
+- Elder: memory, regret, mentoring, legacy, family history, and life change.
+
+RESPONSE COHERENCE
+- 65 Parent Dialogue topics now have 65 exact response sets.
+- That is 195 exact choice labels and 195 exact remembered replies.
+- Questions are tied to the exact three choices shown next.
+- 240 Life Events now have 240 exact prompt summaries and 480 exact choices.
+- Growing Together retains 27 feature-specific question/choice families, but
+  now has hard stage gates and scenario-level stage filters.
+
+OLD SAVE PROTECTION
+- Invalid pending Parent Dialogue topics are discarded as soon as the stage is
+  checked, then replaced with a valid topic.
+- Invalid pending Growing Together features/scenarios are also discarded and
+  reselected.
+- A baby can never display a saved school, career, marriage, co-parenting, or
+  elder narrative.
+
+READABILITY
+- Parent Dialogue and Growing Together remain word-wrapped and scrollable.
+- Text stays open until D1 is pressed.
+- Life Events now open in a full-width scrollable reader before choices.
+- Long Life Event choices wrap over two lines instead of being cut off.
+- The confirmation page also stays open until D1.
+
+BASIC TALK MENU
+During the baby stage, the menu now uses baby-appropriate interactions:
+- Make silly sound
+- Cheer baby
+- Ask sleepy dream
+- Play peekaboo
+- Teach gentle hands
+- Baby temperament
+- Look at fish
+Growing Together displays Unlocks at child rather than opening adult text.
+
+SAVE COMPATIBILITY
+No save structure, checksum, EEPROM address, or profile layout changed.
+Existing v43/v43a/v43b saves remain compatible.
