@@ -84,8 +84,10 @@ choice uses five care quality bands. The save structure stays the same; v19
 saves are accepted and their old species choices are migrated to the new
 lineages on load.
 
-Pet sprites are transparent masks: the renderer paints only the creature's
-lit pixels, so room details remain visible through open spaces inside a design.
+Pet sprites preserve transparent exterior space, while enclosed body interiors
+are opaque black so scenery cannot show through outlined creatures. Babies are
+authored at their native pixel size, and every adult branch retains its family's
+recognizable crest, ears, fins, horns, leaves, handle, wisp, or antenna.
 Awake idle cycles animate a lineage-specific part independently of the body's
 position: wings flap, fins and tails swish, ears flop, leaves sway, wisps trail,
 and bells or antennae swing. These poses change every 700 ms; the home pet also
@@ -101,3 +103,6 @@ python3 tools/render_evolution.py
 The evolution approach follows the care based branching pattern in the
 [1996 Tamagotchi character list](https://tamagotchi.fandom.com/wiki/Tamagotchi_(1996_Pet)/Character_list#Generation_1_2).
 All Tamachibi sprite designs in this project are original.
+
+[View the evolution lineup](../docs/evolution/Tamachibi_Evolution_Tree.png) and
+[animated family features](../docs/evolution/Tamachibi_Part_Animation.gif).

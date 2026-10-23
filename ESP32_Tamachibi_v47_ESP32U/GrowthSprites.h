@@ -14,3 +14,6 @@ void buildGrowthRows(uint8_t family, uint8_t stage, uint8_t route,
 uint8_t growthAdultSpecies(uint8_t family, uint8_t careTier);
 uint8_t growthFamilyForAdult(uint8_t adultSpecies);
 uint8_t growthCareTierForAdult(uint8_t adultSpecies);
+
+// Recognizable inherited feature retained by every adult in the family.
+void addGrowthFamilyTrait(uint8_t family, uint32_t rows[32]);

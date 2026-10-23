@@ -165,15 +165,14 @@ int main() {
             # Include the animated appendages, which extend beyond the 32px
             # torso mask, while preserving their transparent margins.
             image = image.crop((12, 12, 116, 116))
-            pixels = image.load()
-            rgba = Image.new("RGBA", image.size, (255, 255, 255, 0))
-            alpha = Image.new("L", image.size, 0)
-            ap = alpha.load()
-            for y in range(image.height):
-                for x in range(image.width):
-                    if pixels[x, y][0] > 127:
-                        ap[x, y] = 255
-            rgba.putalpha(alpha)
+            # Exterior flood preserves black body interiors in the preview.
+            mask = image.convert("L")
+            for edge in range(mask.width):
+                for point in ((edge, 0), (edge, mask.height-1), (0, edge), (mask.width-1, edge)):
+                    if mask.getpixel(point) == 0:
+                        ImageDraw.floodfill(mask, point, 128, thresh=0)
+            rgba = image.convert("RGBA")
+            rgba.putalpha(mask.point(lambda value: 0 if value == 128 else 255))
             return rgba
 
         scale = 2
@@ -244,25 +243,25 @@ int main() {
             image.paste(elder, (S(left + (cell_w - 72) // 2), S(y + 5)), elder)
             centered(draw, (S(left + cell_w // 2), S(y + 83)), "chosen adult", label_font, "#dbe4f3")
 
-            # The connector reinforces the split and reunion without crossing
-            # over the sprite art.
-            line_y = S(y + 108)
-            line_color = "#5b6f8a"
-            start_x = S(x0 + cell_w * 2 + cell_w // 2)
-            teen_left = S(x0 + cell_w * 3 + cell_w // 2)
-            teen_right = S(x0 + cell_w * 4 + cell_w // 2)
-            draw.line((start_x, line_y, teen_left, line_y), fill=line_color, width=S(1))
-            draw.line((start_x, line_y, teen_right, line_y), fill=line_color, width=S(1))
-            draw.line((teen_left, line_y, teen_right, line_y), fill=line_color, width=S(1))
-            adult_start = S(x0 + cell_w * 5 + 5)
-            adult_end = S(x0 + cell_w * 10 - 5)
-            draw.line((teen_left, line_y, adult_start, line_y), fill=line_color, width=S(1))
-            draw.line((teen_right, line_y, adult_start, line_y), fill=line_color, width=S(1))
-            draw.line((adult_start, line_y, adult_end, line_y), fill=line_color, width=S(1))
-            for column in range(5, 11):
-                cx = S(x0 + column * cell_w + cell_w // 2)
-                draw.polygon([(cx, line_y + S(4)), (cx - S(3), line_y - S(1)),
-                              (cx + S(3), line_y - S(1))], fill=line_color)
+            # Explicit growth chain, teen fork, and care-selected adult fan.
+            centers = [S(x0 + col * cell_w + cell_w // 2) for col in range(11)]
+            ink = "#637c9c"
+            upper, lower, tip = S(y+101), S(y+117), S(y+94)
+            for col in range(2):
+                draw.line((centers[col],upper,centers[col+1],upper),fill=ink,width=S(1))
+                draw.ellipse((centers[col]-S(2),upper-S(2),centers[col]+S(2),upper+S(2)),fill=ink)
+            fork = centers[2]
+            draw.line((fork,upper,fork,lower,centers[4],lower),fill=ink,width=S(1))
+            for col in (3,4):
+                draw.line((centers[col],lower,centers[col],tip),fill=ink,width=S(1))
+            join = S(x0+5*cell_w-8)
+            draw.line((centers[3],upper,join,upper,join,lower,centers[9],lower),fill=ink,width=S(1))
+            draw.line((centers[4],upper,join,upper),fill=ink,width=S(1))
+            for col in range(5,10):
+                cx=centers[col]
+                draw.line((cx,lower,cx,tip),fill=ink,width=S(1))
+                draw.polygon([(cx,tip),(cx-S(3),tip+S(4)),(cx+S(3),tip+S(4))],fill=ink)
+            centered(draw,(centers[10],S(y+108)),"same adult → elder",note_font,"#8493a9")
 
         draw.text((S(margin), S(height - 18)),
                   "Adult sprites are original roster designs; elder keeps the chosen adult form and adds a cane.",

@@ -101,44 +101,15 @@ int main() {
   d.display();
   assert(memcmp(firstAdult, panel.pixels, sizeof(firstAdult)) != 0);
 
-  // A pre-painted background pixel in an empty adult mask pixel must remain
-  // visible after drawing the pet. The renderer paints set bits only.
+  // The bird's outlined torso must cover background detail with black.
   const int holeX = 11, holeY = 15;
-  const uint32_t adultRow = pgm_read_dword(&ROSTER_SPRITES[0][holeY]);
-  assert(!(adultRow & (0x80000000UL >> holeX)));
   d.clearDisplay();
-  d.drawPixel(48 + holeX, 48 + holeY, 1);
-  NativeUI::pet(d, 48, 48, 0, 4, 0, false, 2);
+  d.fillRect(48,48,32,32,1);
+  NativeUI::pet(d,48,48,0,4,0,false,2);
   d.display();
-  assert(panel.pixels[(48 + holeY) * 128 + 48 + holeX]);
-
-  uint32_t teenRows[32];
-  buildGrowthRows(0, 3, 0, teenRows);
-  int teenHoleX = -1, teenHoleY = -1, bestHoleDistance = 1000;
-  for (int y = 2; y < 30; ++y) {
-    for (int x = 2; x < 30; ++x) {
-      if (teenRows[y] & (0x80000000UL >> x))
-        continue;
-      int neighbors = 0;
-      for (int dy = -1; dy <= 1; ++dy)
-        for (int dx = -1; dx <= 1; ++dx)
-          if ((dx || dy) &&
-              (teenRows[y + dy] & (0x80000000UL >> (x + dx))))
-            ++neighbors;
-      const int distance = abs(x - 16) + abs(y - 16);
-      if (neighbors >= 3 && distance < bestHoleDistance) {
-        teenHoleX = x;
-        teenHoleY = y;
-        bestHoleDistance = distance;
-      }
-    }
-  }
-  assert(teenHoleX >= 0 && teenHoleY >= 0);
-  d.clearDisplay();
-  d.drawPixel(48 + teenHoleX, 48 + teenHoleY, 1);
-  NativeUI::pet(d, 48, 48, 0, 3, 0, false, 2);
-  d.display();
-  assert(panel.pixels[(48 + teenHoleY) * 128 + 48 + teenHoleX]);
+  assert(!panel.pixels[(48+holeY)*128+48+holeX]);
+  // Exterior space remains transparent, including mirrored small icons.
+  assert(panel.pixels[48*128+48]);
 
   uint64_t familyPrints[4][10]{};
   for (uint8_t stage = 0; stage <= 3; ++stage) {
@@ -215,7 +186,7 @@ int main() {
   assert(memcmp(facingRight, panel.pixels, sizeof(facingRight)) != 0);
 
   puts("Renderer checks passed: square geometry, framebuffer isolation, "
-       "transparent sprite holes, 50 adult masks, 10 distinct lineages, "
+       "opaque body interiors and transparent exterior, 50 adult masks, 10 distinct lineages, "
        "care-split teens, animated lineage parts through elder, 50 mapped "
        "adult outcomes, and facing animation.");
 }

@@ -121,11 +121,13 @@ void buildAgeRows(uint8_t species, uint8_t stage, uint8_t evolutionPath,
   if (stage < 4) {
     buildGrowthRows(species % TAMACHIBI_FAMILY_COUNT, stage, evolutionPath,
                     rows);
+    addGrowthFamilyTrait(species % TAMACHIBI_FAMILY_COUNT, rows);
     return;
   }
   const uint8_t id = species % 50;
   for (int y = 0; y < 32; ++y)
     rows[y] = pgm_read_dword(&ROSTER_SPRITES[id][y]);
+  addGrowthFamilyTrait(growthFamilyForAdult(id), rows);
 }
 
 int floorScale(int source, int outputSize) {
@@ -522,6 +524,31 @@ void pet(GameDisplay &d, int x, int y, uint8_t species, uint8_t stage,
   buildAgeRows(species, stage, evolutionPath, frame, rows);
   const int outputSize = 16 * std::max(1, scale);
   const int bob = ((frame & 1U) != 0) ? std::max(1, outputSize / 32) : 0;
+
+  // Flood only the exterior empty pixels. Enclosed body interiors are
+  // opaque black, while the space outside ears, tails and legs stays clear.
+  uint32_t exterior[32]{};
+  uint16_t queue[1024];
+  int head = 0, tail = 0;
+  auto visit = [&](int px, int py) {
+    const uint32_t bit = 0x80000000UL >> px;
+    if (!((rows[py] | exterior[py]) & bit)) {
+      exterior[py] |= bit; queue[tail++] = py * 32 + px;
+    }
+  };
+  for (int i = 0; i < 32; ++i) { visit(i,0); visit(i,31); visit(0,i); visit(31,i); }
+  while (head < tail) {
+    const int value = queue[head++], px = value % 32, py = value / 32;
+    if (px) visit(px-1,py); if (px<31) visit(px+1,py);
+    if (py) visit(px,py-1); if (py<31) visit(px,py+1);
+  }
+  for (int py=0; py<32; ++py) for (int px=0; px<32; ++px) {
+    const int sx = facingLeft ? 31-px : px;
+    if ((rows[py] | exterior[py]) & (0x80000000UL >> sx)) continue;
+    const int x0=px*outputSize/32, x1=((px+1)*outputSize+31)/32;
+    const int y0=py*outputSize/32-bob, y1=((py+1)*outputSize+31)/32-bob;
+    d.fillRect(x+x0,y+y0,std::max(1,x1-x0),std::max(1,y1-y0),0);
+  }
 
   // The old callers use scale 1 for a 16px icon and scale 2 for a 32px
   // character. Larger preview scales keep the same pixel-art proportions.

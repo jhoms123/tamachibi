@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <cstring>
+#include <initializer_list>
 
 namespace {
 
@@ -203,53 +204,6 @@ void line32(uint32_t rows[32], int x0, int y0, int x1, int y1) {
   }
 }
 
-void addChildAccents(uint32_t rows[32], uint8_t family) {
-  switch (family % TAMACHIBI_FAMILY_COUNT) {
-  case 0: // young bird's growing wing and split tail
-    line32(rows, 4, 17, 9, 19); line32(rows, 5, 19, 9, 21);
-    line32(rows, 22, 23, 27, 27); set32(rows, 28, 27);
-    break;
-  case 1: // swimmer's side fins and rising bubbles
-    line32(rows, 24, 20, 30, 16); line32(rows, 24, 22, 30, 24);
-    set32(rows, 5, 9); set32(rows, 3, 6); set32(rows, 6, 4);
-    break;
-  case 2: // catlike ears, paws, and a curling tail
-    line32(rows, 24, 23, 29, 21); line32(rows, 29, 21, 30, 17);
-    set32(rows, 10, 29); set32(rows, 20, 29);
-    break;
-  case 3: // wisp and a wavy ghost hem
-    line32(rows, 24, 5, 27, 2); line32(rows, 27, 2, 30, 4);
-    line32(rows, 6, 29, 10, 27); line32(rows, 14, 29, 18, 27);
-    line32(rows, 22, 29, 26, 27);
-    break;
-  case 4: // sesame seeds and a second filling stripe
-    line32(rows, 7, 22, 24, 22);
-    set32(rows, 10, 9); set32(rows, 16, 7); set32(rows, 22, 9);
-    break;
-  case 5: // longer horns, ridge, and tail
-    line32(rows, 9, 7, 7, 1); line32(rows, 22, 7, 25, 1);
-    line32(rows, 23, 22, 30, 19); line32(rows, 23, 23, 29, 26);
-    break;
-  case 6: // floppy ears and four little paws
-    line32(rows, 4, 13, 1, 19); line32(rows, 27, 13, 30, 19);
-    set32(rows, 9, 29); set32(rows, 13, 30); set32(rows, 20, 30); set32(rows, 24, 29);
-    break;
-  case 7: // paired leaves, stem, and root marks
-    line32(rows, 16, 10, 16, 1); line32(rows, 16, 5, 10, 2); line32(rows, 16, 6, 22, 2);
-    set32(rows, 12, 29); set32(rows, 16, 30); set32(rows, 20, 29);
-    break;
-  case 8: // bell rim, side arms, and clapper
-    line32(rows, 8, 27, 24, 27); line32(rows, 8, 28, 24, 28);
-    line32(rows, 7, 17, 2, 20); line32(rows, 25, 17, 30, 20);
-    set32(rows, 16, 30);
-    break;
-  default: // antenna, bolts, and square feet
-    line32(rows, 18, 7, 18, 1); line32(rows, 18, 1, 23, 1);
-    set32(rows, 5, 14); set32(rows, 26, 14);
-    line32(rows, 10, 28, 8, 31); line32(rows, 22, 28, 24, 31);
-    break;
-  }
-}
 
 } // namespace
 
@@ -261,28 +215,49 @@ void buildGrowthRows(uint8_t family, uint8_t stage, uint8_t route,
   uint16_t seed[16];
   buildFamilySeed(family % TAMACHIBI_FAMILY_COUNT, seed);
 
-  int width = 16, height = 16;
-  if (stage == 1) { width = 8; height = 7; }
-  else if (stage == 2) { width = 13; height = 12; }
-  else if (stage == 3 && route != 0) { width = 14; height = 11; }
-  const int offsetX = (16 - width) / 2;
-  const int offsetY = 16 - height;
+  // Babies are authored at their actual pixel size. Sampling the larger
+  // creature used to drop eyes and limbs, leaving disconnected dots.
+  if (stage == 1) {
+    memset(seed, 0, sizeof(seed));
+    ellipse16(seed, 8, 11, 3, 3);
+    switch (family % TAMACHIBI_FAMILY_COUNT) {
+    case 0: line16(seed, 7, 8, 6, 6); fillRect16(seed, 11, 10, 2, 2); break;
+    case 1: ellipse16(seed, 8, 12, 4, 2); line16(seed, 11, 12, 14, 10); line16(seed, 14, 10, 14, 14); break;
+    case 2: line16(seed, 5, 9, 5, 6); line16(seed, 5, 6, 8, 9); line16(seed, 8, 9, 11, 6); line16(seed, 11, 6, 11, 9); break;
+    case 3: line16(seed, 8, 8, 9, 5); fillRect16(seed, 5, 13, 7, 2); clear16(seed, 7, 14); clear16(seed, 10, 14); break;
+    case 4: ellipse16(seed, 8, 10, 4, 2); fillRect16(seed, 4, 12, 9, 2); clear16(seed, 8, 8); break;
+    case 5: line16(seed, 5, 9, 4, 6); line16(seed, 11, 9, 12, 6); break;
+    case 6: ellipse16(seed, 4, 10, 1, 2); ellipse16(seed, 12, 10, 1, 2); break;
+    case 7: line16(seed, 8, 8, 8, 6); ellipse16(seed, 6, 6, 2, 1); ellipse16(seed, 10, 5, 2, 1); break;
+    case 8: fillRect16(seed, 5, 9, 7, 5); fillRect16(seed, 4, 13, 9, 1); set16(seed, 8, 15); break;
+    default: fillRect16(seed, 5, 9, 7, 5); line16(seed, 8, 9, 8, 6); fillRect16(seed, 7, 5, 3, 2); break;
+    }
+    clear16(seed, 7, 11); clear16(seed, 9, 11);
+    set16(seed, 6, 15); set16(seed, 10, 15);
+  }
+  const int width = stage == 1 ? 16 : stage == 2 ? 13 : 16;
+  const int height = stage == 1 ? 16 : stage == 2 ? 13 : (route ? 14 : 16);
+  const int offsetX = (16 - width) / 2, offsetY = 16 - height;
+  // Forward projection preserves every authored feature when the child is
+  // smaller; inverse nearest-neighbor sampling could erase whole appendages.
+  for (int y = 0; y < 16; ++y)
+    for (int x = 0; x < 16; ++x) {
+      if (!(seed[y] & static_cast<uint16_t>(1U << x))) continue;
+      const int tx = 2 * (offsetX + x * width / 16);
+      const int ty = 2 * (offsetY + y * height / 16);
+      for (int dy = 0; dy < 2; ++dy)
+        for (int dx = 0; dx < 2; ++dx) set32(rows, tx + dx, ty + dy);
+    }
 
-  for (int y = 0; y < height; ++y) {
-    const int sourceY = (y * 16) / height;
-    for (int x = 0; x < width; ++x) {
-      const int sourceX = (x * 16) / width;
-      if (!(seed[sourceY] & static_cast<uint16_t>(1U << sourceX))) continue;
-      const int targetX = 2 * (offsetX + x);
-      const int targetY = 2 * (offsetY + y);
-      set32(rows, targetX, targetY);
-      set32(rows, targetX + 1, targetY);
-      set32(rows, targetX, targetY + 1);
-      set32(rows, targetX + 1, targetY + 1);
+  // Recut the face after projection so smaller bodies never lose their eyes.
+  if (stage == 2) {
+    const int eyeY = family == 7 ? 10 : family == 9 ? 6 : family == 0 ? 7 : 8;
+    for (int eyeX : {6, 10}) {
+      const int tx = 2 * (offsetX + eyeX * width / 16);
+      const int ty = 2 * (offsetY + eyeY * height / 16);
+      for (int dy=0;dy<2;++dy) for (int dx=0;dx<2;++dx) clear32(rows,tx+dx,ty+dy);
     }
   }
-
-  if (stage >= 2) addChildAccents(rows, family);
   if (stage == 3) {
     if (route == 0) addThrivingTeenCrest(rows, family);
     else addCareMissMark(rows, family);
@@ -311,4 +286,44 @@ uint8_t growthCareTierForAdult(uint8_t adultSpecies) {
     for (uint8_t tier = 0; tier < TAMACHIBI_CARE_TIER_COUNT; ++tier)
       if (growthAdultSpecies(family, tier) == adultSpecies) return tier;
   return 0;
+}
+
+void addGrowthFamilyTrait(uint8_t family, uint32_t rows[32]) {
+  int top = 32, left = 32, right = -1;
+  // Anchor to the main body rather than a stray star, foot, or ornament.
+  for (int y = 3; y < 27; ++y) {
+    int count = 0, l = 32, r = -1;
+    for (int x = 3; x < 29; ++x) if (rows[y] & (0x80000000UL >> x)) {
+      ++count; if (l == 32) l = x; r = x;
+    }
+    if (count >= 6) { top = y; left = l; right = r; break; }
+  }
+  if (top == 32) return;
+  const int cx = (left + right) / 2;
+  const int y = top < 5 ? 5 : top;
+  switch (family % TAMACHIBI_FAMILY_COUNT) {
+  case 0: // forked feather crest
+    line32(rows,cx,y,cx-3,y-4); line32(rows,cx,y,cx+2,y-4); break;
+  case 1: // paired swept fins
+    line32(rows,left,y+4,left-3,y+1); line32(rows,right,y+4,right+3,y+1); break;
+  case 2: // triangular cat ears
+    line32(rows,left,y+2,left,y-4); line32(rows,left,y-4,left+5,y+1);
+    line32(rows,right,y+2,right,y-4); line32(rows,right,y-4,right-5,y+1); break;
+  case 3: // curled spirit wisp
+    line32(rows,cx,y,cx+3,y-3); line32(rows,cx+3,y-3,cx+1,y-5); break;
+  case 4: // sesame crown attached to the bun
+    line32(rows,cx-3,y+1,cx-3,y-1); line32(rows,cx+3,y+1,cx+3,y-1); break;
+  case 5: // outward horns
+    line32(rows,left+2,y+1,left,y-4); line32(rows,right-2,y+1,right,y-4); break;
+  case 6: // rounded drooping ears
+    line32(rows,left,y+1,left-2,y+3); line32(rows,left-2,y+3,left-2,y+6);
+    line32(rows,right,y+1,right+2,y+3); line32(rows,right+2,y+3,right+2,y+6); break;
+  case 7: // sprouting twin leaves
+    line32(rows,cx,y,cx,y-4); line32(rows,cx,y-2,cx-4,y-4); line32(rows,cx-4,y-4,cx,y-4);
+    line32(rows,cx,y-3,cx+4,y-5); line32(rows,cx+4,y-5,cx,y-5); break;
+  case 8: // rounded bell handle
+    line32(rows,cx-2,y,cx-2,y-3); line32(rows,cx-2,y-3,cx+2,y-3); line32(rows,cx+2,y-3,cx+2,y); break;
+  default: // square receiver on a stalk
+    line32(rows,cx,y,cx,y-3); line32(rows,cx-2,y-3,cx+2,y-3); line32(rows,cx-2,y-4,cx+2,y-4); break;
+  }
 }
