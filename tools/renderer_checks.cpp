@@ -16,10 +16,17 @@ int main() {
   buildTamachibiCareMemory(memories, 0, remembered, sizeof(remembered));
   assert(strstr(remembered, "day 4") && strstr(remembered, "in the evening"));
   assert(strstr(remembered, "Quiet Star"));
+  memories.careTypes[0] = 22;
+  buildTamachibiCareMemory(memories, 0, remembered, sizeof(remembered));
+  assert(strstr(remembered, "little snack") && strstr(remembered, "day 4"));
+  memories.careTypes[0] = 42;
+  buildTamachibiBabyMemory(memories, 0, remembered, sizeof(remembered));
+  assert(strstr(remembered, "sat together quietly") && strstr(remembered, "day 4"));
+  memories.careTypes[0] = 6;
   memories.learnedFavoriteFood = 1; memories.learnedDislikedFood = 3;
   buildTamachibiPersonalMemory(memories, TAMA_MEMORY_FOOD, 2,
                                remembered, sizeof(remembered));
-  assert(strstr(remembered, "rice") && strstr(remembered, "snack"));
+  assert(strstr(remembered, "cooked meal") && strstr(remembered, "healthy meal"));
   assert(tamachibiMemoryForParentTopic(54) == TAMA_MEMORY_FOOD);
   assert(tamachibiMemoryForParentTopic(18) == TAMA_MEMORY_GARDEN);
   assert(tamachibiMemoryForGrowingFeature(16) == TAMA_MEMORY_GAME);

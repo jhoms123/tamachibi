@@ -150,3 +150,20 @@ Open **Talk → Parent Bond Journal → page 7** to review care, food, play, tri
 shared-place, and current-feeling memories. Page 8 changes how often the pet
 initiates check-ins. The conversation layer reads existing save fields and
 does not add or move any EEPROM data.
+
+## Everyday care
+
+Meals react to hunger, the Tama's learned likes and dislikes, and foods served
+recently. The selector marks a favorite, a food they have grown tired of, a
+frequent repeat, or a new option before it is chosen. Cleaning gives its full
+health and trust benefits when the Tama actually needs a bath; an already-clean
+pet still gets a small shared moment without turning baths into a stat-grinding
+shortcut. Medicine replies reflect whether the remedy matched and whether the
+Tama recovered.
+
+The Love action now offers **Cuddle**, **Praise**, or **Quiet company**. Each
+choice affects mood, bond, trust, discipline, or kindness differently, with
+personality affinities and smaller repeat rewards when the same gesture is used
+over and over. Care history records the selected meal, medicine, and comfort
+choice, so later conversations can refer to what actually happened. These
+details use the existing eight-entry care history and preserve the save layout.

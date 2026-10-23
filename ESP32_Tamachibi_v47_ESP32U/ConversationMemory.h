@@ -68,10 +68,10 @@ enum TamachibiMemoryKind : uint8_t {
 
 inline const char *tamachibiFoodMemoryName(uint8_t food) {
   switch (food) {
-    case 0: return "berries";
-    case 1: return "rice";
-    case 2: return "vegetables";
-    case 3: return "a snack";
+    case 0: return "a basic meal";
+    case 1: return "a cooked meal";
+    case 2: return "a snack";
+    case 3: return "a healthy meal";
     case 4: return "a treat";
     default: return "that meal";
   }
@@ -130,6 +130,20 @@ inline void buildTamachibiCareMemory(const TamachibiMemoryContext &m,
     case 13: snprintf(event, sizeof(event), "you made time for affection on day %u %s", day, when); break;
     case 14: snprintf(event, sizeof(event), "we played together on day %u %s", day, when); break;
     case 15: snprintf(event, sizeof(event), "we went exploring together on day %u %s", day, when); break;
+    case 20: snprintf(event, sizeof(event), "we shared a basic meal on day %u %s", day, when); break;
+    case 21: snprintf(event, sizeof(event), "you made me a cooked meal on day %u %s", day, when); break;
+    case 22: snprintf(event, sizeof(event), "you brought me a little snack on day %u %s", day, when); break;
+    case 23: snprintf(event, sizeof(event), "you chose a healthy meal for me on day %u %s", day, when); break;
+    case 24: snprintf(event, sizeof(event), "you gave me a special treat on day %u %s", day, when); break;
+    case 30: snprintf(event, sizeof(event), "you gave me cold syrup on day %u %s", day, when); break;
+    case 31: snprintf(event, sizeof(event), "you helped my tummy on day %u %s", day, when); break;
+    case 32: snprintf(event, sizeof(event), "you helped my skin feel better on day %u %s", day, when); break;
+    case 33: snprintf(event, sizeof(event), "you helped when I felt worn out on day %u %s", day, when); break;
+    case 34: snprintf(event, sizeof(event), "you brought me comfort tea on day %u %s", day, when); break;
+    case 35: snprintf(event, sizeof(event), "you gave me strong medicine on day %u %s", day, when); break;
+    case 40: snprintf(event, sizeof(event), "you gave me a cuddle on day %u %s", day, when); break;
+    case 41: snprintf(event, sizeof(event), "you noticed my effort and praised me on day %u %s", day, when); break;
+    case 42: snprintf(event, sizeof(event), "we sat quietly together on day %u %s", day, when); break;
     default: snprintf(event, sizeof(event), "you made time for me on day %u %s", day, when); break;
   }
   snprintf(out, outSize, "%s %s.", lead, event);
@@ -153,6 +167,13 @@ inline void buildTamachibiBabyMemory(const TamachibiMemoryContext &m,
     case 13: snprintf(out, outSize, "You gave me a gentle cuddle on day %u. I liked that.", day); break;
     case 14: snprintf(out, outSize, "We played together on day %u. I remember laughing with you.", day); break;
     case 15: snprintf(out, outSize, "We went out together on day %u. I liked staying near you.", day); break;
+    case 20: case 21: case 22: case 23: case 24:
+      snprintf(out, outSize, "You made sure I had something to eat on day %u. I remember that care.", day); break;
+    case 30: case 31: case 32: case 33: case 34: case 35:
+      snprintf(out, outSize, "You helped when I felt unwell on day %u. I felt safer with you there.", day); break;
+    case 40: snprintf(out, outSize, "You gave me a cuddle on day %u. I felt close to you.", day); break;
+    case 41: snprintf(out, outSize, "You noticed me trying on day %u. I wanted to keep learning.", day); break;
+    case 42: snprintf(out, outSize, "We sat together quietly on day %u. I felt safe beside you.", day); break;
     default: buildTamachibiCareMemory(m, turn, out, outSize); break;
   }
 }

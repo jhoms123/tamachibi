@@ -59,6 +59,11 @@ const byte HABITAT_COUNT = 8;
 const byte MATERIAL_COUNT = 6;
 const byte CRAFT_RECIPE_COUNT = 12;
 const byte CARE_HISTORY_COUNT = 8;
+// Care history stores specific choices as well as broad milestones. These fit
+// the existing byte-sized history format, so older saves remain compatible.
+const byte CARE_EVENT_FOOD_BASE = 20;
+const byte CARE_EVENT_MED_BASE = 30;
+const byte CARE_EVENT_COMFORT_BASE = 40;
 const byte PARTNER_COUNT = 8;
 const byte AQUARIUM_MENU_COUNT = 10;
 #ifdef BLACK
@@ -1043,6 +1048,20 @@ void doMedicine();
 void doClean();
 void doLove();
 void doCall();
+byte recentCareCount(byte eventType, byte lookbackDays = 1);
+byte careReplyVariant(byte count);
+const __FlashStringHelper* careFoodReply(byte pick, bool favorite, bool disliked,
+                                         bool overfed, bool hungryBefore, byte repeats);
+const __FlashStringHelper* careCleanReply(bool needed, bool messy, byte repeats);
+const __FlashStringHelper* careMedicineReply(byte medId, bool correct, bool recovered,
+                                             byte repeats);
+const __FlashStringHelper* careComfortReply(byte mode, bool personalityMatch, byte repeats);
+const __FlashStringHelper* careCallReply(byte reason);
+const __FlashStringHelper* careSleepReply(bool waking);
+const __FlashStringHelper* careFoodDetail(byte pick, bool favorite, bool disliked,
+                                          bool overfed, bool hungryBefore, byte repeats);
+const __FlashStringHelper* careComfortDetail(byte mode, byte repeats);
+void careChoiceAnimation(byte mode);
 void executeAction(byte action);
 void recordCareMistake();
 void createPetCallIfNeeded();
@@ -1469,7 +1488,6 @@ void wrongMedicineEffect() {
   subStat(happy, 1);
   if (random(0, 5) == 0) setCondition(2, 1); // upset stomach from wrong meds sometimes
   badSound();
-  popup(F("Wrong med"), F("No cure"));
 }
 
 byte* medCountPtr(byte medId) {
@@ -1506,13 +1524,15 @@ void applyMedicine(byte medId) {
   }
 
   bool wasSick = sick || conditionType != 0;
+  byte repeats = recentCareCount(CARE_EVENT_MED_BASE + medId, 1);
   byte *stock = medCountPtr(medId);
+  bool boughtDose = false;
 
   if (*stock == 0) {
     if (coins >= MEDICINE_PRICE) {
       spendCoins(MEDICINE_PRICE);
       *stock = 1;
-      popup(F("Bought dose"), medName(medId), 450);
+      boughtDose = true;
     } else {
       badSound();
       popup(F("No medicine"), F("Need coins"));
@@ -1548,24 +1568,23 @@ void applyMedicine(byte medId) {
     addStat(happy, 1);
   }
 
+  bool recovered = false;
   if (medId == 5 && correct) {
     clearCondition();
     sick = false;
     winSound();
-    popup(F("All cured!"), F("Strong medicine"));
   } else if (correct) {
     if (conditionType != 0) reduceCondition();
     if (conditionType == 0) sick = false;
     addStat(health, 1);
     goodSound();
-    popup(F("Medicine OK"), F("Feeling better"));
   } else {
     wrongMedicineEffect();
   }
 
+  recovered = wasSick && conditionType == 0 && !sick;
   if (correct) {
     markRoutineAction(ROUTINE_CARE);
-    logCareEvent(11);
     recordGoalEvent(0, 1);
     changeTrust(2);
     if (wasSick && conditionType == 0) {
@@ -1574,6 +1593,9 @@ void applyMedicine(byte medId) {
       changeBond(2);
     }
   }
+  logCareEvent(CARE_EVENT_MED_BASE + medId);
+  popup(careMedicineReply(medId, correct, recovered, repeats),
+        boughtDose ? F("Bought and used") : medName(medId), 750);
   clampAll();
   saveDirty = true;
 }
@@ -2203,7 +2225,320 @@ const __FlashStringHelper* careEventName(byte type) {
   if (type == 13) return F("Affection");
   if (type == 14) return F("Playtime");
   if (type == 15) return F("Explored");
+  if (type == CARE_EVENT_FOOD_BASE) return F("Ate a meal");
+  if (type == CARE_EVENT_FOOD_BASE + 1) return F("Ate cooked food");
+  if (type == CARE_EVENT_FOOD_BASE + 2) return F("Had a snack");
+  if (type == CARE_EVENT_FOOD_BASE + 3) return F("Ate healthy food");
+  if (type == CARE_EVENT_FOOD_BASE + 4) return F("Got a treat");
+  if (type == CARE_EVENT_MED_BASE) return F("Took cold syrup");
+  if (type == CARE_EVENT_MED_BASE + 1) return F("Took tummy drops");
+  if (type == CARE_EVENT_MED_BASE + 2) return F("Used skin cream");
+  if (type == CARE_EVENT_MED_BASE + 3) return F("Took energy tonic");
+  if (type == CARE_EVENT_MED_BASE + 4) return F("Had comfort tea");
+  if (type == CARE_EVENT_MED_BASE + 5) return F("Took all-cure");
+  if (type == CARE_EVENT_COMFORT_BASE) return F("Shared a cuddle");
+  if (type == CARE_EVENT_COMFORT_BASE + 1) return F("Heard kind praise");
+  if (type == CARE_EVENT_COMFORT_BASE + 2) return F("Sat together");
   return F("Care event");
+}
+
+byte recentCareCount(byte eventType, byte lookbackDays) {
+  const unsigned int today = static_cast<unsigned int>(
+      min<unsigned long>(65535UL, static_cast<unsigned long>(petAgeDays())));
+  const byte oldest = (careHistoryHead + CARE_HISTORY_COUNT - careHistoryCount) % CARE_HISTORY_COUNT;
+  byte count = 0;
+  for (byte i = 0; i < careHistoryCount; ++i) {
+    const byte slot = (oldest + i) % CARE_HISTORY_COUNT;
+    const unsigned int day = careHistoryDay[slot];
+    if (careHistoryType[slot] == eventType && day <= today && today - day <= lookbackDays) {
+      if (count < 255) ++count;
+    }
+  }
+  return count;
+}
+
+byte careReplyVariant(byte count) {
+  if (count == 0) return 0;
+  const unsigned long seed = static_cast<unsigned long>(petAgeDays()) * 31UL +
+      static_cast<unsigned long>(visualHour()) * 7UL +
+      static_cast<unsigned long>(temperament) * 17UL +
+      static_cast<unsigned long>(speciesType) * 13UL +
+      static_cast<unsigned long>(ownerBond) * 3UL +
+      static_cast<unsigned long>(careHistoryHead) * 5UL + dailyRoutineMask;
+  return static_cast<byte>(seed % count);
+}
+
+const __FlashStringHelper* careFoodReply(byte pick, bool favorite, bool disliked,
+                                         bool overfed, bool hungryBefore, byte repeats) {
+  const byte variant = careReplyVariant(3);
+  if (overfed) {
+    if (variant == 0) return F("My tummy is full!");
+    if (variant == 1) return F("Tiny bites next time?");
+    return F("I need a little break.");
+  }
+  if (disliked) {
+    if (variant == 0) return F("Could we try another?");
+    if (variant == 1) return F("I'm tired of this taste.");
+    return F("Maybe a different bite?");
+  }
+  if (favorite) {
+    if (variant == 0) return F("You remembered my favorite!");
+    if (variant == 1) return F("This one always feels special.");
+    return F("You know what I like.");
+  }
+  if (repeats >= 3) {
+    if (variant == 0) return F("This again? I know it well.");
+    if (variant == 1) return F("A familiar meal today.");
+    return F("Same choice, same smile.");
+  }
+  if (hungryBefore) {
+    if (variant == 0) return F("That hit the spot!");
+    if (variant == 1) return F("I really needed that.");
+    return F("My tummy says thanks.");
+  }
+
+  const byte tone = temperament % 8;
+  const byte choice = (tone * 2 + careReplyVariant(2) + pick) % 16;
+  switch (choice) {
+    case 0: return F("I'll try a little bite.");
+    case 1: return F("Thanks for asking me.");
+    case 2: return F("Now I have zoomies!");
+    case 3: return F("Snack fuel! Let's go!");
+    case 4: return F("What does this taste like?");
+    case 5: return F("I like trying new things.");
+    case 6: return F("Food is nicer with you.");
+    case 7: return F("Can we eat together?");
+    case 8: return F("I saved the last crumb!");
+    case 9: return F("I may have taken two.");
+    case 10: return F("A peaceful little meal.");
+    case 11: return F("That was just right.");
+    case 12: return F("Mmm, lovely aroma.");
+    case 13: return F("I notice every flavor.");
+    case 14: return F("A good choice. Thank you.");
+    default: return F("I can choose for myself!");
+  }
+}
+
+const __FlashStringHelper* careFoodDetail(byte pick, bool favorite, bool disliked,
+                                          bool overfed, bool hungryBefore, byte repeats) {
+  if (overfed) return F("I'll pace myself next time");
+  if (disliked) return F("Let's change the menu");
+  if (favorite) return F("You know what I enjoy");
+  if (repeats >= 3) return F("A little variety sounds good");
+  if (hungryBefore) return F("That helped a lot");
+  if (pick == 1) return F("A warm cooked meal");
+  if (pick == 2) return F("A quick little snack");
+  if (pick == 3) return F("A nourishing choice");
+  if (pick == 4) return F("A special treat today");
+  return F("A familiar meal together");
+}
+
+const __FlashStringHelper* careCleanReply(bool needed, bool messy, byte repeats) {
+  const byte variant = careReplyVariant(3);
+  if (!needed) {
+    if (repeats >= 2) return variant == 0 ? F("We do love this ritual.") : F("I'm already fresh, though!");
+    if (temperament == 0 || temperament == 5 || temperament == 7) return F("A calm little bath sounds nice.");
+    return F("Bath time can be fun too!");
+  }
+  if (repeats >= 3) {
+    if (variant == 0) return F("We make a good clean-up team.");
+    if (variant == 1) return F("Fresh again, just like that!");
+    return F("You always notice the mess.");
+  }
+  if (messy) {
+    if (variant == 0) return F("Whew, that feels better.");
+    if (variant == 1) return F("Thanks for helping me reset.");
+    return F("I can breathe easier now.");
+  }
+  switch (temperament % 8) {
+    case 0: return F("Thanks for being gentle.");
+    case 1: return F("Clean and ready to bounce!");
+    case 2: return F("I found a bubble!");
+    case 3: return F("I like caring together.");
+    case 4: return F("I was totally helping!");
+    case 5: return F("That was nice and quiet.");
+    case 6: return F("Fresh fur, fresh feeling!");
+    default: return F("I could have done it...thanks.");
+  }
+}
+
+const __FlashStringHelper* careMedicineReply(byte medId, bool correct, bool recovered,
+                                             byte repeats) {
+  const byte variant = (careReplyVariant(3) + medId) % 3;
+  if (!correct) {
+    if (variant == 0) return F("That doesn't feel right.");
+    if (variant == 1) return F("Could you check my symptoms?");
+    return F("Let's find the right remedy.");
+  }
+  if (recovered) {
+    if (variant == 0) return F("I feel like me again!");
+    if (variant == 1) return F("You noticed just in time.");
+    return F("Thank you for staying close.");
+  }
+  if (repeats >= 2) {
+    if (variant == 0) return F("This dose is becoming familiar.");
+    if (variant == 1) return F("I'll rest while it works.");
+    return F("You know how to help me.");
+  }
+  if (temperament == 0) return F("Stay with me a moment?");
+  if (temperament == 1) return F("I'll be back on my feet!");
+  if (temperament == 2) return F("I wonder how it works.");
+  if (temperament == 3) return F("Thank you for caring.");
+  if (temperament == 4) return F("No sneaking past you!");
+  if (temperament == 5) return F("I'll rest and take it easy.");
+  if (temperament == 6) return F("It tastes a little odd.");
+  return F("I'll handle this my way.");
+}
+
+const __FlashStringHelper* careComfortReply(byte mode, bool personalityMatch, byte repeats) {
+  const byte variant = careReplyVariant(2);
+  if (repeats >= 2) {
+    if (mode == 0) return variant ? F("A familiar hug still helps.") : F("You know my cuddle routine.");
+    if (mode == 1) return variant ? F("I remember your kind words.") : F("You always notice my effort.");
+    return variant ? F("I like our quiet habit.") : F("We can sit like this again.");
+  }
+  if (personalityMatch) {
+    if (mode == 0) return variant ? F("That hug was just right.") : F("I needed a cuddle from you.");
+    if (mode == 1) return variant ? F("I'll remember that praise.") : F("You saw how hard I tried!");
+    return variant ? F("This quiet feels safe.") : F("I like having you nearby.");
+  }
+  const byte choice = (temperament % 8) * 3 + (mode % 3);
+  switch (choice) {
+    case 0: return F("A slow hug is okay.");
+    case 1: return F("I tried very hard!");
+    case 2: return F("Let's be quiet a while.");
+    case 3: return F("A quick squeeze, then play!");
+    case 4: return F("I did something well?");
+    case 5: return F("Stay for one more minute.");
+    case 6: return F("What a warm feeling.");
+    case 7: return F("I'll tell you what I think.");
+    case 8: return F("I like being close to you.");
+    case 9: return F("You always make me smile.");
+    case 10: return F("That made my day softer.");
+    case 11: return F("Let's share this moment.");
+    case 12: return F("I was going to hug you!");
+    case 13: return F("Good job noticing me.");
+    case 14: return F("No need to fill the silence.");
+    case 15: return F("A hug was my idea, really.");
+    case 16: return F("I worked hard for that.");
+    case 17: return F("Quiet time is underrated.");
+    case 18: return F("I'll accept that cuddle.");
+    case 19: return F("I can do even better!");
+    case 20: return F("I like your calm company.");
+    case 21: return F("Best friend, best hugs.");
+    case 22: return F("Praise makes me beam.");
+    case 23: return F("Let's just breathe together.");
+  }
+  return F("I'm glad you're here.");
+}
+
+const __FlashStringHelper* careComfortDetail(byte mode, byte repeats) {
+  if (repeats >= 2) return F("A familiar kind of care");
+  if (mode == 0) return F("A close, warm moment");
+  if (mode == 1) return F("Praise builds confidence");
+  return F("Quiet company together");
+}
+
+const __FlashStringHelper* careCallReply(byte reason) {
+  const byte variant = careReplyVariant(3);
+  if (reason == 1) {
+    if (variant == 0) return F("My tummy's singing again.");
+    if (variant == 1) return F("Could we share a little meal?");
+    return F("I tried to wait patiently.");
+  }
+  if (reason == 2) {
+    if (variant == 0) return F("I found a bit of a mess.");
+    if (variant == 1) return F("Can we tidy up together?");
+    return F("I might have tracked it in.");
+  }
+  if (reason == 3) {
+    if (variant == 0) return F("I don't feel quite myself.");
+    if (variant == 1) return F("Could you stay close to me?");
+    return F("Something feels a little off.");
+  }
+  if (reason == 4) {
+    if (variant == 0) return F("I missed having you nearby.");
+    if (variant == 1) return F("Could we share a moment?");
+    return F("I have something to show you.");
+  }
+  if (reason == 5) {
+    if (variant == 0) return F("You remembered our day!");
+    if (variant == 1) return F("This little milestone is ours.");
+    return F("I'm glad we marked today.");
+  }
+  if (reason == 7) {
+    if (variant == 0) return F("Something grew in the garden!");
+    if (variant == 1) return F("Come see what we made.");
+    return F("I kept checking on it.");
+  }
+  if (reason == 8) {
+    if (variant == 0) return F("That meal is still cozy.");
+    if (variant == 1) return F("I can feel the warm energy.");
+    return F("I saved some for later.");
+  }
+  if (reason == 9) {
+    if (variant == 0) return F("My eyelids feel so heavy.");
+    if (variant == 1) return F("Can we slow things down?");
+    return F("I need a quiet corner.");
+  }
+  if (reason == 10) {
+    if (variant == 0) return F("Show me how to do better.");
+    if (variant == 1) return F("I want to make you proud.");
+    return F("I'm learning, one try at a time.");
+  }
+  if (reason == 11) {
+    if (variant == 0) return F("I might have hidden a thing.");
+    if (variant == 1) return F("I have a tiny secret.");
+    return F("Can you guess what I did?");
+  }
+  if (reason == 12) {
+    if (variant == 0) return F("Do you like my outfit?");
+    if (variant == 1) return F("I picked this look for you.");
+    return F("I feel like myself in this.");
+  }
+  if (reason == 13) {
+    if (variant == 0) return F("Should we visit the market?");
+    if (variant == 1) return F("I have an idea for a treat.");
+    return F("Let's save up for something fun.");
+  }
+  if (reason == 14) {
+    if (variant == 0) return F("Our friends asked about us.");
+    if (variant == 1) return F("I wonder who is out today.");
+    return F("Let's say hi to someone soon.");
+  }
+  if (reason == 15) {
+    if (variant == 0) return F("The plants need our help.");
+    if (variant == 1) return F("I checked the leaves for you.");
+    return F("Let's see what the garden needs.");
+  }
+  switch (temperament % 8) {
+    case 0: return F("I wanted to hear your voice.");
+    case 1: return F("I have news! Guess what?");
+    case 2: return F("I noticed something new today.");
+    case 3: return F("I like when you check in.");
+    case 4: return F("I wasn't doing anything sneaky.");
+    case 5: return F("It's nice just being together.");
+    case 6: return F("I have a snack idea.");
+    default: return F("Just checking that you're there.");
+  }
+}
+
+const __FlashStringHelper* careSleepReply(bool waking) {
+  const byte variant = careReplyVariant(3);
+  if (waking) {
+    if (temperament == 1) return F("I'm ready to bounce!");
+    if (temperament == 2) return F("I dreamed about exploring.");
+    if (temperament == 5) return F("That was a peaceful rest.");
+    if (variant == 0) return F("Good morning, my friend.");
+    if (variant == 1) return F("I slept better knowing you.");
+    return F("A new day with you!");
+  }
+  if (temperament == 0 || temperament == 3) return F("Stay nearby while I drift off?");
+  if (temperament == 4) return F("No midnight mischief. Promise.");
+  if (temperament == 5 || temperament == 7) return F("Let's make the room quiet.");
+  if (variant == 0) return F("I'll tell you my dream tomorrow.");
+  if (variant == 1) return F("Good night. Save me a thought.");
+  return F("Rest time already? Okay, then.");
 }
 
 const __FlashStringHelper* habitatName(byte id) {
@@ -2713,7 +3048,7 @@ void synchronizeDailySchedule(bool announce) {
     pendingCallType = 0;
     pendingCallTicks = 0;
     markRoutineAction(ROUTINE_BED);
-    if (announce && !rtcCatchUpMode) popup(F("Bedtime"), F("Sleeping until morning"), 750);
+    if (announce && !rtcCatchUpMode) popup(careSleepReply(false), F("I'll see you in the morning"), 750);
     markSaveDirty();
   } else if (!shouldSleep && sleeping) {
     sleeping = false;
@@ -2723,7 +3058,7 @@ void synchronizeDailySchedule(bool announce) {
     wrongLightTicks = 0;
     lightMistakeOpen = false;
     addStat(happy, 1);
-    if (announce && !rtcCatchUpMode) popup(F("Good morning"), F("A new real day begins"), 750);
+    if (announce && !rtcCatchUpMode) popup(careSleepReply(true), F("A new day begins"), 750);
     markSaveDirty();
   }
 }
@@ -5264,6 +5599,42 @@ void animLove() {
     display.fillCircle(91, y + 5, 2, WHITE); display.fillCircle(95, y + 5, 2, WHITE); display.fillTriangle(89, y + 6, 97, y + 6, 93, y + 12, WHITE);
     if (ownerBond >= 60) { display.drawPixel(16, 21, WHITE); display.drawPixel(111, 20, WHITE); }
     display.display(); delay(95);
+  }
+}
+
+void careChoiceAnimation(byte mode) {
+  if (mode == 0) {
+    animLove();
+    return;
+  }
+
+  for (byte frame = 0; frame < 8; ++frame) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(mode == 1 ? 43 : 39, 8);
+    display.print(mode == 1 ? F("KIND WORDS") : F("QUIET TIME"));
+    display.drawLine(10, 22, 118, 22, WHITE);
+    drawCurrentPetTiny(56, 62 + ((frame & 1) ? 1 : 0));
+    if (mode == 1) {
+      int rise = (frame & 1) ? 3 : 0;
+      display.drawLine(64, 41 - rise, 64, 52 - rise, WHITE);
+      display.drawLine(59, 46 - rise, 69, 46 - rise, WHITE);
+      display.drawLine(60, 42 - rise, 68, 50 - rise, WHITE);
+      display.drawLine(68, 42 - rise, 60, 50 - rise, WHITE);
+      display.drawPixel(34, 59, WHITE);
+      display.drawPixel(94, 57 + (frame & 1), WHITE);
+    } else {
+      display.fillCircle(64, 41, 8, WHITE);
+      display.fillCircle(69, 38, 8, BLACK);
+      display.drawPixel(42, 50, WHITE);
+      display.drawPixel(86, 48 + (frame & 1), WHITE);
+      display.drawPixel(98, 61, WHITE);
+    }
+    display.setCursor(32, 104);
+    display.print(mode == 1 ? F("I see you trying") : F("No words needed"));
+    display.display();
+    delay(100);
   }
 }
 
@@ -11715,10 +12086,11 @@ void foodMenu() {
       display.setCursor(45, 36); display.print(F("-Discipline"));
     }
 
-    if (pick == favoriteFoodType() || pick == learnedFavoriteFood) {
-      display.setCursor(91, 0);
-      display.print(F("FAV"));
-    }
+    display.setCursor(91, 0);
+    if (learnedDislikedFood == pick || foodBoredom[pick] >= 12) display.print(F("TIRED"));
+    else if (pick == favoriteFoodType() || pick == learnedFavoriteFood) display.print(F("FAV"));
+    else if (recentCareCount(CARE_EVENT_FOOD_BASE + pick, 1) >= 2) display.print(F("AGAIN"));
+    else if (foodExperience[pick] == 0) display.print(F("NEW"));
 
     display.setCursor(45, 55);
     display.print(F("D0 next D1 eat"));
@@ -11727,14 +12099,15 @@ void foodMenu() {
   }
 
   byte fullnessBefore = full;
+  bool hungryBefore = fullnessBefore <= 2;
   bool overfed = fullnessBefore >= 9;
+  byte recentMeals = recentCareCount(CARE_EVENT_FOOD_BASE + pick, 1);
   if (overfed && overfeedCount < 255) overfeedCount++;
   if (weight < 20) weight++;
 
   if (pick == 0) {
     addStat(full, 3);
     addStat(happy, 1);
-    popup(F("Yum!"), F("Basic meal"), 650);
   } else if (pick == 1) {
     if (cookedMeals == 0) {
       badSound();
@@ -11749,35 +12122,30 @@ void foodMenu() {
     addStat(clean, 1);
     mealBuffTicks = 18;
 
-    goodSound();
-    popup(F("Great meal!"), F("Long buff"), 750);
   } else if (pick == 2) {
     addStat(full, 1);
     addStat(happy, 2);
     if (clean > 0) subStat(clean, 1);
-    popup(F("Snack time"), F("Mood up"), 650);
   } else if (pick == 3) {
     addStat(full, 3);
     addStat(health, 1);
     addStat(clean, 1);
-    popup(F("Healthy!"), F("Care up"), 650);
   } else {
     addStat(full, 1);
     addStat(happy, 4);
     if (discipline > 0) subStat(discipline, 1);
-    popup(F("Treat!"), F("Big mood"), 650);
   }
 
   updateLearnedFoodPreferences(pick);
-  logCareEvent(10);
+  logCareEvent(CARE_EVENT_FOOD_BASE + pick);
   bool learnedFavorite = (learnedFavoriteFood == pick && learnedDislikedFood != pick);
-  if (pick == favoriteFoodType() || learnedFavorite) {
+  bool disliked = learnedDislikedFood == pick;
+  bool favorite = (pick == favoriteFoodType() || learnedFavorite) && !disliked;
+  if (favorite) {
     favoriteGivenFood = pick;
     addStat(happy, 2);
     addStat(discipline, 1);
     changeBond(1);
-    if (pick == favoriteFoodType()) popup(F("Favorite!"), favoriteFoodName(), 650);
-    else popup(F("New favorite!"), F("Preference learned"), 650);
   }
 
   if (lastFood != pick) {
@@ -11787,16 +12155,14 @@ void foodMenu() {
   }
   lastFood = pick;
 
-  if (learnedDislikedFood == pick) {
+  if (disliked) {
     subStat(happy, 1);
-    popup(F("A little bored"), F("Try another food"), 600);
   }
 
   if (overfed) {
     subStat(health, 1);
     subStat(clean, 1);
     if (poop < 3) poop++;
-    popup(F("Too much food"), F("Tummy needs a rest"), 650);
   } else if (full >= 10 && random(0, 8) == 0 && poop < 3) {
     poop++;
   }
@@ -11809,6 +12175,8 @@ void foodMenu() {
   goodSound();
   clampAll();
   markSaveDirty();
+  popup(careFoodReply(pick, favorite, disliked, overfed, hungryBefore, recentMeals),
+        careFoodDetail(pick, favorite, disliked, overfed, hungryBefore, recentMeals), 800);
 }
 
 
@@ -11933,21 +12301,37 @@ void doMedicine() {
 void doClean() {
   clickSound();
   const byte cleanedPoop = poop;
+  const byte repeats = recentCareCount(12, 1);
+  const bool messy = cleanedPoop > 0 || clean <= 3;
+  const bool needed = cleanedPoop > 0 || clean <= 7 || conditionType == 3;
   animBath();
   poop = 0;
   if (cleanedPoop > 0) paradise.addBiofuel((uint16_t)cleanedPoop * 6U);
   zeroCleanTicks = 0; cleanMistakeOpen = false;
-  cleanlinessScore = min((byte)100, (byte)(cleanlinessScore + 3));
-  addStat(clean, 5);
-  addStat(health, 1);
-  addStat(happy, 1);
+
+  if (needed) {
+    cleanlinessScore = min((byte)100, (byte)(cleanlinessScore + 3));
+    addStat(clean, 5);
+    addStat(happy, 1);
+    if (messy) addStat(health, 1);
+    changeTrust(1);
+    if (repeats == 0) changeBond(1);
+    recordGoalEvent(3, 1);
+  } else {
+    // A pleasant bath can still be a shared moment, but clean-up is no longer
+    // an easy way to grind health, trust, or cleanliness milestones.
+    if (repeats == 0) addStat(clean, 1);
+    if (repeats < 2) addStat(happy, 1);
+    if (repeats == 0) changeBond(1);
+  }
+
   if (conditionType == 3 && conditionSeverity <= 1) clearCondition();
   markRoutineAction(ROUTINE_CARE);
   logCareEvent(12);
-  recordGoalEvent(3, 1);
-  changeTrust(1);
   clampAll();
-  popup(F("Sparkly clean!"));
+  popup(careCleanReply(needed, messy, repeats),
+        needed ? (messy ? F("I feel fresh again") : F("That helped me reset"))
+               : F("A little splash for fun"), 750);
 }
 
 void doLove() {
@@ -11956,14 +12340,80 @@ void doLove() {
     popup(F("Shhh..."), F("It is asleep"));
     return;
   }
-  animLove();
-  addStat(happy, 3);
-  addStat(discipline, 1);
+
+  byte pick = 0;
+  bool oldLeft = HIGH, oldSelect = HIGH, oldRight = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    const bool left = digitalRead(BTN_L);
+    const bool select = digitalRead(BTN_S);
+    const bool right = digitalRead(BTN_R);
+    if (oldLeft == HIGH && left == LOW) {
+      pick = pick == 0 ? 2 : pick - 1;
+      clickSound();
+      delay(100);
+    }
+    if (oldRight == HIGH && right == LOW) {
+      pick = (pick + 1) % 3;
+      clickSound();
+      delay(100);
+    }
+    if (oldSelect == HIGH && select == LOW) {
+      waitButtonRelease();
+      break;
+    }
+    oldLeft = left; oldSelect = select; oldRight = right;
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(35, 8); display.print(F("CARE MOMENT"));
+    display.drawLine(8, 20, 120, 20, WHITE);
+    display.drawRoundRect(9, 28, 110, 60, 8, WHITE);
+    drawCurrentPetTiny(56, 43);
+    display.setCursor(22, 72);
+    if (pick == 0) display.print(F("Cuddle"));
+    else if (pick == 1) display.print(F("Praise"));
+    else display.print(F("Quiet company"));
+    display.setCursor(13, 96);
+    if (pick == 0) display.print(F("Warm reassurance"));
+    else if (pick == 1) display.print(F("Notice their effort"));
+    else display.print(F("Stay close, no rush"));
+    display.setCursor(4, 117); display.print(F("D0/D2 pick  D1 select"));
+    display.display();
+    delay(20);
+  }
+
+  const byte repeats = recentCareCount(CARE_EVENT_COMFORT_BASE + pick, 1);
+  const bool personalityMatch =
+      (pick == 0 && (temperament == 0 || temperament == 3)) ||
+      (pick == 1 && (temperament == 1 || temperament == 2 || temperament == 4 || temperament == 6)) ||
+      (pick == 2 && (temperament == 0 || temperament == 5 || temperament == 7));
+
+  careChoiceAnimation(pick);
+  if (pick == 0) {
+    addStat(happy, happy <= 4 ? 3 : 1);
+    if (repeats < 2) changeBond(personalityMatch ? 2 : 1);
+    if (personalityMatch && repeats == 0) changeTrust(1);
+  } else if (pick == 1) {
+    if (repeats < 2) {
+      addStat(happy, 1);
+      addStat(discipline, 1);
+      addSkill(skillKind, 1);
+    }
+    if (repeats < 2) changeBond(1);
+    if (repeats == 0) changeTrust(1);
+  } else {
+    addStat(happy, (happy <= 3 || (temperament == 5 && repeats == 0)) ? 2 : 1);
+    if (repeats < 2) changeBond(1);
+    if (personalityMatch && repeats == 0) changeTrust(1);
+  }
+
   markRoutineAction(ROUTINE_TALK);
-  logCareEvent(13);
-  changeBond(1);
+  logCareEvent(CARE_EVENT_COMFORT_BASE + pick);
   clampAll();
-  popup(F("Hee hee!"), F("Bond up"));
+  popup(careComfortReply(pick, personalityMatch, repeats), careComfortDetail(pick, repeats), 800);
 }
 
 void doCall() {
@@ -11987,26 +12437,22 @@ void doCall() {
   }
 
   if (answeredCall == 6) aquarium.showPetComment();
-  else if (answeredCall == 5) animCallBubble(F("You remembered my day!"));
-  else if (answeredCall == 4) animCallBubble(F("Thanks for talking!"));
-  else if (answeredCall == 3) animCallBubble(F("Please help me feel well"));
-  else if (answeredCall == 2) animCallBubble(F("Thanks for checking me"));
-  else if (answeredCall == 1) animCallBubble(F("Could I have food?"));
-  else if (conditionType != 0) animCallBubble(conditionName());
-  else if (sick) animCallBubble(F("I feel sick!"));
+  else if (answeredCall >= 1 && answeredCall <= 5) animCallBubble(careCallReply(answeredCall));
+  else if (conditionType != 0) animCallBubble(careCallReply(3));
+  else if (sick) animCallBubble(careCallReply(3));
   else if (aquarium.needsCare()) aquarium.showPetComment();
-  else if (botany.gardenReady()) animCallBubble(F("Garden ready!"));
-  else if (mealBuffTicks > 0) animCallBubble(F("Meal feels good"));
-  else if (poop > 0 || clean < 4) animCallBubble(F("Please clean!"));
-  else if (full < 4) animCallBubble(F("I am hungry!"));
-  else if (energy < 3) animCallBubble(F("I am sleepy!"));
-  else if (happy < 4) animCallBubble(F("Play with me!"));
-  else if (discipline < 3) animCallBubble(F("Teach me!"));
-  else if (mischief > 0) animCallBubble(F("I hid stuff!"));
-  else if (outfit > 0 && skillStyle >= 4) animCallBubble(F("I look cute!"));
-  else if (coins >= 20) animCallBubble(F("Let's shop!"));
-  else if (friendCount > 1) animCallBubble(F("Friends miss us"));
-  else if (botany.needsCare()) animCallBubble(F("Our plants need care"));
+  else if (botany.gardenReady()) animCallBubble(careCallReply(7));
+  else if (mealBuffTicks > 0) animCallBubble(careCallReply(8));
+  else if (poop > 0 || clean < 4) animCallBubble(careCallReply(2));
+  else if (full < 4) animCallBubble(careCallReply(1));
+  else if (energy < 3) animCallBubble(careCallReply(9));
+  else if (happy < 4) animCallBubble(careCallReply(4));
+  else if (discipline < 3) animCallBubble(careCallReply(10));
+  else if (mischief > 0) animCallBubble(careCallReply(11));
+  else if (outfit > 0 && skillStyle >= 4) animCallBubble(careCallReply(12));
+  else if (coins >= 20) animCallBubble(careCallReply(13));
+  else if (friendCount > 1) animCallBubble(careCallReply(14));
+  else if (botany.needsCare()) animCallBubble(careCallReply(15));
   else if (gardenHarvests >= 3) animCallBubble(F("Garden snacks!"));
   else if (gardenLevel >= 4) animCallBubble(F("Garden is nice!"));
   else if (trainStars >= 8) animCallBubble(F("I am focused!"));
