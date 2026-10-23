@@ -785,12 +785,14 @@ void GrowingTogetherSystem::recordAction(uint8_t action, const GrowingTogetherCo
     choreDoneMask_ |= choreAssignedMask_;
   }
   if (action == GTA_PLAY || action == GTA_GARDEN || action == GTA_COOK ||
-      action == GTA_EXPLORE || action == GTA_COMPANION) {
+      action == GTA_EXPLORE || action == GTA_COMPANION ||
+      action == GTA_HOBBY) {
     uint8_t hobby = 0;
     if (action == GTA_GARDEN) hobby = 1;
     else if (action == GTA_PLAY) hobby = 3;
     else if (action == GTA_COOK) hobby = 0;
     else if (action == GTA_EXPLORE) hobby = 8;
+    else if (action == GTA_HOBBY) hobby = 6;
     else hobby = 9;
     sharedHobby_ = hobby;
     changeByte(hobbyBond_[hobby], 2);

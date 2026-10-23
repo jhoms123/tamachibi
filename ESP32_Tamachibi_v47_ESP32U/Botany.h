@@ -138,8 +138,10 @@ private:
   uint8_t cropStage(uint8_t plot) const;
   uint8_t indoorStage(uint8_t pot) const;
   bool cropReady(uint8_t plot) const;
-  void drawCropSprite(uint8_t species, int x, int groundY, uint8_t stage, bool unhealthy) const;
-  void drawIndoorSprite(uint8_t species, int x, int baseY, uint8_t stage, bool unhealthy) const;
+  void drawCropSprite(uint8_t species, int x, int groundY, uint8_t stage,
+                      bool unhealthy, uint8_t frame = 0) const;
+  void drawIndoorSprite(uint8_t species, int x, int baseY, uint8_t stage,
+                        bool unhealthy, uint8_t frame = 0) const;
 
   void drawGardenOverview(uint8_t frame) const;
   void drawPlantRoomOverview(uint8_t frame) const;

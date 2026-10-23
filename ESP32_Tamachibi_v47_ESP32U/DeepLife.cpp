@@ -51,6 +51,7 @@ const uint8_t ACTION_WALK = 7;
 const uint8_t ACTION_TRAIN = 8;
 const uint8_t ACTION_STUDY = 9;
 const uint8_t ACTION_GARDEN = 10;
+const uint8_t ACTION_PLANTROOM = 34;
 const uint8_t ACTION_MUSIC = 11;
 const uint8_t ACTION_TOY = 14;
 const uint8_t ACTION_EXPLORE = 15;
@@ -823,6 +824,7 @@ void DeepLifeSystem::recordAction(uint8_t action, uint32_t dayLong, uint8_t hour
   else if (action == ACTION_CALL && happy < 3) setEmotion(4, 4, action);
   else if (action == ACTION_COOK || action == ACTION_FOOD) { changeByte(familyMood_, 1); if (groupId_ == 7) changeByte(groupLevel_, 1, 9); }
   else if (action == ACTION_GARDEN && groupId_ == 2) changeByte(groupLevel_, 1, 9);
+  else if (action == ACTION_PLANTROOM) { changeByte(familyMood_, 1); setEmotion(1, 3, action); }
 
   if (action == ACTION_MUSIC && groupId_ == 3) changeByte(groupLevel_, 1, 9);
   if (action == ACTION_STUDY && groupId_ == 5) changeByte(groupLevel_, 1, 9);

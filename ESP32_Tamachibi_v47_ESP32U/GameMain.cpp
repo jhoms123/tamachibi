@@ -854,6 +854,7 @@ void drawStatsIcon(int x, int y, bool inv);
 void drawTrainIcon(int x, int y, bool inv);
 void drawStudyIcon(int x, int y, bool inv);
 void drawGardenIcon(int x, int y, bool inv);
+void drawPlantRoomIcon(int x, int y, bool inv);
 void drawMusicIcon(int x, int y, bool inv);
 void drawShopIcon(int x, int y, bool inv);
 void drawToyIcon(int x, int y, bool inv);
@@ -3353,10 +3354,28 @@ void drawStudyIcon(int x, int y, bool inv) {
 
 void drawGardenIcon(int x, int y, bool inv) {
   uint16_t col = inv ? BLACK : WHITE;
-  display.drawLine(x + 9, y + 13, x + 9, y + 6, col);
-  display.drawCircle(x + 6, y + 8, 3, col);
-  display.drawCircle(x + 12, y + 7, 3, col);
-  display.drawLine(x + 4, y + 14, x + 15, y + 14, col);
+  display.drawRoundRect(x + 2, y + 9, 14, 7, 2, col);
+  display.drawFastHLine(x + 3, y + 11, 12, col);
+  display.drawLine(x + 6, y + 11, x + 6, y + 5, col);
+  display.drawCircle(x + 4, y + 6, 2, col);
+  display.drawCircle(x + 8, y + 5, 2, col);
+  display.drawLine(x + 12, y + 11, x + 12, y + 6, col);
+  display.drawTriangle(x + 10, y + 8, x + 14, y + 4, x + 14, y + 9, col);
+  display.drawPixel(x + 5, y + 13, inv ? WHITE : BLACK);
+  display.drawPixel(x + 12, y + 14, inv ? WHITE : BLACK);
+}
+
+void drawPlantRoomIcon(int x, int y, bool inv) {
+  uint16_t col = inv ? BLACK : WHITE;
+  display.drawRoundRect(x + 4, y + 11, 10, 5, 2, col);
+  display.drawFastHLine(x + 5, y + 12, 8, inv ? WHITE : BLACK);
+  display.drawLine(x + 9, y + 11, x + 9, y + 5, col);
+  display.drawLine(x + 9, y + 8, x + 5, y + 6, col);
+  display.drawLine(x + 9, y + 8, x + 13, y + 6, col);
+  display.drawCircle(x + 5, y + 5, 2, col);
+  display.drawCircle(x + 9, y + 3, 2, col);
+  display.drawCircle(x + 13, y + 5, 2, col);
+  display.drawPixel(x + 9, y + 5, inv ? WHITE : BLACK);
 }
 
 void drawMusicIcon(int x, int y, bool inv) {
@@ -3449,7 +3468,7 @@ void drawIcon(byte id, int x, int y, bool inv) {
   else if (id == M_ROOM) drawRoomIcon(x, y, inv);
   else if (id == M_TALK || id == M_FAMILY || id == M_DIARY) drawTalkIcon(x, y, inv);
   else if (id == M_AQUARIUM) drawAquariumIcon(x, y, inv);
-  else if (id == M_PLANTROOM) drawGardenIcon(x, y, inv);
+  else if (id == M_PLANTROOM) drawPlantRoomIcon(x, y, inv);
   else if (id == M_CRAFT) drawCookIcon(x, y, inv);
   else if (id == M_HABITAT || id == M_EVENT) drawExploreIcon(x, y, inv);
   else if (id == M_BOOK || id == M_HISTORY || id == M_INSPECT || id == M_DIAG) drawStatsIcon(x, y, inv);
@@ -4111,17 +4130,31 @@ void drawBigMenuEmoji(byte id, int x, int y, bool inv) {
     display.drawLine(x + 18, y + 7, x + 18, y + 27, col);
     display.drawLine(x + 8, y + 12, x + 15, y + 12, col);
     display.drawLine(x + 21, y + 12, x + 28, y + 12, col);
-  } else if (id == M_GARDEN) { // sprout
-    display.drawLine(x + 18, y + 27, x + 18, y + 12, col);
-    display.drawCircle(x + 12, y + 14, 5, col);
-    display.drawCircle(x + 24, y + 12, 5, col);
-    display.drawLine(x + 7, y + 28, x + 29, y + 28, col);
-  } else if (id == M_PLANTROOM) { // indoor plant in a pot
-    display.drawRoundRect(x + 10, y + 20, 16, 8, 3, col);
-    display.drawLine(x + 18, y + 20, x + 18, y + 9, col);
-    display.drawCircle(x + 12, y + 12, 5, col);
-    display.drawCircle(x + 24, y + 10, 5, col);
-    display.drawLine(x + 7, y + 28, x + 29, y + 28, col);
+  } else if (id == M_GARDEN) { // raised food bed with a crop and root vegetable
+    display.drawRoundRect(x + 4, y + 21, 28, 8, 2, col);
+    display.drawFastHLine(x + 6, y + 23, 24, col);
+    display.drawLine(x + 12, y + 22, x + 12, y + 9, col);
+    display.drawCircle(x + 8, y + 12, 4, col);
+    display.drawCircle(x + 16, y + 10, 4, col);
+    display.fillTriangle(x + 25, y + 16, x + 31, y + 16, x + 28, y + 22, col);
+    display.drawLine(x + 28, y + 16, x + 28, y + 11, col);
+    display.drawLine(x + 28, y + 13, x + 24, y + 10, col);
+    display.drawLine(x + 28, y + 13, x + 32, y + 10, col);
+    display.drawPixel(x + 10, y + 25, inv ? WHITE : BLACK);
+    display.drawPixel(x + 22, y + 26, inv ? WHITE : BLACK);
+  } else if (id == M_PLANTROOM) { // arranged flower in a ceramic pot
+    display.drawRoundRect(x + 10, y + 22, 16, 7, 3, col);
+    display.drawFastHLine(x + 12, y + 24, 12, inv ? WHITE : BLACK);
+    display.drawLine(x + 18, y + 22, x + 18, y + 11, col);
+    display.drawLine(x + 18, y + 17, x + 12, y + 14, col);
+    display.drawLine(x + 18, y + 18, x + 24, y + 14, col);
+    display.drawTriangle(x + 12, y + 14, x + 7, y + 12, x + 13, y + 11, col);
+    display.drawTriangle(x + 24, y + 14, x + 23, y + 11, x + 29, y + 12, col);
+    display.drawCircle(x + 18, y + 8, 3, col);
+    display.drawCircle(x + 14, y + 8, 3, col);
+    display.drawCircle(x + 22, y + 8, 3, col);
+    display.drawCircle(x + 18, y + 4, 3, col);
+    display.drawPixel(x + 18, y + 8, inv ? WHITE : BLACK);
   } else if (id == M_MUSIC || id == M_PLAYER) { // note
     display.drawLine(x + 14, y + 7, x + 14, y + 23, col);
     display.drawLine(x + 14, y + 7, x + 26, y + 10, col);
@@ -4268,7 +4301,7 @@ const __FlashStringHelper* menuDescription(byte id) {
   if (id == M_WALK) return F("Go outside");
   if (id == M_TRAIN) return F("Build skill");
   if (id == M_STUDY) return F("Learn");
-  if (id == M_GARDEN) return F("Grow crops");
+  if (id == M_GARDEN) return F("Grow food plants");
   if (id == M_MUSIC) return F("Play music");
   if (id == M_PLAYER) return F("MP3 from SD card");
   if (id == M_STATS) return F("Needs/info");
@@ -4292,7 +4325,7 @@ const __FlashStringHelper* menuDescription(byte id) {
   if (id == M_DIAG) return F("System info");
   if (id == M_DIARY) return F("Memories");
   if (id == M_AQUARIUM) return F("Fish care");
-  if (id == M_PLANTROOM) return F("Plant care");
+  if (id == M_PLANTROOM) return F("Grow and sell decor");
   if (id == M_PARADISE) return F("Planet lab");
   if (id == M_LIFE) return F("Life world");
   return F("Talk/bond");
@@ -12546,7 +12579,8 @@ void executeAction(byte action) {
   deepLife.recordAction(action, petAgeDays(), visualHour(), visualWeather());
   if (action == M_GAME || action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY) recordGrowingAction(GTA_PLAY);
   else if (action == M_STUDY) recordGrowingAction(GTA_SCHOOL);
-  else if (action == M_GARDEN || action == M_PLANTROOM) recordGrowingAction(GTA_GARDEN);
+  else if (action == M_GARDEN) recordGrowingAction(GTA_GARDEN);
+  else if (action == M_PLANTROOM) recordGrowingAction(GTA_HOBBY);
   else if (action == M_AQUARIUM) recordGrowingAction(GTA_COMPANION);
   else if (action == M_EXPLORE) recordGrowingAction(GTA_EXPLORE);
   else if (action == M_COOK || action == M_FOOD) recordGrowingAction(GTA_COOK);

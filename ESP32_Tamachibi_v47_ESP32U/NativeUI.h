@@ -54,7 +54,9 @@ void pet(GameDisplay &d, int x, int y, uint8_t species, uint8_t stage,
          uint8_t evolutionPath = 0, bool facingLeft = false);
 void accessory(GameDisplay &d, int x, int y, uint8_t outfit, int scale = 1);
 void plant(GameDisplay &d, int x, int y, uint8_t species, uint8_t growth,
-           bool bad = false);
+           bool bad = false, uint8_t frame = 0);
+void crop(GameDisplay &d, int x, int y, uint8_t species, uint8_t growth,
+          bool bad = false, uint8_t frame = 0);
 void fish(GameDisplay &d, int x, int y, uint8_t species, bool right = true,
           bool selected = false);
 void family(GameDisplay &d, uint8_t children, bool spouse,

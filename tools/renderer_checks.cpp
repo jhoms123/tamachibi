@@ -116,6 +116,74 @@ int main() {
   d.drawPixel(20, 20, 1);
   assert(panel.pixels[20 * 128 + 20] == 0);
 
+  auto pixelFingerprint = [&]() {
+    uint64_t hash = 1469598103934665603ULL;
+    for (uint8_t pixel : panel.pixels) {
+      hash ^= pixel;
+      hash *= 1099511628211ULL;
+    }
+    return hash;
+  };
+  d.useNativeLayout(true);
+  uint64_t cropSpeciesArt[12]{};
+  for (uint8_t species = 0; species < 12; ++species) {
+    uint64_t growthArt[5]{};
+    for (uint8_t stage = 0; stage <= 4; ++stage) {
+      d.clearDisplay();
+      NativeUI::crop(d, 48, 48, species, stage, false, 0);
+      d.display();
+      growthArt[stage] = pixelFingerprint();
+      for (uint8_t prior = 0; prior < stage; ++prior) {
+        if (growthArt[prior] == growthArt[stage])
+          std::fprintf(stderr, "crop %u repeats growth stage %u at %u\n",
+                       species, prior, stage);
+        assert(growthArt[prior] != growthArt[stage]);
+      }
+    }
+    cropSpeciesArt[species] = growthArt[4];
+    for (uint8_t prior = 0; prior < species; ++prior)
+      assert(cropSpeciesArt[prior] != cropSpeciesArt[species]);
+    d.clearDisplay();
+    NativeUI::crop(d, 48, 48, species, 4, false, 0);
+    d.display();
+    const uint64_t still = pixelFingerprint();
+    d.clearDisplay();
+    NativeUI::crop(d, 48, 48, species, 4, false, 4);
+    d.display();
+    if (still == pixelFingerprint())
+      std::fprintf(stderr, "crop %u does not animate at mature stage\n", species);
+    assert(still != pixelFingerprint());
+  }
+  uint64_t decorSpeciesArt[10]{};
+  for (uint8_t species = 0; species < 10; ++species) {
+    uint64_t growthArt[5]{};
+    for (uint8_t stage = 0; stage <= 4; ++stage) {
+      d.clearDisplay();
+      NativeUI::plant(d, 48, 48, species, stage, false, 0);
+      d.display();
+      growthArt[stage] = pixelFingerprint();
+      for (uint8_t prior = 0; prior < stage; ++prior) {
+        if (growthArt[prior] == growthArt[stage])
+          std::fprintf(stderr, "decor plant %u repeats growth stage %u at %u\n",
+                       species, prior, stage);
+        assert(growthArt[prior] != growthArt[stage]);
+      }
+    }
+    decorSpeciesArt[species] = growthArt[4];
+    for (uint8_t prior = 0; prior < species; ++prior)
+      assert(decorSpeciesArt[prior] != decorSpeciesArt[species]);
+    d.clearDisplay();
+    NativeUI::plant(d, 48, 48, species, 4, false, 0);
+    d.display();
+    const uint64_t still = pixelFingerprint();
+    d.clearDisplay();
+    NativeUI::plant(d, 48, 48, species, 4, false, 4);
+    d.display();
+    if (still == pixelFingerprint())
+      std::fprintf(stderr, "decor plant %u does not animate at mature stage\n", species);
+    assert(still != pixelFingerprint());
+  }
+
   uint64_t fishPrints[12]{};
   for (uint8_t species = 0; species < 12; ++species) {
     d.clearDisplay();
@@ -304,6 +372,7 @@ int main() {
        "opaque body interiors and transparent exterior, 50 adult masks, 10 distinct lineages, "
        "care-split teens, animated lineage parts through elder, 50 mapped "
        "adult outcomes, facing animation, 12 unique aquarium species, memory-specific dialogue, "
-       "4 care-grown fish forms, "
-       "four distinct fish swim temperaments, and animated aquarium fins.");
+       "4 care-grown fish forms, four distinct fish swim temperaments, "
+       "12 unique food crops and 10 unique decorative plants with five growth stages, "
+       "animated plant parts, and animated aquarium fins.");
 }

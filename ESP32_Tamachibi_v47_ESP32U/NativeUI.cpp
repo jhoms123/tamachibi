@@ -619,24 +619,354 @@ void accessory(GameDisplay &d, int x, int y, uint8_t outfit, int scale) {
   }
 }
 void plant(GameDisplay &d, int x, int y, uint8_t species, uint8_t growth,
-           bool bad) {
-  d.drawRoundRect(x + 2, y + 15, 12, 5, 1, 1);
-  d.drawFastHLine(x + 4, y + 21, 8, 1);
+           bool bad, uint8_t frame) {
+  species %= 10;
+  growth = std::min<uint8_t>(4, growth);
+  const int sway = ((frame / 4U) & 1U) ? 1 : 0;
+  const int dip = bad ? 2 : 0;
+  auto leaf = [&](int cx, int cy, int ex, int ey, int width) {
+    d.drawLine(cx, cy, ex, ey, 1);
+    d.fillTriangle(ex, ey, ex + width, ey - width, ex + width * 2, ey, 1);
+  };
+  auto bloom = [&](int cx, int cy, int r) {
+    d.fillCircle(cx, cy - r, r, 1);
+    d.fillCircle(cx - r, cy, r, 1);
+    d.fillCircle(cx + r, cy, r, 1);
+    d.fillCircle(cx, cy + r, r, 1);
+    d.fillCircle(cx, cy, 1, 0);
+  };
+  // Decorative plants always keep a ceramic pot. The leaves and flowers are
+  // drawn as separate parts so the breeze moves a leaf tip or bloom in place.
+  d.fillRoundRect(x + 6, y + 18, 12, 5, 1, 1);
+  d.drawRoundRect(x + 6, y + 18, 12, 5, 1, 1);
+  d.drawFastHLine(x + 8, y + 20, 8, 0);
   if (!growth) {
-    d.drawPixel(x + 8, y + 13, 1);
+    d.drawPixel(x + 11 + (species & 1U), y + 17, 1);
+    if (species % 3 == 0) d.drawFastHLine(x + 10, y + 16, 3, 1);
+    if (bad) d.drawPixel(x + 20, y + 20, 1);
     return;
   }
-  int top = std::max(1, 13 - static_cast<int>(growth) * 2);
-  d.drawLine(x + 8, y + 15, x + 8, y + top, 1);
-  d.drawLine(x + 8, y + 11, x + 3, y + 8 + (bad ? 3 : 0), 1);
-  d.drawLine(x + 8, y + 8, x + 13, y + 5 + (bad ? 4 : 0), 1);
-  if (growth >= 3) {
-    d.drawCircle(x + 8, y + top, 3, 1);
-    if (species % 2)
-      d.fillCircle(x + 8, y + top, 1, 1);
+  const int youngTop = growth == 1 ? 12 : (growth == 2 ? 8 : 4);
+  d.drawLine(x + 12, y + 18, x + 12, y + youngTop + dip, 1);
+  switch (species) {
+  case 0: // Pothos: a cascading vine with heart-shaped leaves.
+    d.drawLine(x + 12, y + 9 + dip, x + 18 + sway, y + 12 + dip, 1);
+    leaf(x + 12, y + 12, x + 5 - sway, y + 9 + dip, 2);
+    if (growth >= 2) leaf(x + 15, y + 11, x + 19 + sway, y + 7 + dip, 2);
+    if (growth >= 3) {
+      d.drawLine(x + 18 + sway, y + 12, x + 20 + sway, y + 16, 1);
+      d.drawCircle(x + 19 + sway, y + 16, 2, 1);
+    }
+    if (growth >= 4) leaf(x + 18, y + 15, x + 21 + sway, y + 17, 1);
+    break;
+  case 1: // Aloe: a compact, pointed rosette.
+    leaf(x + 12, y + 17, x + 7, y + 5 + dip, 1);
+    leaf(x + 12, y + 17, x + 12 + sway, y + 3 + dip, 1);
+    leaf(x + 12, y + 17, x + 17, y + 5 + dip, 1);
+    if (growth >= 2) {
+      leaf(x + 12, y + 17, x + 5, y + 10 + dip, 2);
+      leaf(x + 12, y + 17, x + 19, y + 10 + dip, 2);
+    }
+    if (growth >= 3) d.drawFastVLine(x + 12, y + 9, 6, 0);
+    if (growth >= 4) {
+      d.drawLine(x + 12, y + 5, x + 12 + sway, y + 1, 1);
+      bloom(x + 12 + sway, y + 2, 1);
+    }
+    break;
+  case 2: // Lavender: slender flower spikes over narrow leaves.
+    leaf(x + 12, y + 16, x + 5, y + 12 + dip, 1);
+    leaf(x + 12, y + 16, x + 19, y + 11 + dip, -1);
+    if (growth >= 2) {
+      d.drawLine(x + 12, y + 12, x + 12 + sway, y + 4 + dip, 1);
+      for (int p = 0; p < (growth >= 3 ? 4 : 2); ++p) {
+        d.fillCircle(x + 10 + ((p + frame / 8) & 1), y + 5 + p * 2 + dip, 1, 1);
+        d.fillCircle(x + 14 - ((p + frame / 8) & 1), y + 6 + p * 2 + dip, 1, 1);
+      }
+    }
+    if (growth >= 4) {
+      d.drawLine(x + 9, y + 15, x + 8, y + 7 + dip, 1);
+      d.fillCircle(x + 7 + sway, y + 7 + dip, 1, 1);
+      d.fillCircle(x + 10 + sway, y + 10 + dip, 1, 1);
+    }
+    break;
+  case 3: // Bonsai: curved trunk and a tiered canopy.
+    d.drawLine(x + 12, y + 18, x + 10 + sway, y + 11, 1);
+    d.drawLine(x + 10 + sway, y + 11, x + 15, y + 7 + dip, 1);
+    d.drawLine(x + 11, y + 13, x + 6, y + 9 + dip, 1);
+    d.drawLine(x + 13, y + 10, x + 18, y + 7 + dip, 1);
+    d.fillCircle(x + 7, y + 8 + dip, growth, 1);
+    d.fillCircle(x + 14, y + 5 + dip, growth, 1);
+    d.fillCircle(x + 19, y + 8 + dip, std::max(1, static_cast<int>(growth) - 1), 1);
+    if (growth >= 4) d.drawFastHLine(x + 6, y + 3 + dip, 14, 1);
+    break;
+  case 4: // Fern: long arching fronds with paired leaflets.
+    for (int side = -1; side <= 1; ++side) {
+      const int tipX = x + 12 + side * (5 + sway);
+      const int tipY = y + (side == 0 ? 3 : 7) + dip;
+      d.drawLine(x + 12, y + 18, tipX, tipY, 1);
+      if (growth >= 2) {
+        for (int n = 1; n <= (growth >= 3 ? 3 : 2); ++n) {
+          int fx = x + 12 + side * n * 2;
+          int fy = y + 15 - n * 3 + dip;
+          d.drawLine(fx, fy, fx - 3, fy - 2, 1);
+          d.drawLine(fx, fy, fx + 3, fy - 2, 1);
+        }
+      }
+      if (growth >= 4) {
+        d.drawPixel(tipX - 2, tipY + 2, 1);
+        d.drawPixel(tipX + 2, tipY + 2, 1);
+      }
+    }
+    break;
+  case 5: // Orchid: one stem with a showy, asymmetric flower.
+    d.drawLine(x + 12, y + 18, x + 13 + sway, y + 7 + dip, 1);
+    leaf(x + 12, y + 15, x + 5, y + 12 + dip, 2);
+    leaf(x + 12, y + 14, x + 18, y + 11 + dip, 2);
+    if (growth >= 2) {
+      bloom(x + 14 + sway, y + 5 + dip, growth >= 3 ? 2 : 1);
+      if (growth >= 4) d.drawPixel(x + 18 + sway, y + 8 + dip, 1);
+    }
+    break;
+  case 6: // Cactus: ribbed column, then two distinctive side arms.
+    d.drawRoundRect(x + 8, y + 6 + dip, 8, 13 - dip, 3, 1);
+    d.drawFastVLine(x + 10, y + 9 + dip, 7, 1);
+    d.drawFastVLine(x + 13, y + 8 + dip, 8, 1);
+    if (growth >= 2) {
+      d.drawLine(x + 8, y + 13, x + 5, y + 13, 1);
+      d.drawLine(x + 5, y + 13, x + 5, y + 9, 1);
+      d.drawLine(x + 16, y + 15, x + 19, y + 15, 1);
+      d.drawLine(x + 19, y + 15, x + 19, y + 11, 1);
+    }
+    if (growth >= 3) {
+      d.drawPixel(x + 7, y + 10, 1); d.drawPixel(x + 16, y + 8, 1);
+      d.drawPixel(x + 11, y + 12, 1);
+    }
+    if (growth >= 4) bloom(x + 12 + sway, y + 4 + dip, 1);
+    break;
+  case 7: // Peace lily: broad leaves and a single white spathe.
+    leaf(x + 12, y + 18, x + 3, y + 12 + dip, 3);
+    leaf(x + 12, y + 18, x + 20, y + 10 + dip, -3);
+    if (growth >= 2) {
+      d.drawLine(x + 13, y + 16, x + 13 + sway, y + 5 + dip, 1);
+      d.fillTriangle(x + 13 + sway, y + 3 + dip, x + 9 + sway, y + 7 + dip,
+                     x + 14 + sway, y + 9 + dip, 1);
+      d.drawFastVLine(x + 13 + sway, y + 4 + dip, 5, 0);
+    }
+    if (growth >= 3) {
+      d.drawLine(x + 11, y + 17, x + 5, y + 14, 1);
+      d.drawLine(x + 15, y + 16, x + 21, y + 12, 1);
+    }
+    if (growth >= 4) {
+      d.drawLine(x + 13, y + 15, x + 18 + sway, y + 8 + dip, 1);
+      d.fillTriangle(x + 18 + sway, y + 6 + dip, x + 15 + sway, y + 9 + dip,
+                     x + 19 + sway, y + 11 + dip, 1);
+    }
+    break;
+  case 8: // Mint: soft, opposite leaves on branching stems.
+    d.drawLine(x + 12, y + 18, x + 12 + sway, y + 5 + dip, 1);
+    for (int n = 0; n < (growth >= 3 ? 3 : (growth == 2 ? 2 : 1)); ++n) {
+      int yy = y + 14 - n * 4 + dip;
+      leaf(x + 12 + sway, yy, x + 5, yy - 3, 2);
+      leaf(x + 12 + sway, yy - 1, x + 19, yy - 4, -2);
+      if (growth >= 3) {
+        d.drawPixel(x + 7, yy - 2, 1);
+        d.drawPixel(x + 17, yy - 3, 1);
+      }
+    }
+    if (growth >= 4) bloom(x + 12 + sway, y + 4 + dip, 1);
+    break;
+  default: // Moonbloom: night leaves and little star flowers.
+    leaf(x + 12, y + 18, x + 5, y + 12 + dip, 2);
+    leaf(x + 12, y + 18, x + 19, y + 11 + dip, -2);
+    if (growth >= 2) {
+      d.drawLine(x + 12, y + 16, x + 12 + sway, y + 5 + dip, 1);
+      d.drawLine(x + 12, y + 10, x + 7, y + 7 + dip, 1);
+      d.drawLine(x + 12, y + 12, x + 18, y + 8 + dip, 1);
+    }
+    if (growth >= 3) {
+      d.drawLine(x + 7, y + 4 + dip, x + 9, y + 6 + dip, 1);
+      d.drawLine(x + 9, y + 4 + dip, x + 7, y + 6 + dip, 1);
+      d.fillCircle(x + 19 + sway, y + 5 + dip, 2, 1);
+      d.drawPixel(x + 19 + sway, y + 5 + dip, 0);
+    }
+    if (growth >= 4) bloom(x + 12 + sway, y + 3 + dip, 1);
+    break;
   }
-  if (bad)
-    d.drawPixel(x + 15, y + 18, 1);
+  if (bad) d.drawPixel(x + 21, y + 20, 1);
+}
+
+void crop(GameDisplay &d, int x, int y, uint8_t species, uint8_t growth,
+          bool bad, uint8_t frame) {
+  species %= 12;
+  growth = std::min<uint8_t>(4, growth);
+  const int sway = ((frame / 4U) & 1U) ? 1 : 0;
+  const int droop = bad ? 2 : 0;
+  auto leaf = [&](int sx, int sy, int ex, int ey, int spread) {
+    d.drawLine(sx, sy, ex, ey, 1);
+    d.fillTriangle(ex, ey, ex + spread, ey - 2, ex + spread * 2, ey, 1);
+  };
+  auto flower = [&](int cx, int cy) {
+    d.fillCircle(cx, cy - 1, 1, 1); d.fillCircle(cx - 1, cy, 1, 1);
+    d.fillCircle(cx + 1, cy, 1, 1); d.fillCircle(cx, cy + 1, 1, 1);
+    d.drawPixel(cx, cy, 0);
+  };
+  // The garden artwork sits in open soil; only the food bed supplies a pot or
+  // container. A species-specific seed mark preserves identity from day one.
+  d.drawFastHLine(x + 2, y + 22, 20, 1);
+  if (!growth) {
+    switch (species) {
+    case 0: d.drawFastHLine(x + 10, y + 20, 4, 1); break;
+    case 1: d.drawPixel(x + 10, y + 20, 1); d.drawPixel(x + 12, y + 19, 1); d.drawPixel(x + 14, y + 20, 1); break;
+    case 2: d.drawLine(x + 12, y + 18, x + 12, y + 21, 1); d.drawPixel(x + 11, y + 19, 1); d.drawPixel(x + 13, y + 19, 1); break;
+    case 3: d.fillRoundRect(x + 10, y + 19, 5, 3, 1, 1); break;
+    case 4: d.drawCircle(x + 12, y + 20, 2, 1); break;
+    case 5: d.drawCircle(x + 10, y + 20, 1, 1); d.drawCircle(x + 14, y + 20, 1, 1); break;
+    case 6: d.drawPixel(x + 10, y + 20, 1); d.drawPixel(x + 12, y + 19, 1); d.drawPixel(x + 14, y + 20, 1); break;
+    case 7: d.drawFastHLine(x + 11, y + 20, 3, 1); d.drawPixel(x + 12, y + 19, 1); break;
+    case 8: d.drawLine(x + 10, y + 21, x + 14, y + 19, 1); break;
+    case 9: d.drawRoundRect(x + 9, y + 19, 7, 3, 1, 1); break;
+    case 10: d.drawLine(x + 11, y + 21, x + 14, y + 19, 1); d.drawLine(x + 11, y + 19, x + 14, y + 21, 1); break;
+    default: d.drawLine(x + 10, y + 20, x + 12, y + 18, 1); d.drawLine(x + 12, y + 18, x + 14, y + 20, 1); d.drawLine(x + 14, y + 20, x + 12, y + 22, 1); break;
+    }
+    if (bad) d.drawPixel(x + 20, y + 19, 1);
+    return;
+  }
+  switch (species) {
+  case 0: // Tomato: branching vine with round fruit.
+    d.drawLine(x + 12, y + 22, x + 12 + sway, y + 7 + droop, 1);
+    leaf(x + 12, y + 13, x + 5, y + 10 + droop, 2);
+    leaf(x + 12, y + 10, x + 19, y + 7 + droop, -2);
+    if (growth >= 2) leaf(x + 12, y + 16, x + 6, y + 16 + droop, 2);
+    if (growth >= 3) { d.fillCircle(x + 8, y + 17, 2, 1); d.fillCircle(x + 16, y + 13, 2, 1); }
+    if (growth >= 4) { d.fillCircle(x + 12 + sway, y + 18, 3, 1); d.drawPixel(x + 12 + sway, y + 18, 0); }
+    break;
+  case 1: // Strawberry: low crown, serrated leaves and berry cluster.
+    d.drawLine(x + 12, y + 22, x + 12, y + 13 + droop, 1);
+    leaf(x + 12, y + 14, x + 4, y + 9 + droop, 3);
+    leaf(x + 12, y + 13, x + 11 + sway, y + 5 + droop, 2);
+    leaf(x + 12, y + 14, x + 20, y + 9 + droop, -3);
+    if (growth >= 2) { flower(x + 8, y + 15); flower(x + 17, y + 15); }
+    if (growth >= 3) { d.fillCircle(x + 9, y + 19, 2, 1); d.fillCircle(x + 17, y + 19, 2, 1); }
+    if (growth >= 4) d.drawPixel(x + 9, y + 19, 0);
+    break;
+  case 2: { // Carrot: feathery tops and a tapered root.
+    d.drawLine(x + 12, y + 11, x + 12, y + 18, 1);
+    const int rootWidth = growth == 1 ? 2 : (growth == 2 ? 3 : 4);
+    const int rootTop = growth == 1 ? 17 : (growth == 2 ? 16 : 15);
+    d.fillTriangle(x + 12 - rootWidth, y + rootTop, x + 12 + rootWidth,
+                   y + rootTop, x + 12, y + 22, 1);
+    d.drawLine(x + 12, y + rootTop + 1, x + 12, y + 20, 0);
+    for (int n = 0; n < (growth >= 3 ? 4 : (growth == 2 ? 3 : 2)); ++n) {
+      int xx = x + 12 + sway + (n % 2 ? -1 : 1) * (n / 2 + 1);
+      int yy = y + 11 - n * 2 + droop;
+      d.drawLine(x + 12, y + 13, xx, yy, 1);
+      d.drawLine(xx, yy, xx - 3, yy - 2, 1); d.drawLine(xx, yy, xx + 3, yy - 2, 1);
+    }
+    if (growth >= 4) d.drawFastHLine(x + 10, y + 19, 5, 0);
+    break;
+  }
+  case 3: // Corn: tall blade leaves and a wrapped cob.
+    d.drawLine(x + 12, y + 22, x + 12 + sway, y + 4 + droop, 1);
+    leaf(x + 12, y + 16, x + 3, y + 12 + droop, 3);
+    leaf(x + 12, y + 12, x + 20, y + 8 + droop, -3);
+    if (growth >= 2) { leaf(x + 12, y + 9, x + 5, y + 6 + droop, 2); leaf(x + 12, y + 7, x + 18, y + 4 + droop, -2); }
+    if (growth >= 3) {
+      d.fillRoundRect(x + 14, y + 10, 4, 8, 2, 1);
+      for (int yy = y + 12; yy < y + 18; yy += 2) d.drawFastHLine(x + 15, yy, 2, 0);
+    }
+    if (growth >= 4) d.drawFastHLine(x + 15, y + 17, 2, 0);
+    break;
+  case 4: // Potato: compound foliage and a pair of tubers.
+    d.drawLine(x + 12, y + 22, x + 12 + sway, y + 11 + droop, 1);
+    for (int side = -1; side <= 1; side += 2) {
+      if (side > 0 && growth == 1) continue;
+      d.drawLine(x + 12 + sway, y + 14, x + 12 + sway + side * 7, y + 8 + droop, 1);
+      d.fillCircle(x + 12 + sway + side * 7, y + 8 + droop, 3, 1);
+      d.fillCircle(x + 12 + sway + side * 3, y + 11 + droop, 2, 1);
+    }
+    if (growth >= 3) { d.drawCircle(x + 7, y + 20, 2, 1); d.drawCircle(x + 17, y + 20, 2, 1); }
+    if (growth >= 4) { d.drawPixel(x + 6, y + 20, 1); d.drawPixel(x + 18, y + 20, 1); }
+    break;
+  case 5: // Pumpkin: sprawling vine, curling tendril and fruit.
+    d.drawLine(x + 3, y + 19, x + 20, y + 17, 1);
+    d.drawLine(x + 12, y + 18, x + 12 + sway, y + 8 + droop, 1);
+    d.drawCircle(x + 5, y + 13 + droop, 2 + (growth >= 2), 1);
+    if (growth >= 2) d.drawCircle(x + 18, y + 11 + droop, 3, 1);
+    d.drawLine(x + 18, y + 17, x + 21, y + 14, 1); d.drawPixel(x + 21, y + 13, 1);
+    if (growth >= 3) { d.fillCircle(x + 13, y + 19, 4, 1); d.drawFastVLine(x + 13, y + 16, 6, 0); }
+    if (growth >= 4) { d.drawCircle(x + 13, y + 19, 2, 0); d.drawPixel(x + 13, y + 15, 1); }
+    break;
+  case 6: // Mushroom: paired caps and short pale stems.
+    d.drawFastVLine(x + 8, y + 14, 7, 1);
+    d.fillRoundRect(x + 5, y + 9 + droop, growth == 1 ? 7 : 9, 5, 3, 1);
+    d.drawFastHLine(x + 6, y + 12 + droop, 5, 0);
+    if (growth >= 2) {
+      d.drawFastVLine(x + 16 + sway, y + 12, 9, 1);
+      d.fillRoundRect(x + 12 + sway, y + 6 + droop, growth >= 3 ? 9 : 7, 6, 3, 1);
+      d.drawPixel(x + 16 + sway, y + 8 + droop, 0);
+    }
+    if (growth >= 4) { d.drawPixel(x + 6, y + 10 + droop, 0); d.drawPixel(x + 18 + sway, y + 10 + droop, 0); }
+    break;
+  case 7: // Basil: broad, rounded opposite leaves.
+    d.drawLine(x + 12, y + 22, x + 12 + sway, y + 8 + droop, 1);
+    for (int n = 0; n < (growth >= 3 ? 3 : (growth == 2 ? 2 : 1)); ++n) {
+      int yy = y + 16 - n * 4 + droop;
+      d.fillCircle(x + 7, yy, 3, 1); d.fillCircle(x + 17, yy - 2, 3, 1);
+      d.drawLine(x + 8, yy, x + 12, yy - 1, 0);
+      d.drawLine(x + 16, yy - 2, x + 12, yy - 1, 0);
+    }
+    if (growth >= 4) flower(x + 12 + sway, y + 4 + droop);
+    break;
+  case 8: // Chili: long curved pods among narrow leaves.
+    d.drawLine(x + 12, y + 22, x + 12 + sway, y + 7 + droop, 1);
+    leaf(x + 12, y + 13, x + 5, y + 10 + droop, 2);
+    leaf(x + 12, y + 10, x + 19, y + 7 + droop, -2);
+    if (growth >= 2) {
+      d.drawLine(x + 9, y + 14, x + 7, y + 17, 1); d.drawLine(x + 7, y + 17, x + 9, y + 20, 1);
+    }
+    if (growth >= 3) { d.drawLine(x + 15, y + 12, x + 17, y + 16, 1); d.drawLine(x + 17, y + 16, x + 15, y + 19, 1); }
+    if (growth >= 4) {
+      d.drawPixel(x + 9, y + 20, 1); d.drawPixel(x + 15, y + 19, 1);
+      d.drawLine(x + 11, y + 14, x + 10, y + 16, 1);
+      d.drawPixel(x + 10, y + 17, 1);
+    }
+    break;
+  case 9: // Melon: ground-hugging runner with a striped round fruit.
+    d.drawLine(x + 2, y + 20, x + 21, y + 19, 1);
+    d.drawLine(x + 12, y + 19, x + 12 + sway, y + 10 + droop, 1);
+    d.drawCircle(x + 6, y + 14 + droop, growth >= 2 ? 3 : 2, 1);
+    if (growth >= 2) d.drawCircle(x + 18, y + 14 + droop, 3, 1);
+    if (growth >= 3) {
+      d.fillCircle(x + 12, y + 19, 4, 1);
+      d.drawLine(x + 10, y + 16, x + 10, y + 22, 0); d.drawLine(x + 14, y + 16, x + 14, y + 22, 0);
+    }
+    if (growth >= 4) { d.drawPixel(x + 12, y + 18, 0); d.drawPixel(x + 12, y + 20, 0); }
+    break;
+  case 10: // Rice: narrow stalks ending in bowed grain heads.
+    for (int stalk = 0; stalk < (growth == 1 ? 2 : 3); ++stalk) {
+      int bx = x + 7 + stalk * 5;
+      d.drawLine(bx, y + 22, bx + stalk - 1 + sway, y + 7 + droop, 1);
+      d.drawLine(bx + stalk - 1 + sway, y + 9, bx + stalk + 3 + sway, y + 11, 1);
+      if (growth >= 2) d.drawLine(bx, y + 17, bx - 4, y + 14, 1);
+      if (growth >= 3) for (int grain = 0; grain < (growth >= 4 ? 4 : 3); ++grain) d.fillCircle(bx + stalk + grain + sway, y + 10 + grain * 2, 1, 1);
+    }
+    break;
+  default: // Starfruit: little tree with unmistakable five-point fruit.
+    d.drawLine(x + 12, y + 22, x + 12, y + 10 + droop, 1);
+    d.drawLine(x + 12, y + 13, x + 5 - sway, y + 8 + droop, 1); d.drawLine(x + 12, y + 12, x + 19 + sway, y + 7 + droop, 1);
+    d.fillCircle(x + 6 - sway, y + 7 + droop, 3, 1); d.fillCircle(x + 18 + sway, y + 6 + droop, 3, 1);
+    if (growth >= 2) { d.drawCircle(x + 7, y + 13, 2, 1); d.drawCircle(x + 17, y + 12, 2, 1); }
+    if (growth >= 3) {
+      d.fillTriangle(x + 12, y + 13, x + 9, y + 17, x + 12, y + 20, 1);
+      d.fillTriangle(x + 12, y + 13, x + 15, y + 17, x + 12, y + 20, 1);
+      d.fillTriangle(x + 9, y + 16, x + 8, y + 20, x + 12, y + 19, 1);
+      d.fillTriangle(x + 15, y + 16, x + 16, y + 20, x + 12, y + 19, 1);
+      d.drawPixel(x + 12, y + 17, 0);
+    }
+    if (growth >= 4) { d.drawPixel(x + 11, y + 17, 0); d.drawPixel(x + 13, y + 17, 0); }
+    break;
+  }
+  if (bad) d.drawPixel(x + 21, y + 20, 1);
 }
 void fish(GameDisplay &d, int x, int y, uint8_t species, bool right,
           bool selected) {
@@ -708,12 +1038,51 @@ void room(GameDisplay &d, uint8_t roomId, uint8_t theme, uint8_t hour,
     d.drawCircle(98, 41, 2, 1);
     d.drawCircle(101, 53, 1, 1);
     shelf(d, 12, 79);
-  } else if (roomId == 2 || roomId == 3) {
-    for (int i = 0; i < 6; ++i) {
-      int x = 14 + (i % 3) * 36, y = 33 + (i / 3) * 30;
-      d.fillRect(x - 2, y - 2, 23, 27, 0);
-      plant(d, x, y, i + theme, 2 + i % 3, false);
+  } else if (roomId == 2) {
+    // A calm indoor conservatory: tall divided window, two display shelves,
+    // and pots arranged along the edges so the pet keeps a clear foreground.
+    d.fillRect(44, 29, 40, 30, 0);
+    d.drawRoundRect(44, 29, 40, 30, 2, 1);
+    d.drawFastVLine(64, 30, 28, 1);
+    d.drawFastHLine(45, 44, 38, 1);
+    d.drawFastHLine(9, 63, 110, 1);
+    d.drawFastHLine(9, 65, 110, 1);
+    d.drawFastVLine(12, 63, 21, 1);
+    d.drawFastVLine(115, 63, 21, 1);
+    d.drawFastHLine(15, 86, 98, 1);
+    d.drawRoundRect(9, 88, 110, 10, 2, 1);
+    plant(d, 17, 40, (theme + 0) % 10, 4, false, frame);
+    plant(d, 89, 40, (theme + 5) % 10, 4, false, frame + 2);
+    plant(d, 31, 64, (theme + 2) % 10, 3, false, frame + 4);
+    plant(d, 77, 64, (theme + 7) % 10, 3, false, frame + 1);
+    if ((frame / 6U) & 1U) d.drawPixel(53, 36, 1);
+    else d.drawPixel(74, 51, 1);
+  } else if (roomId == 3) {
+    // Outdoor food garden: a fence, sun, raised beds and visible edible crops.
+    d.drawFastHLine(8, 35, 112, 1);
+    for (int fx = 12; fx < 119; fx += 14) {
+      d.drawFastVLine(fx, 27, 15, 1);
+      d.fillTriangle(fx - 2, 29, fx + 2, 29, fx, 25, 1);
     }
+    d.drawCircle(106, 29, 5, 1);
+    d.drawFastHLine(105, 29, 3, 0);
+    d.drawFastHLine(12, 84, 104, 1);
+    d.drawRoundRect(10, 54, 51, 29, 3, 1);
+    d.drawRoundRect(67, 54, 51, 29, 3, 1);
+    d.drawFastHLine(13, 60, 45, 1);
+    d.drawFastHLine(70, 60, 45, 1);
+    d.drawFastVLine(19, 61, 19, 1);
+    d.drawFastVLine(42, 61, 19, 1);
+    d.drawFastVLine(76, 61, 19, 1);
+    d.drawFastVLine(99, 61, 19, 1);
+    crop(d, 14, 42, (theme + 0) % 12, 4, false, frame);
+    crop(d, 37, 42, (theme + 3) % 12, 4, false, frame + 2);
+    crop(d, 71, 42, (theme + 6) % 12, 4, false, frame + 3);
+    crop(d, 94, 42, (theme + 9) % 12, 4, false, frame + 1);
+    // A tiny bee flits beside the beds without shifting any crop artwork.
+    int beeX = 88 + ((frame / 3U) % 14U);
+    d.drawPixel(beeX, 45 + ((frame / 8U) & 1U), 1);
+    d.drawFastHLine(beeX - 2, 44 + ((frame / 8U) & 1U), 2, 1);
   } else if (roomId == 4) {
     d.fillRect(11, 31, 105, 16, 0);
     d.drawRoundRect(11, 31, 105, 16, 2, 1);

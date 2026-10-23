@@ -69,6 +69,16 @@ Firmware-rendered screenshots and the design/validation notes are in
 [`../docs/NATIVE_UI.md`](../docs/NATIVE_UI.md). Run the screenshot harness from the
 repository root with `python3 tools/render_ui.py` after PlatformIO installs GFX.
 
+## Garden and Plant Room
+
+The Garden is the food-growing space: its twelve crop sprites progress from seed
+to harvest, and harvests add ingredients to the cooking pantry. The Plant Room
+is a florist collection: its ten potted ornament species have distinct animated
+art, can be sold for coins, and can fill a changing daily customer order. Orders
+raise florist rank, style skill, town reputation, and a scrapbook memory. Their
+home scenes and activity screens are drawn separately, and both systems keep the
+existing `BotanySave` record layout.
+
 ## Character growth and movement
 
 The original roster now has ten lineage families with their own egg emblems,

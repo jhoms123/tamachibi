@@ -97,6 +97,8 @@ public:
   void archiveGeneration(uint8_t species, uint16_t generation, uint8_t temperament,
                          uint8_t favoriteFood, uint8_t ageDays);
   void recordAction(uint8_t action, uint32_t day, uint8_t hour, uint8_t weather);
+  void recordPlantSale(uint8_t species);
+  void recordFloristOrder(uint8_t species, uint32_t day);
   void recordGameResult(uint8_t gameId, bool won);
   void recordNeighborInteraction(uint8_t resident, uint8_t interaction, uint8_t relation);
   uint8_t neighborStoryChapter(uint8_t resident) const;

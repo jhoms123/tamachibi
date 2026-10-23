@@ -24,10 +24,12 @@ def main():
  program=(ROOT/'tools/preview_fixture.cpp').read_text()
  program+='\n'+extract('GameMain.cpp','petWalkPose')+'\n'
  for f,names in {
-  'GameMain.cpp':['drawSquarePet','drawMenu','drawHouseWorldView','drawCityWorldView'],
+  'GameMain.cpp':['drawGardenIcon','drawPlantRoomIcon','drawSquarePet','drawMenu',
+                  'drawHouseWorldView','drawCityWorldView'],
   'ParentDialogue.cpp':['ParentDialogueSystem::drawDialoguePage','ParentDialogueSystem::drawChoicePage','ParentDialogueSystem::drawResultPage'],
   'Aquarium.cpp':['AquariumSystem::drawTankScene'],
-  'Botany.cpp':['BotanySystem::drawGardenOverview','BotanySystem::drawPlantRoomOverview'],
+  'Botany.cpp':['BotanySystem::drawCropSprite','BotanySystem::drawIndoorSprite',
+                'BotanySystem::drawGardenOverview','BotanySystem::drawPlantRoomOverview'],
   'MusicPlayer.cpp':['Esp32MusicPlayer::drawPlayerScreen']}.items():
   for name in names:program+='\n'+extract(f,name)+'\n'
  for func,vars in [('categoryMenu','byte pick=2,count=6,category=0;'),('miniGameMenu','byte g=0,gameCount=14;'),('gameHubMenu','byte selected=1;')]:
@@ -46,6 +48,9 @@ int main(){
  {NativeUI::Scope f(display);display.clearDisplay();drawSquarePet();save("home.pbm");}
  {NativeUI::Scope f(display);display.clearDisplay();mainCategory=2;drawMenu();save("menu.pbm");}
  {NativeUI::Scope f(display);display.clearDisplay();drawHouseWorldView();save("house.pbm");}
+ {cityWorld.room=2;NativeUI::Scope f(display);display.clearDisplay();drawHouseWorldView();save("house-plants.pbm");}
+ {cityWorld.room=3;NativeUI::Scope f(display);display.clearDisplay();drawHouseWorldView();save("house-garden.pbm");}
+ cityWorld.room=0;
  {NativeUI::Scope f(display);display.clearDisplay();drawCityWorldView();save("town.pbm");}
  fixture_categoryMenu();save("actions.pbm");fixture_miniGameMenu();save("arcade.pbm");fixture_gameHubMenu();save("game-types.pbm");
  ParentDialogueSystem p;ParentDialogueContext c;ParentDialogueOutcome o;
@@ -54,6 +59,10 @@ int main(){
  p.drawResultPage(c,"That sounds lovely. I feel braver when you help me try.",o);save("reply.pbm");
  AquariumSystem a;a.drawTankScene(0,10,true);save("tank.pbm");
  BotanySystem b;b.drawGardenOverview(0);save("garden.pbm");b.drawPlantRoomOverview(0);save("plants.pbm");
+ b.gardenCapacity_=2;b.selectedGarden_=0;b.drawGardenOverview(0);save("garden-start.pbm");
+ b.indoorCapacity_=2;b.selectedIndoor_=0;b.drawPlantRoomOverview(0);save("plants-start.pbm");
+ {NativeUI::Scope f(display);display.clearDisplay();display.setCursor(31,0);display.print("FOOD CROPS 0-11");for(uint8_t i=0;i<12;++i){int x=(i%4)*32,y=18+(i/4)*32;display.drawRoundRect(x,y,31,31,2,1);NativeUI::crop(display,x+4,y,i,4,false,0);display.setCursor(x+10,y+24);display.print(i);}save("crop-catalog.pbm");}
+ {NativeUI::Scope f(display);display.clearDisplay();display.setCursor(17,0);display.print("DECOR PLANTS 0-9");for(uint8_t i=0;i<10;++i){int x=(i%4)*32,y=18+(i/4)*32;display.drawRoundRect(x,y,31,31,2,1);NativeUI::plant(display,x+4,y,i,4,false,0);display.setCursor(x+10,y+24);display.print(i);}save("decor-catalog.pbm");}
  Esp32MusicPlayer music;music.drawPlayerScreen();save("music.pbm");
  display.useNativeLayout(false);display.clearDisplay();display.setCursor(20,0);display.print("LONG STATUS TITLE");display.setCursor(105,0);display.print("2/7");
  display.setCursor(1,14);display.print("School confidence 100");display.setCursor(1,26);display.print("Social confidence 86");display.setCursor(1,38);display.print("Attachment security 95");display.setCursor(1,50);display.print("Difficult talks 32");display.setPageFooter("D0 PREV","D1 OPEN","D2 NEXT");save("status.pbm");
@@ -72,7 +81,7 @@ int main(){
   subprocess.run(cmd,check=True);subprocess.run([str(td/'preview')],cwd=td,check=True)
   checks=cmd[:-3]+[str(ROOT/'tools/renderer_checks.cpp'),'-o',str(td/'checks')]
   subprocess.run(checks,check=True);subprocess.run([str(td/'checks')],check=True)
-  names=['home','menu','actions','arcade','game-types','house','town','talk','choices','reply','tank','garden','plants','music','status','save','game']
+  names=['home','menu','actions','arcade','game-types','house','house-plants','house-garden','town','talk','choices','reply','tank','garden','plants','garden-start','plants-start','crop-catalog','decor-catalog','music','status','save','game']
   scale=3;cellw,cellh=416,438;sheet=Image.new('RGB',(cellw*4,cellh*math.ceil(len(names)/4)),'#191d22');draw=ImageDraw.Draw(sheet)
   font=ImageFont.truetype('DejaVuSans.ttf',17)
   for i,n in enumerate(names):

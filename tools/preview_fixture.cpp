@@ -19,6 +19,9 @@ char petName[] = "MOCHI";
 constexpr byte STAGE_EGG = 0, STAGE_BABY = 1, STAGE_CHILD = 2,
                STAGE_TEEN = 3, STAGE_ADULT = 4;
 constexpr byte CATEGORY_COUNT = 6, HOUSE_ROOM_COUNT = 5, CITY_PLACE_COUNT = 6;
+constexpr byte BOTANY_GARDEN_PLOTS = 4, BOTANY_INDOOR_POTS = 4;
+constexpr byte BOTANY_INDOOR_COUNT = 10;
+unsigned long ageTicks = 1440;
 bool needsCare() { return false; }
 bool isScheduledAwayTime() { return false; }
 byte visualHour() { return 14; }
@@ -93,13 +96,25 @@ public:
   GameDisplay &display_ = display;
   byte selectedGarden_ = 1, selectedIndoor_ = 2, gardenCapacity_ = 4,
        indoorCapacity_ = 4;
+  uint16_t discoveredIndoor_ = static_cast<uint16_t>(2U << 11);
   byte cropSpecies_[4] = {0, 1, 2, 255}, indoorSpecies_[4] = {1, 2, 3, 4},
        cropWater_[4] = {6, 8, 3, 0}, indoorWater_[4] = {8, 4, 7, 3},
        cropHealth_[4] = {8, 7, 6, 0}, indoorHealth_[4] = {9, 8, 7, 9};
-  byte cropStage(byte i) const { return i + 1; }
-  byte indoorStage(byte i) const { return i + 1; }
-  const __FlashStringHelper *cropName(byte) const { return F("MOON BERRIES"); }
-  const __FlashStringHelper *indoorName(byte) const { return F("STAR FLOWER"); }
+  byte cropStage(byte i) const { return i == 0 ? 4 : i + 1; }
+  byte indoorStage(byte i) const { return i == 0 ? 4 : i + 1; }
+  byte indoorCost(byte i) const { return static_cast<byte>(5 + (i % 10) * 2); }
+  bool cropReady(byte i) const { return cropSpecies_[i] != EMPTY_PLANT && cropStage(i) >= 4; }
+  const __FlashStringHelper *cropName(byte i) const {
+    static const char *names[] = {"Tomato", "Strawberry", "Carrot", "Corn"};
+    return reinterpret_cast<const __FlashStringHelper *>(names[i % 4]);
+  }
+  const __FlashStringHelper *indoorName(byte i) const {
+    static const char *names[] = {"Pothos", "Aloe", "Lavender", "Bonsai", "Fern",
+                                  "Orchid", "Cactus", "Peace Lily", "Mint", "Moonbloom"};
+    return reinterpret_cast<const __FlashStringHelper *>(names[i % 10]);
+  }
+  void drawCropSprite(uint8_t, int, int, uint8_t, bool, uint8_t) const;
+  void drawIndoorSprite(uint8_t, int, int, uint8_t, bool, uint8_t) const;
   void drawGardenOverview(uint8_t) const;
   void drawPlantRoomOverview(uint8_t) const;
 };
