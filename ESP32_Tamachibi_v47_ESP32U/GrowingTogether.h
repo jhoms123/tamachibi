@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "GameDisplay.h"
 #include "Esp32Platform.h"
+#include "ConversationMemory.h"
 
 constexpr uint32_t GROWING_TOGETHER_SAVE_MAGIC = 0x47545731UL; // GTW1
 constexpr uint8_t GROWING_TOGETHER_SAVE_VERSION = 1;
@@ -129,6 +130,8 @@ struct GrowingTogetherContext {
   uint8_t schoolConfidence;
   uint8_t socialConfidence;
   uint8_t attachmentSecurity;
+
+  TamachibiMemoryContext memory;
 };
 
 struct GrowingTogetherOutcome {

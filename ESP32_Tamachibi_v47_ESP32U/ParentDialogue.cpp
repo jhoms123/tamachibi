@@ -8,6 +8,7 @@ extern void clickSound();
 extern void goodSound();
 extern void badSound();
 extern void waitButtonRelease();
+extern void markSaveDirty();
 extern unsigned long lastInputAt;
 
 namespace {
@@ -253,10 +254,15 @@ bool ParentDialogueSystem::recentTopic(uint8_t topic) const {
 }
 
 void ParentDialogueSystem::selectTopic(const ParentDialogueContext &ctx, bool manual) {
+  if (ctx.stage == 0) { pendingTopic_ = 255; return; }
   uint8_t pool[128]; uint8_t count = 0;
+  uint8_t freshPool[128]; uint8_t freshCount = 0;
   auto add = [&](uint8_t topic, uint8_t weight) {
     if (!topicAllowedForStage(topic, ctx.stage)) return;
-    for (uint8_t i = 0; i < weight && count < sizeof(pool); ++i) pool[count++] = topic;
+    for (uint8_t i = 0; i < weight; ++i) {
+      if (count < sizeof(pool)) pool[count++] = topic;
+      if (!recentTopic(topic) && freshCount < sizeof(freshPool)) freshPool[freshCount++] = topic;
+    }
   };
 
   if (ctx.stage <= 1) {
@@ -299,8 +305,11 @@ void ParentDialogueSystem::selectTopic(const ParentDialogueContext &ctx, bool ma
   add(60, 1); add(61, ctx.ownerTrust < 45 ? 4 : 1); add(62, 1); add(63, ctx.mischief > 2 ? 3 : 1); add(64, 1);
 
   if (count == 0) { add(ctx.stage <= 1 ? 0 : 44, 1); }
-  uint8_t picked = pool[random(0, count)];
-  for (uint8_t tries = 0; tries < 12 && recentTopic(picked); ++tries) picked = pool[random(0, count)];
+  const bool haveFresh = freshCount > 0;
+  const uint8_t pickedCount = haveFresh ? freshCount : count;
+  const uint8_t *pickedPool = haveFresh ? freshPool : pool;
+  if (pickedCount == 0) { pendingTopic_ = 255; return; }
+  const uint8_t picked = pickedPool[random(0, pickedCount)];
   pendingTopic_ = picked;
   pendingVariant_ = static_cast<uint8_t>(random(0, 4));
   pendingSeed_ = static_cast<uint16_t>((ctx.ageTicks * 37UL + ctx.ownerBond * 19U + ctx.ownerTrust * 11U + random(1, 65535)) & 0xFFFFU);
@@ -331,6 +340,7 @@ bool ParentDialogueSystem::shouldAutoOpen(const ParentDialogueContext &ctx, unsi
 }
 
 void ParentDialogueSystem::scheduleManual(const ParentDialogueContext &ctx) {
+  if (ctx.stage == 0) { pendingTopic_ = 255; return; }
   if (hasPending() && !topicAllowedForStage(pendingTopic_, ctx.stage)) pendingTopic_ = 255;
   if (!hasPending()) selectTopic(ctx, true);
 }
@@ -362,7 +372,11 @@ void ParentDialogueSystem::buildBabyPrompt(const ParentDialogueContext &ctx, cha
   const uint8_t a = pendingSeed_ % 24U;
   const uint8_t b = (pendingSeed_ / 7U + ctx.temperament * 3U) % 24U;
   const uint8_t cue = (pendingSeed_ / 13U + pendingTopic_ + ctx.hour) % 16U;
-  snprintf(page1, page1Size, "%s-%s! %s", BABBLE_SYLLABLES[a], BABBLE_SYLLABLES[b], BABY_CUES[cue]);
+  char babyMemory[140];
+  buildTamachibiBabyMemory(ctx.memory, pendingSeed_ / 19U + ctx.ownerBond,
+                           babyMemory, sizeof(babyMemory));
+  snprintf(page1, page1Size, "%s-%s! %s %s", BABBLE_SYLLABLES[a], BABBLE_SYLLABLES[b],
+           BABY_CUES[cue], babyMemory);
   snprintf(page2, page2Size, "%s", BABY_QUESTIONS[(pendingSeed_ / 31U) % 3U]);
 }
 
@@ -372,9 +386,12 @@ void ParentDialogueSystem::buildPrompt(const ParentDialogueContext &ctx, char *p
   const uint8_t stageIndex = clampedStageIndex(ctx.stage);
   const char *lead = STAGE_LEADS[stageIndex][(pendingSeed_ + pendingVariant_) % 8U];
   const char *line = topicLine(pendingTopic_, pendingVariant_);
+  char memory[150];
+  buildTamachibiPersonalMemory(ctx.memory, static_cast<uint8_t>((pendingSeed_ + pendingVariant_) % 8U),
+                               pendingSeed_, memory, sizeof(memory));
   // The dialogue runner splits this full sentence across as many OLED pages
   // as needed, so no context sentence is silently clipped.
-  snprintf(page1, page1Size, "%s %s", lead, line);
+  snprintf(page1, page1Size, "%s %s %s", lead, line, memory);
   snprintf(page2, page2Size, "%s", topicQuestion(pendingTopic_, pendingVariant_));
 }
 
@@ -558,7 +575,7 @@ ParentDialogueOutcome ParentDialogueSystem::runPending(const ParentDialogueConte
     if (!hasPending()) return o;
   }
 
-  char narrative[240], question[120], combined[400];
+  char narrative[360], question[120], combined[520];
   buildPrompt(ctx, narrative, sizeof(narrative), question, sizeof(question));
   snprintf(combined, sizeof(combined), "%s\n%s", narrative, question);
   showScrollableText(ctx, ctx.stage <= 1 ? "BABY BABBLE" : "TAMA TALK", combined, "D1 response");
@@ -578,7 +595,12 @@ ParentDialogueOutcome ParentDialogueSystem::runPending(const ParentDialogueConte
   applyChoice(pendingTopic_, style, o);
   o.resolved = true;
   const bool positive = style != STYLE_DISMISS && style != STYLE_MISCHIEF;
-  const char *reply = resultReply(ctx.stage, set, selected);
+  char rememberedDetail[150];
+  buildTamachibiPersonalMemory(ctx.memory,
+      static_cast<uint8_t>((pendingSeed_ + pendingVariant_ + selected + 3U) % 8U),
+      lifetimeConversations_, rememberedDetail, sizeof(rememberedDetail));
+  char reply[360];
+  snprintf(reply, sizeof(reply), "%s\n%s", resultReply(ctx.stage, set, selected), rememberedDetail);
   showScrollableText(ctx, "RESPONSE REMEMBERED", reply, "D1 close");
   positive ? goodSound() : badSound();
 
@@ -601,6 +623,15 @@ void ParentDialogueSystem::recordSchoolResult(bool successful) {
 void ParentDialogueSystem::recordSocialResult(bool successful) {
   changeByte(socialConfidence_, successful ? 2 : -1);
   changeByte(empathy_, successful ? 1 : 0);
+}
+
+void ParentDialogueSystem::recordDirectTalk(uint8_t stage) {
+  if (generationConversations_ < 65535U) ++generationConversations_;
+  if (lifetimeConversations_ < 0xFFFFFFFFUL) ++lifetimeConversations_;
+  const uint8_t si = clampedStageIndex(stage);
+  if (stageConversations_[si] < 65535U) ++stageConversations_[si];
+  if (petTalks_ < 65535U) ++petTalks_;
+  markSaveDirty();
 }
 
 void ParentDialogueSystem::eventAdjustDevelopment(int openness, int confidence,
@@ -645,7 +676,7 @@ void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
       display_.setCursor(2, 25); display_.print(F("Lifetime talks ")); display_.print(lifetimeConversations_);
       display_.setCursor(2, 36); display_.print(F("Bond ")); display_.print(ctx.ownerBond); display_.print(F(" Trust ")); display_.print(ctx.ownerTrust);
       display_.setCursor(2, 47); display_.print(F("Attachment ")); display_.print(attachmentSecurity_);
-      display_.setCursor(2, 58); display_.print(F("Lines >")); display_.print(estimatedLinePool());
+      display_.setCursor(2, 58); display_.print(F("Talk variants ")); display_.print(estimatedLinePool());
     } else if (page == 1) {
       display_.setCursor(2, 14); display_.print(F("Open ")); display_.print(openness_); display_.setCursor(68,14); display_.print(F("Conf ")); display_.print(confidence_);
       display_.setCursor(2, 26); display_.print(F("Empathy ")); display_.print(empathy_); display_.setCursor(68,26); display_.print(F("Honest ")); display_.print(honesty_);

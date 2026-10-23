@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "GameDisplay.h"
 #include "Esp32Platform.h"
+#include "ConversationMemory.h"
 
 constexpr uint32_t PARENT_DIALOGUE_SAVE_MAGIC = 0x50444231UL; // PDB1
 constexpr uint8_t PARENT_DIALOGUE_SAVE_VERSION = 1;
@@ -66,6 +67,8 @@ struct ParentDialogueContext {
   uint8_t lowestChildBond;
   uint8_t siblingBond;
   uint8_t pendingCallType;
+
+  TamachibiMemoryContext memory;
 };
 
 struct ParentDialogueOutcome {
@@ -154,6 +157,7 @@ public:
   void runJournal(const ParentDialogueContext &ctx);
   void recordSchoolResult(bool successful);
   void recordSocialResult(bool successful);
+  void recordDirectTalk(uint8_t stage);
   void eventAdjustDevelopment(int openness, int confidence, int empathy,
                               int responsibility, int resilience, int honesty,
                               int independence, int emotionWords,
@@ -172,7 +176,7 @@ public:
   uint8_t socialConfidence() const { return socialConfidence_; }
   uint8_t attachmentSecurity() const { return attachmentSecurity_; }
   uint32_t lifetimeConversations() const { return lifetimeConversations_; }
-  uint32_t estimatedLinePool() const { return 54720UL; }
+  uint32_t estimatedLinePool() const { return 9216UL; }
 
   void developerMax();
   void developerReset();

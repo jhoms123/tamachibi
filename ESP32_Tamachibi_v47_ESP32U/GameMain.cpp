@@ -394,6 +394,7 @@ unsigned long lastLifeClockEpoch = 0;
 unsigned long lifeSecondRemainder = 0;
 unsigned long lastAnimTick = 0;
 unsigned long lastButtonTick = 0;
+unsigned long lastNarrativeInteractionAtMs = 0;
 bool rightButtonRawLast = HIGH;
 bool rightButtonStable = HIGH;
 unsigned long rightButtonRawChangedAt = 0;
@@ -417,6 +418,7 @@ const unsigned long LIFE_TICK_MS = TAMACHIBI_TEST_MODE ? 1000UL : 300000UL;
 const unsigned long GAME_TICK_MS = LIFE_TICK_MS;
 const unsigned long RTC_SECONDS_PER_TICK = TAMACHIBI_TEST_MODE ? 1UL : SIM_SECONDS_PER_TICK;
 const unsigned long ANIM_TICK_MS = 350UL;
+const unsigned long NARRATIVE_COOLDOWN_MS = 15UL * 60UL * 1000UL;
 const unsigned long ACTIVE_ANIMATION_WINDOW_MS = 12000UL;
 const unsigned long TICKS_PER_HOUR = 12UL;
 const unsigned long TICKS_PER_DAY = 288UL;
@@ -1006,8 +1008,10 @@ const __FlashStringHelper* petMoodTreeLine();
 const __FlashStringHelper* petJokeReply();
 const __FlashStringHelper* petPraiseReply();
 const __FlashStringHelper* petAdviceReply();
-const __FlashStringHelper* petMemoryLine();
-void dialoguePopup(const __FlashStringHelper* youLine, const __FlashStringHelper* petLine);
+void dialoguePopup(const __FlashStringHelper* youLine, const __FlashStringHelper* petLine,
+                   byte talkTopic = 255);
+void dialoguePopupText(const char *youLine, const char *petLine, byte talkTopic = 255);
+TamachibiMemoryContext makeTamachibiMemoryContext();
 ParentDialogueContext makeParentDialogueContext();
 GrowingTogetherContext makeGrowingTogetherContext();
 void applyParentDialogueOutcome(const ParentDialogueOutcome &outcome);
@@ -1561,6 +1565,7 @@ void applyMedicine(byte medId) {
 
   if (correct) {
     markRoutineAction(ROUTINE_CARE);
+    logCareEvent(11);
     recordGoalEvent(0, 1);
     changeTrust(2);
     if (wasSick && conditionType == 0) {
@@ -2192,6 +2197,12 @@ const __FlashStringHelper* careEventName(byte type) {
   if (type == 7) return F("Care mistake");
   if (type == 8) return F("Ran away");
   if (type == 9) return F("Came home");
+  if (type == 10) return F("Fed");
+  if (type == 11) return F("Medicine");
+  if (type == 12) return F("Cleaned up");
+  if (type == 13) return F("Affection");
+  if (type == 14) return F("Playtime");
+  if (type == 15) return F("Explored");
   return F("Care event");
 }
 
@@ -7124,6 +7135,7 @@ void finishGameSession(byte gameId) {
   if (playedMs < 2500UL) return; // prevents opening/closing a game to grind rewards
 
   if (gameCounts[gameId] < 255) gameCounts[gameId]++;
+  logCareEvent(14);
   if (exerciseScore < 100 && (gameId == 0 || gameId == 7 || gameId == 8 || gameId == 9 || gameId == 10)) exerciseScore++;
   if (weight > 1 && (gameId == 7 || gameId == 10)) weight--;
   markRoutineAction(ROUTINE_PLAY);
@@ -8617,7 +8629,7 @@ void exploreTrip() {
   else if (loc == 4 || loc == 8) addSkill(skillSmart, 1);
   else if (loc == 6) addSkill(skillFit, 1);
   addStat(happy, 1); subStat(energy, 2); subStat(full, 1);
-  lastTripEvent = loc; markRoutineAction(ROUTINE_PLAY); recordGoalEvent(5, 1); changeBond(1);
+  lastTripEvent = loc; logCareEvent(15); markRoutineAction(ROUTINE_PLAY); recordGoalEvent(5, 1); changeBond(1);
   clampAll(); goodSound(); markSaveDirty();
 }
 
@@ -8918,29 +8930,185 @@ const __FlashStringHelper* petAdviceReply() {
   }
 }
 
-const __FlashStringHelper* petMemoryLine() {
-  if (stage == STAGE_BABY) return F("Ba-ba! You came back!");
-  if (parentDialogue.lifetimeConversations() >= 100) return F("Our talks helped me grow.");
-  if (parentDialogue.attachmentSecurity() >= 75) return F("You make it safe to talk.");
-  if (rescuedFromSickness > 0) return F("You helped me get well.");
-  if (favoriteGivenFood != 255) return F("I remember my favorite meal!");
-  if (lastTripEvent != 255) return F("Our last trip was fun.");
-  if (gameCounts[favoriteGameId] >= 3) return F("Can we play my favorite?");
-  if (ignoredCallCount > 0 && ownerTrust < 40) return F("Please answer when I call.");
-  if (caredDayStreak >= 5) return F("You always come back.");
-  return petDialogue();
+namespace {
+const char *const PERSONAL_TALK_OPENERS[12] = {
+  "I am glad you asked me.", "I have been holding a thought for you.",
+  "A little thing from our days came back to me.", "I thought about us earlier today.",
+  "This is one of those small things I wanted to share.", "You know what I remember right now?",
+  "I want to tell you something from our story.", "I saved this thought for when you came by.",
+  "Something about our routine feels special to me.", "I feel like talking about us for a moment.",
+  "I have a memory I want to keep warm.", "I notice the little ways we know each other."
+};
+
+const char *const PERSONAL_TALK_BABY_OPENERS[12] = {
+  "Ba!", "Da-da!", "Mmm!", "Look!", "I know you!", "You came!",
+  "Baba!", "Hee!", "My friend!", "There you are!", "I remember!", "Listen!"
+};
+
+const char *const PERSONAL_TALK_TAILS[12] = {
+  "That is a part of my life I share with you.", "I do not want that small moment to disappear.",
+  "It makes me feel like you know the real me.", "Our tiny history makes this home feel like ours.",
+  "I hope we keep adding stories to this one.", "I carry that feeling into whatever happens next.",
+  "Even an ordinary day can become one of our memories.", "I remember the way you made room for me.",
+  "I like that we have our own ways of caring.", "That is why I keep telling you what is on my mind.",
+  "I am glad I get to grow up with you nearby.", "I notice the care you give me, even in small things."
+};
+
+const char *const PERSONAL_TALK_BABY_TAILS[12] = {
+  "I like when you are near.", "I know that sound.", "We are making a little story.",
+  "I feel safe with you.", "Come back and see me again.", "You are part of my home.",
+  "I remember your gentle hands.", "I like our time together.", "My little heart knows you.",
+  "We can do it again soon.", "You make my world feel familiar.", "I am happy you are here."
+};
+
+const char *const PERSONAL_TALK_RELATIONSHIPS[3][8] = {
+  {
+    "I am still learning how safe it is to open up.",
+    "I need time, but I notice when you come back.",
+    "I am figuring out which parts of me you understand.",
+    "Small, steady moments help me feel less unsure.",
+    "I want to trust the care I see from you.",
+    "I am not ready for everything, but I am here with you.",
+    "I remember how it feels when you listen patiently.",
+    "I hope we keep learning each other's rhythms."
+  },
+  {
+    "I notice how you show up for me, even on ordinary days.",
+    "I am learning which parts of myself I can trust you with.",
+    "Our routines are becoming a language between us.",
+    "I like that you give me room to be my own kind of Tama.",
+    "I can feel our history building one small moment at a time.",
+    "I think we are getting better at understanding each other.",
+    "I know you have learned some of my little tells.",
+    "I like that we can keep growing without being the same."
+  },
+  {
+    "I feel safe enough with you to be completely myself.",
+    "I trust the care we have built together.",
+    "You have learned the quiet details that make me feel known.",
+    "I can bring you a hard feeling and still feel loved.",
+    "Our little history feels like a place I can come home to.",
+    "You know my rhythms, and I know you will keep showing up.",
+    "I can be brave because I know you are nearby.",
+    "I feel like your Tamachibi, not just another little face."
+  }
+};
+
+const char *const PERSONAL_TALK_EGG_LINES[8] = {
+  "Your voice reaches me through the shell.", "I feel the gentle warmth outside.",
+  "I am listening from my little egg.", "The world sounds kind out there.",
+  "I am not ready to hatch, but I know you are near.", "The shell rocks when you visit.",
+  "I am keeping this first hello.", "I wonder what our home will be like."
+};
+
+const char *const PERSONAL_TALK_EGG_VOICES[8] = {
+  "I hear you from in here.", "The world is still muffled, but your voice is clear.",
+  "I am listening while I get ready.", "I can feel the shell rock when you visit.",
+  "I wonder what your hands will feel like.", "I am keeping this hello for later.",
+  "It is nice knowing someone is waiting.", "I will meet you when I am ready."
+};
+
+const char *const PERSONAL_TALK_BABY_MEMORY[8] = {
+  "I know your voice.", "You came when I called.", "You notice my tiny needs.",
+  "Our visits feel familiar.", "Your gentle care feels safe.", "I like our little routine.",
+  "I remember you came back.", "We are making our first memories."
+};
 }
 
-void dialoguePopup(const __FlashStringHelper* youLine, const __FlashStringHelper* petLine) {
-  // ESP32 flash strings are memory mapped, so they can be copied into the
-  // same persistent, word-wrapped viewer used by the new narrative systems.
-  // This also fixes older Talk-menu lines that previously ran off the OLED.
-  const char *you = reinterpret_cast<const char *>(youLine);
-  const char *pet = reinterpret_cast<const char *>(petLine);
-  char text[420];
-  snprintf(text, sizeof(text), "%s\n%s", you ? you : "You listen.",
-           pet ? pet : "Your Tama stays close.");
-  growingTogether.showReadableMessage("CONVERSATION", text, "D1 close");
+void dialoguePopupText(const char *youLine, const char *petLine, byte talkTopic) {
+  const uint32_t sequence = parentDialogue.lifetimeConversations();
+  // This is a permutation through 9,216 opening / memory / relationship /
+  // closing combinations. The saved conversation count advances it after each
+  // direct Talk reply, so the same pet does not roll a tiny random phrase list.
+  const uint32_t variantCount = 12UL * 8UL * 8UL * 12UL;
+  uint32_t variant = (sequence * 1009UL + birthCode +
+                      static_cast<uint32_t>(talkTopic) * 131UL +
+                      static_cast<uint32_t>(generation) * 17UL) % variantCount;
+  const uint8_t tail = variant % 12U; variant /= 12U;
+  const uint8_t relationship = variant % 8U; variant /= 8U;
+  const uint8_t memoryKind = variant % 8U; variant /= 8U;
+  const uint8_t opener = variant % 12U;
+
+  char memory[170];
+  TamachibiMemoryContext memoryContext = makeTamachibiMemoryContext();
+  if (stage == STAGE_BABY) {
+    buildTamachibiBabyMemory(memoryContext, sequence + memoryKind, memory, sizeof(memory));
+  } else {
+    buildTamachibiPersonalMemory(memoryContext, memoryKind, sequence, memory, sizeof(memory));
+  }
+
+  const uint8_t relationshipTier = ownerTrust < 40 || ownerBond < 35 ? 0 :
+                                   (ownerTrust >= 70 && ownerBond >= 70 ? 2 : 1);
+  const char *voice = PERSONAL_TALK_RELATIONSHIPS[relationshipTier][relationship];
+  const char *opening = PERSONAL_TALK_OPENERS[opener];
+  const char *ending = PERSONAL_TALK_TAILS[tail];
+  const char *baseReply = petLine ? petLine : "I like that you asked me.";
+  if (stage == STAGE_EGG) {
+    baseReply = PERSONAL_TALK_EGG_LINES[memoryKind];
+    opening = PERSONAL_TALK_BABY_OPENERS[opener];
+    memory[0] = '\0';
+    voice = PERSONAL_TALK_EGG_VOICES[relationship];
+    ending = PERSONAL_TALK_BABY_TAILS[tail];
+  } else if (stage == STAGE_BABY) {
+    opening = PERSONAL_TALK_BABY_OPENERS[opener];
+    voice = PERSONAL_TALK_BABY_MEMORY[(relationship + temperament) % 8U];
+    ending = PERSONAL_TALK_BABY_TAILS[tail];
+  }
+
+  char openingLine[112];
+  const char *nickname = reinterpret_cast<const char *>(ownerNickname());
+  if (stage >= STAGE_CHILD && (opener % 4U) == 0 && nickname && nickname[0])
+    snprintf(openingLine, sizeof(openingLine), "%s, %s.",
+             opener == 0 ? "I was thinking about us" :
+             (opener == 4 ? "I saved a thought for you" : "I notice how we know each other"), nickname);
+  else snprintf(openingLine, sizeof(openingLine), "%s", opening);
+
+  char reply[540];
+  snprintf(reply, sizeof(reply), "%s %s %s %s %s", openingLine, memory,
+           voice, baseReply, ending);
+  char text[640];
+  snprintf(text, sizeof(text), "%s\n%s", youLine ? youLine : "You listen.", reply);
+  char title[24];
+  snprintf(title, sizeof(title), "%s REMEMBERS", petName[0] ? petName : "TAMA");
+  growingTogether.showReadableMessage(title, text, "D1 close");
+  parentDialogue.recordDirectTalk(stage);
+  lastNarrativeInteractionAtMs = millis();
+}
+
+void dialoguePopup(const __FlashStringHelper* youLine,
+                   const __FlashStringHelper* petLine, byte talkTopic) {
+  // ESP32 flash strings are memory mapped and can be passed to the same
+  // scrollable viewer as generated, relationship-aware replies.
+  dialoguePopupText(reinterpret_cast<const char *>(youLine),
+                    reinterpret_cast<const char *>(petLine), talkTopic);
+}
+
+TamachibiMemoryContext makeTamachibiMemoryContext() {
+  TamachibiMemoryContext m{};
+  m.ownerNickname = reinterpret_cast<const char *>(ownerNickname());
+  m.lastTripName = lastTripEvent < 9
+      ? reinterpret_cast<const char *>(lifeWorld.locationName(lastTripEvent)) : nullptr;
+  m.favoriteGameName = reinterpret_cast<const char *>(gameName(favoriteGameId % 13));
+  memcpy(m.careTypes, careHistoryType, sizeof(m.careTypes));
+  memcpy(m.careDays, careHistoryDay, sizeof(m.careDays));
+  m.careHead = careHistoryHead;
+  m.careCount = careHistoryCount;
+  m.caredDayStreak = caredDayStreak;
+  m.missedCareDays = missedCareDays;
+  m.rescuedFromSickness = rescuedFromSickness;
+  m.ownerBond = ownerBond;
+  m.ownerTrust = ownerTrust;
+  m.lastFood = lastFood;
+  m.learnedFavoriteFood = learnedFavoriteFood;
+  m.learnedDislikedFood = learnedDislikedFood;
+  m.favoriteGivenFood = favoriteGivenFood;
+  m.favoriteGamePlays = gameCounts[favoriteGameId % 13];
+  m.lastTripEvent = lastTripEvent;
+  m.gardenCount = botany.gardenCount();
+  m.companionType = lifeWorld.companionType();
+  m.companionBond = lifeWorld.companionBond();
+  m.fishCount = aquarium.fishCount();
+  return m;
 }
 
 ParentDialogueContext makeParentDialogueContext() {
@@ -8966,6 +9134,7 @@ ParentDialogueContext makeParentDialogueContext() {
   c.partnerHarmony = deepLife.partnerHarmony(); c.familyMood = deepLife.familyMood();
   c.childCount = deepLife.childCount(); c.lowestChildBond = deepLife.lowestChildBond();
   c.siblingBond = deepLife.averageSiblingBond(); c.pendingCallType = pendingCallType;
+  c.memory = makeTamachibiMemoryContext();
   return c;
 }
 
@@ -8994,6 +9163,7 @@ GrowingTogetherContext makeGrowingTogetherContext() {
   c.responsibility = parentDialogue.responsibility(); c.resilience = parentDialogue.resilience(); c.honesty = parentDialogue.honesty();
   c.independence = parentDialogue.independence(); c.schoolConfidence = parentDialogue.schoolConfidence();
   c.socialConfidence = parentDialogue.socialConfidence(); c.attachmentSecurity = parentDialogue.attachmentSecurity();
+  c.memory = makeTamachibiMemoryContext();
   return c;
 }
 
@@ -9035,6 +9205,7 @@ void runGrowingTogetherCheckIn(bool manual) {
   GrowingTogetherOutcome outcome = growingTogether.runPending(context);
   applyGrowingTogetherOutcome(outcome);
   lastInputAt = millis(); oldL = HIGH; oldS = HIGH; oldR = HIGH;
+  lastNarrativeInteractionAtMs = lastInputAt;
 }
 
 void recordGrowingAction(uint8_t action) {
@@ -9074,6 +9245,7 @@ void runParentDialogueCheckIn(bool manual) {
   ParentDialogueOutcome outcome = parentDialogue.runPending(context);
   applyParentDialogueOutcome(outcome);
   lastInputAt = millis(); oldL = HIGH; oldS = HIGH; oldR = HIGH;
+  lastNarrativeInteractionAtMs = lastInputAt;
 }
 
 void talkActivity() {
@@ -9097,8 +9269,10 @@ void talkActivity() {
     display.setCursor(18, 0); display.print(F("Talk with ")); display.print(petName);
     drawRightScore(q + 1, TALK_COUNT);
     display.drawRoundRect(8, 18, 112, 30, 5, WHITE); display.setCursor(18, 28);
-    const bool babyTalk = stage == STAGE_BABY;
-    if (q == 0) display.print(parentDialogue.hasPending() || (!babyTalk && growingTogether.hasPending()) ? F("Answer waiting talk") : F("Parent check-in"));
+    const bool babyTalk = stage <= STAGE_BABY;
+    const bool eggTalk = stage == STAGE_EGG;
+    if (q == 0) display.print(eggTalk ? F("Talk to the egg") :
+        (parentDialogue.hasPending() || (!babyTalk && growingTogether.hasPending()) ? F("Answer waiting talk") : F("Parent check-in")));
     else if (q == 1) display.print(F("Say hello"));
     else if (q == 2) display.print(babyTalk ? F("Check baby's mood") : F("Ask mood"));
     else if (q == 3) display.print(babyTalk ? F("Show favorite things") : F("Ask likes"));
@@ -9119,48 +9293,91 @@ void talkActivity() {
   bool parentConversation = false;
   if (q == 0) {
     parentConversation = true;
-    if (stage == STAGE_BABY) runParentDialogueCheckIn(true);
+    if (stage == STAGE_EGG) dialoguePopup(F("You speak softly"), F("Your voice reaches me through the shell."), q);
+    else if (stage == STAGE_BABY) runParentDialogueCheckIn(true);
     else if (parentDialogue.hasPending()) runParentDialogueCheckIn(false);
     else if (growingTogether.hasPending()) runGrowingTogetherCheckIn(false);
     else runParentDialogueCheckIn(true);
   } else if (q == 1) {
-    if (ownerBond >= 70) popup(F("Pet calls you"), ownerNickname(), 700);
-    if (aquarium.hasFish() && random(0, 4) == 0) aquarium.showPetComment();
-    else dialoguePopup(F("You: hello!"), petMemoryLine());
+    dialoguePopup(F("You: hello!"), stage == STAGE_BABY ? F("Ba-ba! I know your voice.") : petDialogue(), q);
     addStat(happy, 1);
   } else if (q == 2) {
-    dialoguePopup(F("You: how feel?"), petMoodTreeLine());
+    dialoguePopup(F("You: how feel?"), petMoodTreeLine(), q);
   } else if (q == 3) {
-    popup(F("Likes"), favoriteThing(), 850); popup(F("Fav food"), favoriteFoodName(), 850); popup(F("Dislikes"), dislikedThing(), 850);
+    const char *likes = reinterpret_cast<const char *>(favoriteThing());
+    const char *dislikes = reinterpret_cast<const char *>(dislikedThing());
+    if (strncmp(likes, "likes ", 6) == 0) likes += 6;
+    if (strncmp(dislikes, "hates ", 6) == 0) dislikes += 6;
+    const uint8_t likedFood = learnedFavoriteFood < FOOD_COUNT ? learnedFavoriteFood :
+                              (favoriteGivenFood < FOOD_COUNT ? favoriteGivenFood : favoriteFoodType());
+    const uint8_t game = favoriteGameId % 13;
+    char reply[250];
+    if (stage == STAGE_BABY) {
+      snprintf(reply, sizeof(reply), "I like %s. I am still tasting different foods.", likes);
+    } else {
+      snprintf(reply, sizeof(reply), "Things I like: %s. Food that feels special is %s. I try to avoid %s. My favorite game is %s, and we have played it %u times.",
+               likes, tamachibiFoodMemoryName(likedFood), dislikes,
+               reinterpret_cast<const char *>(gameName(game)), gameCounts[game]);
+    }
+    dialoguePopupText("You ask what I like", reply, q);
   } else if (q == 4) {
-    dialoguePopup(F("You tell joke"), petJokeReply()); addStat(happy, 2); if (speciesPersonalityType() == 4) mischief++;
+    dialoguePopup(F("You tell joke"), petJokeReply(), q); addStat(happy, 2); if (speciesPersonalityType() == 4) mischief++;
   } else if (q == 5) {
-    dialoguePopup(F("You praise pet"), petPraiseReply()); addStat(happy, 2); addSkill(skillKind, 1); if (praiseCount < 255) praiseCount++; changeBond(1);
+    dialoguePopup(F("You praise pet"), petPraiseReply(), q); addStat(happy, 2); addSkill(skillKind, 1); if (praiseCount < 255) praiseCount++; changeBond(1);
   } else if (q == 6) {
-    if (stage == STAGE_BABY) dialoguePopup(F("You: sleepy dream?"), F("Mmm... warm light, you."));
-    else dialoguePopup(F("You: dream?"), petDreamLine());
+    if (stage == STAGE_BABY) dialoguePopup(F("You: sleepy dream?"), F("Mmm... warm light, you."), q);
+    else dialoguePopup(F("You: dream?"), petDreamLine(), q);
   } else if (q == 7) {
-    if (stage == STAGE_BABY) dialoguePopup(F("Peekaboo!"), F("Ba! There you are!"));
-    else if (ownerBond < 60) dialoguePopup(F("Secret?"), F("Maybe when we are closer."));
-    else { dialoguePopup(F("Secret?"), speciesSecretLine()); addSkill(skillSmart, 1); }
+    if (stage == STAGE_BABY) dialoguePopup(F("Peekaboo!"), F("Ba! There you are!"), q);
+    else if (ownerBond < 60) dialoguePopup(F("Secret?"), F("Maybe when we are closer."), q);
+    else { dialoguePopup(F("Secret?"), speciesSecretLine(), q); addSkill(skillSmart, 1); }
   } else if (q == 8) {
-    dialoguePopup(stage == STAGE_BABY ? F("You: gentle hands") : F("You give advice"), petAdviceReply());
+    dialoguePopup(stage == STAGE_BABY ? F("You: gentle hands") : F("You give advice"), petAdviceReply(), q);
     addStat(discipline, 1); if (mischief > 0) mischief--;
   } else if (q == 9) {
-    popup(stage == STAGE_BABY ? F("Baby temperament") : F("Personality"), personalityName(), 1000);
-    popup(F("Says"), stage == STAGE_BABY ? F("Ba-ba!" ) : petDialogue(), 1000);
+    const char *traits[8] = {
+      "I take my time and notice the quiet details.", "I want to see what is beyond the next corner.",
+      "I keep asking questions because the world is interesting.", "I feel best when we make time for each other.",
+      "I like the playful parts of life and the occasional harmless prank.", "I feel connected to slow mornings and growing things.",
+      "I notice when you remember what makes me happy.", "I like trying things on my own while knowing you are nearby."
+    };
+    char reply[240];
+    if (stage == STAGE_BABY) {
+      snprintf(reply, sizeof(reply), "I am a little %s. Ba-ba! I like when you are near.",
+               reinterpret_cast<const char *>(personalityName()));
+    } else {
+      snprintf(reply, sizeof(reply), "I am %s. %s One thing that feels very me is: %s",
+               reinterpret_cast<const char *>(personalityName()), traits[temperament % 8],
+               reinterpret_cast<const char *>(petDialogue()));
+    }
+    dialoguePopupText("You ask about my personality", reply, q);
   } else if (q == 10) {
     parentDialogue.runJournal(makeParentDialogueContext());
   } else if (q == 11) {
     parentConversation = true;
-    if (stage == STAGE_BABY) dialoguePopup(F("Growing Together"), F("Unlocks when baby becomes a child."));
+    if (stage <= STAGE_BABY) dialoguePopup(F("Growing Together"),
+        stage == STAGE_EGG ? F("I will have more stories after I hatch.") : F("Unlocks when baby becomes a child."), q);
     else {
       growingTogether.runHub(makeGrowingTogetherContext());
       if (growingTogether.hasPending()) runGrowingTogetherCheckIn(false);
     }
   } else {
-    if (stage == STAGE_BABY) dialoguePopup(F("You show the fish"), F("Bub-bub! Fish!"));
-    else aquarium.showPetComment();
+    if (stage <= STAGE_BABY) dialoguePopup(F("You show the fish"),
+        stage == STAGE_EGG ? F("I can hear the water move outside my shell.") : F("Bub-bub! Fish!"), q);
+    else if (!aquarium.hasFish()) dialoguePopup(F("You ask about the aquarium"), F("Maybe we will meet a fish together one day."), q);
+    else {
+      char reply[180];
+      const char *fish = aquarium.selectedFishName();
+      if (aquarium.needsCare())
+        snprintf(reply, sizeof(reply), "I have been watching %s. We have %u fish together, and the aquarium could use some care.", fish, aquarium.fishCount());
+      else if (aquarium.tankClean() >= 7)
+        snprintf(reply, sizeof(reply), "I like watching %s swim. We have %u fish, and the clean water makes our tank feel peaceful.", fish, aquarium.fishCount());
+      else
+        snprintf(reply, sizeof(reply), "%s was moving around when I checked. There are %u fish in our little aquarium.", fish, aquarium.fishCount());
+      dialoguePopupText("You ask about the aquarium", reply, q);
+      markRoutineAction(ROUTINE_TALK_AQ);
+      changeBond(1);
+    }
   }
 
   bool firstTalkToday = (dailyRoutineMask & ROUTINE_TALK) == 0;
@@ -11597,6 +11814,7 @@ void foodMenu() {
   }
 
   updateLearnedFoodPreferences(pick);
+  logCareEvent(10);
   bool learnedFavorite = (learnedFavoriteFood == pick && learnedDislikedFood != pick);
   if (pick == favoriteFoodType() || learnedFavorite) {
     favoriteGivenFood = pick;
@@ -11770,6 +11988,7 @@ void doClean() {
   addStat(happy, 1);
   if (conditionType == 3 && conditionSeverity <= 1) clearCondition();
   markRoutineAction(ROUTINE_CARE);
+  logCareEvent(12);
   recordGoalEvent(3, 1);
   changeTrust(1);
   clampAll();
@@ -11786,6 +12005,7 @@ void doLove() {
   addStat(happy, 3);
   addStat(discipline, 1);
   markRoutineAction(ROUTINE_TALK);
+  logCareEvent(13);
   changeBond(1);
   clampAll();
   popup(F("Hee hee!"), F("Bond up"));
@@ -12755,7 +12975,9 @@ void loop() {
   // Spontaneous parent-child conversations only open from the safe idle main
   // screen. They never interrupt a minigame, shop, city action, emergency,
   // urgent care call, sleep, or offline catch-up simulation.
-  if (!dead && !sleeping && !lightOff && !screenSleeping && !oledIsOff &&
+  const bool narrativeCooldownDone = lastNarrativeInteractionAtMs == 0 ||
+      now - lastNarrativeInteractionAtMs >= NARRATIVE_COOLDOWN_MS;
+  if (narrativeCooldownDone && !dead && !sleeping && !lightOff && !screenSleeping && !oledIsOff &&
       !rtcCatchUpMode && dialWorldView == VIEW_PET && pendingCallType == 0 &&
       !paradise.emergencyPending() && !anyButtonDown()) {
     GrowingTogetherContext growingContext = makeGrowingTogetherContext();

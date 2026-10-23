@@ -54,6 +54,24 @@ const char *const PROMISE_NAMES[] = {
   "Apology", "Hobby"
 };
 
+const char *const PERSONAL_RESPONSE_ACK[GT_ENDINGS_PER_FEATURE][3] = {
+  {"I will remember that you made room for me to speak.",
+   "Having a next step helps me feel steadier.",
+   "I heard your choice, but I still need time with this."},
+  {"I feel a little safer bringing this to you.",
+   "I want to try that plan and tell you how it goes.",
+   "That left a feeling I may need to bring up again."},
+  {"Your answer taught me something about our trust.",
+   "I can see one thing I can do next.",
+   "I need a quiet moment before I know what comes next."},
+  {"That made me feel understood in a way I can name.",
+   "The plan matters because we made it together.",
+   "I hope we can revisit this when it feels safer."},
+  {"I will carry your response into what I do next.",
+   "I understand the limit better now.",
+   "We have stopped talking, but the feeling is still here."}
+};
+
 // Age-specific openings keep a child from speaking like an adult professional.
 const char *const STAGE_TALK_LEADS[4][GT_LEADS_PER_FEATURE] = {
   {"Can I tell you?", "I need help.", "Something happened.", "Can we talk?", "Please listen."},
@@ -571,6 +589,9 @@ uint8_t GrowingTogetherSystem::featureWeight(uint8_t f, const GrowingTogetherCon
 }
 
 void GrowingTogetherSystem::selectFeature(const GrowingTogetherContext &ctx, bool manual) {
+  const uint8_t previousScenario = pendingScenario_;
+  const uint8_t previousLead = pendingLead_;
+  const uint8_t previousEnding = pendingEnding_;
   uint8_t pool[255];
   uint16_t count = 0;
   lastRejectedMask_ = 0;
@@ -600,10 +621,18 @@ void GrowingTogetherSystem::selectFeature(const GrowingTogetherContext &ctx, boo
                                      ? activeArcType_ : pendingFeature_;
   pendingScenario_ = selectScenarioForFeature(contentFeature, ctx);
   pendingLead_ = static_cast<uint8_t>(random(0, GT_LEADS_PER_FEATURE));
-  pendingEnding_ = 0;
+  pendingEnding_ = static_cast<uint8_t>(random(0, GT_ENDINGS_PER_FEATURE));
   pendingFlags_ = 0;
   if (pendingFeature_ == GT_MULTI_DAY_ARC && activeArcType_ < GT_FEATURE_COUNT) {
     pendingScenario_ = selectScenarioForFeature(activeArcType_, ctx);
+  }
+  // The resolved prompt's feature and its three wording choices are already
+  // saved in lastFeature_ and the retained pending fields. Never repeat that
+  // exact prompt root twice in a row, even when the weighted feature picker
+  // selects the same story again.
+  if (contentFeature == lastFeature_ && pendingScenario_ == previousScenario &&
+      pendingLead_ == previousLead && pendingEnding_ == previousEnding) {
+    pendingEnding_ = static_cast<uint8_t>((pendingEnding_ + 1U) % GT_ENDINGS_PER_FEATURE);
   }
 }
 
@@ -915,6 +944,14 @@ void GrowingTogetherSystem::buildPrompt(const GrowingTogetherContext &ctx,
           ? activeArcType_ : pendingFeature_;
   appendText(out, outSize, scenarioLineForContext(contentFeature, pendingScenario_, ctx));
   appendContextLine(ctx, pendingFeature_, out, outSize);
+  char memory[150];
+  buildTamachibiPersonalMemory(ctx.memory,
+      static_cast<uint8_t>((pendingEnding_ + pendingLead_ + pendingScenario_) % 8U),
+      lifetimeConversations_ + ctx.ageDays, memory, sizeof(memory));
+  appendText(out, outSize, "\n");
+  appendText(out, outSize, memory);
+  appendText(out, outSize, "\n");
+  appendText(out, outSize, GT_ENDINGS[pendingEnding_ % GT_ENDINGS_PER_FEATURE]);
   appendText(out, outSize, "\n");
   appendText(out, outSize, featureQuestion(contentFeature));
 }
@@ -1294,7 +1331,14 @@ GrowingTogetherOutcome GrowingTogetherSystem::runPending(const GrowingTogetherCo
   // Applying the underlying topic changes the real school/family/privacy/etc.
   // system; this separate step advances the four-day narrative itself.
   if (followUp) advanceArc(ctx, GT_MULTI_DAY_ARC, choice);
-  showScrollableText("YOUR TAMA REPLIES", resultLine(contentFeature, choice), "D1 close");
+  char rememberedDetail[150];
+  buildTamachibiPersonalMemory(ctx.memory,
+      static_cast<uint8_t>((pendingEnding_ + choice + contentFeature + 3U) % 8U),
+      lifetimeConversations_ + ctx.ageDays, rememberedDetail, sizeof(rememberedDetail));
+  char reply[360];
+  snprintf(reply, sizeof(reply), "%s\n%s %s", resultLine(contentFeature, choice),
+           rememberedDetail, PERSONAL_RESPONSE_ACK[pendingEnding_ % GT_ENDINGS_PER_FEATURE][choice % 3U]);
+  showScrollableText("YOUR TAMA REPLIES", reply, "D1 close");
   choice < 2 ? goodSound() : badSound();
 
   if (featureTalkCount_[contentFeature] < 65535) ++featureTalkCount_[contentFeature];
@@ -1406,7 +1450,7 @@ void GrowingTogetherSystem::showDebug(const GrowingTogetherContext &ctx) const {
   appendText(text, sizeof(text), ", family mood "); appendNumber(text, sizeof(text), ctx.familyMood);
   appendText(text, sizeof(text), ", garden health "); appendNumber(text, sizeof(text), ctx.gardenHealth);
   appendText(text, sizeof(text), ", companion bond "); appendNumber(text, sizeof(text), ctx.companionBond);
-  appendText(text, sizeof(text), ". Every feature bank has 12 scenario roots x 5 openings x 5 endings = 300 base prompts. Live context and multi-day state add more variations.");
+  appendText(text, sizeof(text), ". Each feature uses 12 scenario roots x 5 openings x 5 personal closers = 300 base prompts. Live care memories and story state add more variations.");
   showScrollableText("NARRATIVE DEBUG", text, "D1 close");
 }
 

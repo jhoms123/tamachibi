@@ -39,11 +39,11 @@ static const char *const GT_LEADS[GT_LEADS_PER_FEATURE] = {
 };
 
 static const char *const GT_ENDINGS[GT_ENDINGS_PER_FEATURE] = {
-  "What should we do?",
-  "Will you help me decide?",
-  "Can we handle it together?",
-  "How would you respond?",
-  "What do you think is fair?",
+  "I wanted to bring it to you before we choose.",
+  "Your view matters to me while I work this out.",
+  "I want us to decide in a way we can both understand.",
+  "I am trying to find an answer that feels fair.",
+  "It helps to talk this through with you.",
 };
 
 static const char *const GT_SCENARIOS[GT_FEATURE_COUNT][GT_SCENARIOS_PER_FEATURE] = {
