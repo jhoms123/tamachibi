@@ -9706,7 +9706,6 @@ void talkActivity() {
       char reply[250];
       aquarium.composeSelectedFishComment(reply, sizeof(reply));
       dialoguePopupText("You ask about the aquarium", reply, q);
-      markRoutineAction(ROUTINE_TALK_AQ);
       changeBond(1);
     }
   }
