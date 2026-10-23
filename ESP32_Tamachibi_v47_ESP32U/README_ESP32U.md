@@ -167,3 +167,20 @@ personality affinities and smaller repeat rewards when the same gesture is used
 over and over. Care history records the selected meal, medicine, and comfort
 choice, so later conversations can refer to what actually happened. These
 details use the existing eight-entry care history and preserve the save layout.
+
+## Town and neighbors
+
+Each of the eight residents has a distinct favorite way to spend time, preferred
+gift, outing, conversation topic, and temperament. Those preferences affect
+friendship gains and are revealed through repeat visits. Talk topics and gifts are
+chosen directly; playing together is a short three-round reaction game; and cafe,
+park, and neighborhood outings use a walk-together animation. Completing a
+resident's three friendship chapters earns a personal invitation to their favorite
+place. Adult pets can also date a close friend, with the existing partner and family
+systems tracking that relationship.
+
+Residents keep one saved shared-moment memory apiece, so a repeated activity gets a
+different response from a first visit. Their story page shows chapter progress,
+visit count, and invitations. The new three-byte neighbor-memory field uses padding
+in the existing 32-byte city save record; version 2 saves remain loadable and keep
+their relations and resident choices.

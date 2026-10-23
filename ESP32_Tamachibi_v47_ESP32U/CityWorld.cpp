@@ -1,11 +1,13 @@
 #include "CityWorld.h"
+#include "NeighborStories.h"
 #include "NativeUI.h"
 #include "PolishedScenes.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 extern byte happy, energy, health, ownerBond, ownerTrust, skillKind, skillStyle;
-extern byte stage, friendCount, partnerId, partnerBond, familyReady;
+extern byte stage, speciesType, temperament, friendCount, partnerId, partnerBond, familyReady;
 extern unsigned int coins;
 extern bool spendCoins(byte amount);
 extern void addStat(byte &value, byte amount);
@@ -27,6 +29,10 @@ extern void drawCurrentPetTiny(int x, int y);
 extern bool lifeResidentAvailable(byte resident, byte hour);
 extern const __FlashStringHelper* lifeResidentLocation(byte resident, byte hour);
 extern void lifeRecordNeighborInteraction(byte resident, byte interaction, byte relation);
+extern byte lifeResidentStoryChapter(byte resident);
+extern byte lifeResidentInteractionCount(byte resident);
+extern bool lifeResidentInvitePending(byte resident);
+extern void lifeSetResidentInvitePending(byte resident, bool pending);
 extern byte visualHour();
 
 namespace {
@@ -37,6 +43,119 @@ constexpr uint8_t ROUTINE_PLAY_CITY = 16;
 const uint8_t RESIDENT_SPECIES[CITY_RESIDENT_COUNT] = {
   2, 8, 19, 29, 42, 43, 48, 38
 };
+
+const char *residentVoice(uint8_t id, uint8_t variant) {
+  static const char *const VOICES[CITY_RESIDENT_COUNT][6] = {
+    {"I saved you a story.", "Look what I made.", "I kept our promise.",
+     "I thought of you today.", "I saved the coziest seat.", "I have a tiny surprise."},
+    {"The clouds made a wish.", "I found a star shape.", "Let's watch the sky.",
+     "The moon looked extra close.", "I named a new constellation.", "The evening felt magical."},
+    {"I have zoomies!", "Race you to the gate.", "I saved a game.",
+     "I nearly beat my record.", "I found a shortcut.", "My feet are ready to go."},
+    {"The garden feels calm.", "I noticed new leaves.", "I like quiet walks.",
+     "A bird visited this morning.", "The breeze smelled like rain.", "I found a sunny patch."},
+    {"I found a small clue.", "The map has a secret.", "Let's explore that.",
+     "I marked a new trail.", "Something glimmered by the path.", "I think there is more to find."},
+    {"I made up a tune.", "I drew us together.", "I have a new idea.",
+     "The chorus is almost ready.", "I saved you the blue crayon.", "I want to show you a sketch."},
+    {"Ready for a race?", "I practiced my jump.", "Let's take the long way.",
+     "I learned a new trick.", "Bet you can't catch me!", "I saved my fastest lap."},
+    {"I solved a puzzle.", "Can you spot the pattern?", "I have a bright plan.",
+     "I tested a clever shortcut.", "Two clues fit together now.", "I wrote down a new idea."}
+  };
+  return VOICES[id % CITY_RESIDENT_COUNT][variant % 6];
+}
+
+uint8_t replyIndex(uint8_t action) {
+  switch (action) {
+    case NeighborStories::CHAT: return 0;
+    case NeighborStories::PLAY: return 1;
+    case NeighborStories::GIFT: return 2;
+    case NeighborStories::OUTING: return 3;
+    default: return 4;
+  }
+}
+
+const char *actionReply(uint8_t action, uint8_t variant, bool favorite,
+                        bool repeated) {
+  if (repeated) {
+    static const char *const AGAIN[6] = {
+      "Our little ritual again!", "I always like this with you.", "Let's make a new memory.",
+      "We know this one by heart.", "Same cozy feeling, new day.", "Let's add a new twist next time."
+    };
+    return AGAIN[variant % 6];
+  }
+  if (favorite) {
+    static const char *const FAVORITE[5][6] = {
+      {"You picked my kind of chat.", "I could talk all day.", "You know what I love.",
+       "I was hoping we'd talk.", "That is my favorite subject.", "You always listen so well."},
+      {"This game is our thing!", "You make play feel easy.", "One more round together?",
+       "I saved a new challenge.", "We make a great team.", "You nearly got my record!"},
+      {"You remembered my favorite!", "This gift feels like me.", "I will keep it close.",
+       "You know me so well.", "This made my whole day.", "I have the perfect spot for it."},
+      {"My favorite place with you!", "I hoped we'd come here.", "This feels just right.",
+       "I could stay here awhile.", "Let's make this our place.", "I always feel happy here."},
+      {"I have been hoping you'd ask.", "I'm glad we're together.", "Let's make this official.",
+       "This feels like a new beginning.", "I want to choose you too.", "I am ready to share our days."}
+    };
+    return FAVORITE[replyIndex(action)][variant % 6];
+  }
+  static const char *const LINES[5][6] = {
+    {"Tell me about your day.", "I have a little story.", "What should we talk about?",
+     "I was saving this thought.", "Want to hear something funny?", "Let's catch up slowly."},
+    {"Ready when you are!", "Let's try a quick game.", "Show me your best move!",
+     "I made up a new round.", "Let's see how we do today.", "Your turn to pick the game."},
+    {"A surprise for me?", "You are thoughtful.", "I like little surprises.",
+     "I wonder what it could be.", "You did not have to, but thanks.", "Let's see what you brought."},
+    {"A change of scene sounds nice.", "Let's take the scenic way.", "We can explore together.",
+     "Which path should we take?", "I could use some fresh air.", "Let's find a new favorite spot."},
+    {"I like spending time with you.", "Let's see where this goes.", "I feel close to you.",
+     "You make today feel special.", "I would like to see you again.", "I am glad we found each other."}
+  };
+  return LINES[replyIndex(action)][variant % 6];
+}
+
+const char *memoryCallback(uint8_t memory, uint8_t currentMemory,
+                           uint8_t variant = 0) {
+  if (memory == 0) {
+    static const char *const NEW[3] = {
+      "A new memory starts.", "I will remember today.", "This is our first one."
+    };
+    return NEW[variant % 3];
+  }
+  if (memory == currentMemory) {
+    static const char *const SAME[6] = {
+      "We love doing this.", "I know this one by heart.", "This still feels special.",
+      "Our little tradition lives on.", "I like coming back to this.", "Same joy, another day."
+    };
+    return SAME[variant % 6];
+  }
+  switch (memory) {
+    case 1: return variant & 1 ? "I remember that chat." : "We talked for ages.";
+    case 2: return variant & 1 ? "I still think of our game." : "We laughed while we played.";
+    case 3: return variant & 1 ? "I kept your flower safe." : "Your flower brightened my room.";
+    case 4: return variant & 1 ? "I saved your little snack." : "We shared a tasty treat.";
+    case 5: return variant & 1 ? "Your charm is on my shelf." : "I keep your charm close.";
+    case 6: return variant & 1 ? "I remember our outing." : "That walk stayed with me.";
+    default: return variant & 1 ? "I remember our first date." : "That day changed everything.";
+  }
+}
+
+const char *chapterMoment(uint8_t chapter) {
+  switch (chapter) {
+    case 1: return "You made me feel welcome.";
+    case 2: return "We have our own thing now.";
+    default: return "You're one of my people!";
+  }
+}
+
+uint8_t actionFromPick(uint8_t pick) {
+  if (pick == 0) return NeighborStories::CHAT;
+  if (pick == 1) return NeighborStories::PLAY;
+  if (pick == 2) return NeighborStories::GIFT;
+  if (pick == 3) return NeighborStories::OUTING;
+  return NeighborStories::DATE;
+}
 
 }
 
@@ -55,6 +174,7 @@ void CityWorldSystem::reset() {
   selectedResident_ = 0;
   selectedHouseRoom_ = 0;
   selectedCityPlace_ = 0;
+  memset(neighborMemory_, 0, sizeof(neighborMemory_));
 }
 
 uint32_t CityWorldSystem::checksum(const CityWorldSave &save) const {
@@ -68,7 +188,8 @@ uint32_t CityWorldSystem::checksum(const CityWorldSave &save) const {
 }
 
 bool CityWorldSystem::valid(const CityWorldSave &save) const {
-  return save.magic == CITY_SAVE_MAGIC && save.version == CITY_SAVE_VERSION &&
+  return save.magic == CITY_SAVE_MAGIC &&
+         (save.version == 2 || save.version == CITY_SAVE_VERSION) &&
          save.checksum == checksum(save);
 }
 
@@ -82,6 +203,7 @@ void CityWorldSystem::fillSave(CityWorldSave &save) const {
   save.selectedResident = selectedResident_;
   save.selectedHouseRoom = selectedHouseRoom_;
   save.selectedCityPlace = selectedCityPlace_;
+  memcpy(save.neighborMemory, neighborMemory_, sizeof(neighborMemory_));
   save.checksum = checksum(save);
 }
 
@@ -95,6 +217,8 @@ void CityWorldSystem::applySave(const CityWorldSave &save) {
   selectedResident_ = save.selectedResident % CITY_RESIDENT_COUNT;
   selectedHouseRoom_ = save.selectedHouseRoom % HOUSE_ROOM_COUNT;
   selectedCityPlace_ = save.selectedCityPlace % CITY_PLACE_COUNT;
+  if (save.version >= 3) memcpy(neighborMemory_, save.neighborMemory, sizeof(neighborMemory_));
+  else memset(neighborMemory_, 0, sizeof(neighborMemory_));
 }
 
 bool CityWorldSystem::load() {
@@ -191,6 +315,15 @@ uint8_t CityWorldSystem::friendCountMet() const {
     if (metMask_ & (1U << i)) ++count;
   }
   return count;
+}
+
+uint8_t CityWorldSystem::lastNeighborMemory(uint8_t id) const {
+  return NeighborStories::readMemory(neighborMemory_, id);
+}
+
+void CityWorldSystem::rememberNeighbor(uint8_t id, uint8_t memory) {
+  NeighborStories::writeMemory(neighborMemory_, id, memory);
+  markSaveDirty();
 }
 
 void CityWorldSystem::drawResidentTiny(uint8_t id, int x, int y, bool wave) const {
@@ -322,12 +455,24 @@ void CityWorldSystem::drawRoomFurniture(uint8_t style) const {
   }
 }
 
-void CityWorldSystem::drawResidentRoom(uint8_t id,uint8_t frame,bool showFooter) const {
-  id%=CITY_RESIDENT_COUNT;NativeUI::Scope native(display_);display_.clearDisplay();NativeUI::header(display_,residentName(id),"VISIT");
-  NativeUI::room(display_,0,residentRoomStyle(id),visualHour(),frame);drawCurrentPetTiny(48,64);
-  NativeUI::pet(display_,72,78,residentSpecies(id),4,frame);
-  NativeUI::text(display_,"FRIENDSHIP",5,104,60);NativeUI::meter(display_,71,105,52,relation_[id],100);
-  if(showFooter)NativeUI::footer(display_,"PREV","TALK","NEXT");
+void CityWorldSystem::drawResidentRoom(uint8_t id, uint8_t frame, bool showFooter) const {
+  id %= CITY_RESIDENT_COUNT;
+  NativeUI::Scope native(display_);
+  display_.clearDisplay();
+  char context[16];
+  snprintf(context, sizeof(context), "STORY %u/3",
+           static_cast<unsigned>(lifeResidentStoryChapter(id)));
+  NativeUI::header(display_, residentName(id), context);
+  NativeUI::room(display_, 0, residentRoomStyle(id), visualHour(), frame);
+  drawCurrentPetTiny(48, 64 + ((frame & 1U) ? 1 : 0));
+  NativeUI::pet(display_, 72, 64 + ((frame & 1U) ? 1 : 0),
+                residentSpecies(id), 4, frame);
+  const uint8_t last = lastNeighborMemory(id);
+  const uint8_t nextMemory = NeighborStories::memoryCode(NeighborStories::CHAT);
+  NativeUI::text(display_, memoryCallback(last, nextMemory), 4, 91, 120);
+  NativeUI::text(display_, "FRIENDSHIP", 5, 104, 60);
+  NativeUI::meter(display_, 71, 105, 52, relation_[id], 100);
+  if (showFooter) NativeUI::footer(display_, "PREV", "VISIT", "NEXT");
 }
 
 void CityWorldSystem::changeRelation(uint8_t id, int amount) {
@@ -362,15 +507,430 @@ void CityWorldSystem::popup(const __FlashStringHelper *line1,
   delay(holdMs);
 }
 
+void CityWorldSystem::drawNeighborChoice(uint8_t id, uint8_t action,
+                                             uint8_t choice, uint8_t frame,
+                                             bool invited) const {
+  id %= CITY_RESIDENT_COUNT;
+  NativeUI::Scope native(display_);
+  display_.clearDisplay();
+  if (action == NeighborStories::OUTING) {
+    const uint8_t outing = invited ? NeighborStories::profile(id).favoriteOuting : choice;
+    NativeUI::header(display_, residentName(id), invited ? "INVITATION" : "OUTING");
+    NativeUI::town(display_, NeighborStories::outingCityPlace(outing), frame);
+    const int offset = frame % 5;
+    NativeUI::pet(display_, 25 + offset, 55, speciesType, stage, frame);
+    NativeUI::pet(display_, 82 - offset, 55, residentSpecies(id), 4, frame);
+  } else {
+    NativeUI::header(display_, residentName(id), "NEIGHBOR");
+    NativeUI::room(display_, 0, residentRoomStyle(id), visualHour(), frame);
+    NativeUI::pet(display_, 31, 59, speciesType, stage, frame);
+    NativeUI::pet(display_, 82, 59, residentSpecies(id), 4, frame);
+  }
+
+  const char *label = "";
+  const char *detail = "";
+  if (action == NeighborStories::CHAT) {
+    label = "TALK ABOUT...";
+    detail = NeighborStories::topicName(choice);
+  } else if (action == NeighborStories::PLAY) {
+    label = "PLAY TOGETHER";
+    detail = "Follow the light";
+  } else if (action == NeighborStories::GIFT) {
+    label = "A LITTLE SURPRISE";
+    detail = NeighborStories::giftName(choice);
+  } else if (action == NeighborStories::OUTING) {
+    label = invited ? "THEY SAVED YOU A PLACE" : "GO SOMEWHERE TOGETHER";
+    detail = NeighborStories::outingName(invited
+        ? NeighborStories::profile(id).favoriteOuting : choice);
+  } else {
+    label = partnerId == id ? "A DATE TOGETHER" : "ASK TO DATE";
+    detail = relation_[id] >= 80 ? "A home together is ready"
+                                 : "Grow your friendship first";
+  }
+
+  NativeUI::text(display_, label, 4, 91, 120);
+  NativeUI::text(display_, detail, 4, 102, 120);
+  if (action == NeighborStories::GIFT && relation_[id] >= 25) {
+    char favorite[22];
+    snprintf(favorite, sizeof(favorite), "LIKES: %s",
+             NeighborStories::giftName(NeighborStories::profile(id).favoriteGift));
+    NativeUI::text(display_, favorite, 4, 80, 120);
+  }
+  if (action != NeighborStories::OUTING || invited)
+    NativeUI::footer(display_, "PREV", "CHOOSE", "NEXT");
+  else
+    NativeUI::footer(display_, "PREV", "GO", "NEXT");
+  display_.display();
+}
+
+void CityWorldSystem::showNeighborMoment(uint8_t id, uint8_t action,
+                                         uint8_t choice, uint8_t previousMemory,
+                                         uint8_t visits, uint8_t chapterBefore,
+                                         uint8_t chapterAfter, bool favorite,
+                                         bool repeated) {
+  id %= CITY_RESIDENT_COUNT;
+  const uint8_t memory = NeighborStories::memoryCode(action, choice);
+  const uint8_t variant = static_cast<uint8_t>((
+      NeighborStories::responseVariant(
+          id, action, visits, visualHour(), temperament, relation_[id]) +
+      choice * 2U) % 6U);
+  const char *firstLine = chapterAfter > chapterBefore
+      ? chapterMoment(chapterAfter)
+      : actionReply(action, variant, favorite, repeated);
+  const char *secondLine = residentVoice(
+      id, static_cast<uint8_t>((variant + action + visits) % 6));
+  const char *thirdLine = lifeResidentInvitePending(id)
+      ? "They saved you an invite."
+      : memoryCallback(previousMemory, memory, variant);
+
+  NativeUI::Scope native(display_);
+  for (uint8_t frame = 0; frame < 6; ++frame) {
+    display_.clearDisplay();
+    NativeUI::header(display_, residentName(id), "MOMENT");
+    NativeUI::room(display_, 0, residentRoomStyle(id), visualHour(), frame);
+    const int petBob = (frame & 1U) ? 1 : 0;
+    NativeUI::pet(display_, 28, 61 + petBob, speciesType, stage, frame);
+    NativeUI::pet(display_, 82, 61 - petBob, residentSpecies(id), 4, frame);
+
+    if (action == NeighborStories::CHAT) {
+      display_.drawRoundRect(57, 30, 18, 11, 3, SSD1306_WHITE);
+      display_.drawPixel(61, 42, SSD1306_WHITE);
+      display_.drawPixel(60, 43, SSD1306_WHITE);
+    } else if (action == NeighborStories::PLAY) {
+      const int starX = 54 + static_cast<int>((frame * 9U) % 28U);
+      display_.drawLine(starX, 34, starX, 42, SSD1306_WHITE);
+      display_.drawLine(starX - 4, 38, starX + 4, 38, SSD1306_WHITE);
+    } else if (action == NeighborStories::GIFT) {
+      display_.drawRect(60, 34, 13, 11, SSD1306_WHITE);
+      display_.drawLine(66, 34, 66, 45, SSD1306_WHITE);
+      display_.drawLine(60, 38, 73, 38, SSD1306_WHITE);
+      display_.drawCircle(63, 32, 2, SSD1306_WHITE);
+      display_.drawCircle(69, 32, 2, SSD1306_WHITE);
+    } else if (action == NeighborStories::OUTING) {
+      display_.drawPixel(58 + frame * 2, 40, SSD1306_WHITE);
+      display_.drawPixel(70 + frame * 2, 44, SSD1306_WHITE);
+    } else {
+      display_.drawPixel(62, 34, SSD1306_WHITE);
+      display_.drawPixel(67, 34, SSD1306_WHITE);
+      display_.drawPixel(60, 36, SSD1306_WHITE);
+      display_.drawPixel(64, 36, SSD1306_WHITE);
+      display_.drawPixel(69, 36, SSD1306_WHITE);
+      display_.drawPixel(64, 39, SSD1306_WHITE);
+    }
+
+    NativeUI::text(display_, firstLine, 4, 89, 120);
+    NativeUI::text(display_, secondLine, 4, 101, 120);
+    NativeUI::text(display_, thirdLine, 4, 112, 120);
+    display_.display();
+    delay(70);
+  }
+}
+
+void CityWorldSystem::chooseNeighborChat() {
+  uint8_t topic = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    const bool l = digitalRead(btnL_), s = digitalRead(btnS_), r = digitalRead(btnR_);
+    if (oldL == HIGH && l == LOW) {
+      topic = topic == 0 ? NeighborStories::TOPIC_COUNT - 1 : topic - 1;
+      clickSound(); delay(90);
+    }
+    if (oldR == HIGH && r == LOW) {
+      topic = static_cast<uint8_t>((topic + 1) % NeighborStories::TOPIC_COUNT);
+      clickSound(); delay(90);
+    }
+    if (oldS == HIGH && s == LOW) {
+      waitButtonRelease();
+      break;
+    }
+    oldL = l; oldS = s; oldR = r;
+    drawNeighborChoice(selectedResident_, NeighborStories::CHAT, topic,
+                       static_cast<uint8_t>(millis() / 350UL));
+    delay(35);
+  }
+
+  const uint8_t id = selectedResident_;
+  const uint8_t visits = lifeResidentInteractionCount(id);
+  const uint8_t chapterBefore = lifeResidentStoryChapter(id);
+  const uint8_t previous = lastNeighborMemory(id);
+  const uint8_t memory = NeighborStories::memoryCode(NeighborStories::CHAT);
+  const bool favorite = topic == NeighborStories::profile(id).favoriteTopic ||
+      NeighborStories::favoriteAction(id, NeighborStories::CHAT);
+  const bool temperamentMatch =
+      temperament == NeighborStories::profile(id).favoriteTemperament;
+  const bool repeated = previous == memory;
+
+  changeRelation(id, NeighborStories::relationReward(2, favorite, temperamentMatch, repeated));
+  addStat(happy, favorite ? 2 : 1);
+  addSkill(skillKind, 1);
+  if (!repeated) changeBond(1);
+  markRoutineAction(ROUTINE_TALK_CITY);
+  lifeRecordNeighborInteraction(id, NeighborStories::chatRecord(topic), relation_[id]);
+  rememberNeighbor(id, memory);
+  clampAll();
+  showNeighborMoment(id, NeighborStories::CHAT, topic, previous, visits,
+                     chapterBefore, lifeResidentStoryChapter(id), favorite, repeated);
+}
+
+void CityWorldSystem::chooseNeighborGift() {
+  uint8_t gift = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    const bool l = digitalRead(btnL_), s = digitalRead(btnS_), r = digitalRead(btnR_);
+    if (oldL == HIGH && l == LOW) {
+      gift = gift == 0 ? NeighborStories::GIFT_COUNT - 1 : gift - 1;
+      clickSound(); delay(90);
+    }
+    if (oldR == HIGH && r == LOW) {
+      gift = static_cast<uint8_t>((gift + 1) % NeighborStories::GIFT_COUNT);
+      clickSound(); delay(90);
+    }
+    if (oldS == HIGH && s == LOW) {
+      waitButtonRelease();
+      break;
+    }
+    oldL = l; oldS = s; oldR = r;
+    drawNeighborChoice(selectedResident_, NeighborStories::GIFT, gift,
+                       static_cast<uint8_t>(millis() / 350UL));
+    delay(35);
+  }
+
+  if (!spendCoins(3)) {
+    badSound(); popup(F("Need 3 coins"), F("For a neighbor gift"));
+    return;
+  }
+  const uint8_t id = selectedResident_;
+  const uint8_t visits = lifeResidentInteractionCount(id);
+  const uint8_t chapterBefore = lifeResidentStoryChapter(id);
+  const uint8_t previous = lastNeighborMemory(id);
+  const uint8_t memory = NeighborStories::memoryCode(NeighborStories::GIFT, gift);
+  const bool favorite = NeighborStories::favoriteGift(id, gift);
+  const bool temperamentMatch =
+      temperament == NeighborStories::profile(id).favoriteTemperament;
+  const bool repeated = previous == memory;
+
+  changeRelation(id, NeighborStories::relationReward(
+      favorite ? 4 : 2, favorite, temperamentMatch, repeated));
+  addStat(happy, favorite ? 2 : 1);
+  addSkill(skillStyle, 1);
+  if (favorite) changeTrust(1);
+  if (!repeated) changeBond(1);
+  markSaveDirty();
+  lifeRecordNeighborInteraction(id, static_cast<uint8_t>(6 + gift), relation_[id]);
+  rememberNeighbor(id, memory);
+  clampAll();
+  goodSound();
+  showNeighborMoment(id, NeighborStories::GIFT, gift, previous, visits,
+                     chapterBefore, lifeResidentStoryChapter(id), favorite, repeated);
+}
+
+void CityWorldSystem::runNeighborPlay() {
+  if (energy == 0) {
+    badSound(); popup(F("Too tired to play"), F("Rest, then visit"));
+    return;
+  }
+  const uint8_t id = selectedResident_;
+  const uint8_t visits = lifeResidentInteractionCount(id);
+  const uint8_t chapterBefore = lifeResidentStoryChapter(id);
+  const uint8_t previous = lastNeighborMemory(id);
+  const uint8_t memory = NeighborStories::memoryCode(NeighborStories::PLAY);
+  uint8_t score = 0;
+  NativeUI::Scope native(display_);
+  waitButtonRelease();
+
+  for (uint8_t round = 0; round < 3; ++round) {
+    const uint8_t target = static_cast<uint8_t>(random(0, 3));
+    uint8_t answer = 255;
+    const unsigned long started = millis();
+    while (millis() - started < 1700UL) {
+      if (rightHoldExitCheck()) return;
+      display_.clearDisplay();
+      NativeUI::header(display_, residentName(id), "FOLLOW THE LIGHT");
+      NativeUI::room(display_, 0, residentRoomStyle(id), visualHour(), round);
+      NativeUI::pet(display_, 35, 60, speciesType, stage, round);
+      NativeUI::pet(display_, 82, 60, residentSpecies(id), 4, round);
+      const int x = target == 0 ? 27 : target == 1 ? 63 : 99;
+      display_.drawCircle(x, 39, 7, SSD1306_WHITE);
+      display_.drawPixel(x, 39, SSD1306_WHITE);
+      display_.setCursor(8, 91);
+      display_.print(target == 0 ? F("Tap LEFT")
+                    : target == 1 ? F("Tap SELECT") : F("Tap RIGHT"));
+      NativeUI::footer(display_, "LEFT", "SELECT", "RIGHT");
+      display_.display();
+
+      if (digitalRead(btnL_) == LOW) { answer = 0; break; }
+      if (digitalRead(btnS_) == LOW) { answer = 1; break; }
+      if (digitalRead(btnR_) == LOW) { answer = 2; break; }
+      delay(12);
+    }
+    waitButtonRelease();
+    if (answer == target) ++score;
+  }
+
+  subStat(energy, 1);
+  const bool favorite = NeighborStories::favoriteAction(id, NeighborStories::PLAY);
+  const bool temperamentMatch =
+      temperament == NeighborStories::profile(id).favoriteTemperament;
+  const bool repeated = previous == memory;
+  changeRelation(id, NeighborStories::relationReward(
+      static_cast<uint8_t>(1 + score), favorite, temperamentMatch, repeated));
+  if (score > 0) {
+    addStat(happy, score >= 2 ? 2 : 1);
+    addSkill(skillKind, 1);
+  }
+  if (score >= 2 && !repeated) changeBond(1);
+  markRoutineAction(ROUTINE_PLAY_CITY);
+  lifeRecordNeighborInteraction(id, NeighborStories::PLAY, relation_[id]);
+  rememberNeighbor(id, memory);
+  clampAll();
+  goodSound();
+  showNeighborMoment(id, NeighborStories::PLAY, score, previous, visits,
+                     chapterBefore, lifeResidentStoryChapter(id), favorite, repeated);
+}
+
+void CityWorldSystem::chooseNeighborOuting(bool invited) {
+  if (invited) {
+    runNeighborOuting(NeighborStories::profile(selectedResident_).favoriteOuting, true);
+    return;
+  }
+  uint8_t outing = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    const bool l = digitalRead(btnL_), s = digitalRead(btnS_), r = digitalRead(btnR_);
+    if (oldL == HIGH && l == LOW) {
+      outing = outing == 0 ? NeighborStories::OUTING_COUNT - 1 : outing - 1;
+      clickSound(); delay(90);
+    }
+    if (oldR == HIGH && r == LOW) {
+      outing = static_cast<uint8_t>((outing + 1) % NeighborStories::OUTING_COUNT);
+      clickSound(); delay(90);
+    }
+    if (oldS == HIGH && s == LOW) {
+      waitButtonRelease();
+      break;
+    }
+    oldL = l; oldS = s; oldR = r;
+    drawNeighborChoice(selectedResident_, NeighborStories::OUTING, outing,
+                       static_cast<uint8_t>(millis() / 350UL), false);
+    delay(35);
+  }
+  runNeighborOuting(outing, false);
+}
+
+void CityWorldSystem::runNeighborOuting(uint8_t outing, bool invited) {
+  if (energy < 2) {
+    badSound(); popup(F("Save some energy"), F("Your invite can wait"));
+    return;
+  }
+  const uint8_t id = selectedResident_;
+  const uint8_t visits = lifeResidentInteractionCount(id);
+  const uint8_t chapterBefore = lifeResidentStoryChapter(id);
+  const uint8_t previous = lastNeighborMemory(id);
+  const uint8_t memory = NeighborStories::memoryCode(NeighborStories::OUTING);
+  const bool favorite = invited || NeighborStories::favoriteOuting(id, outing) ||
+      NeighborStories::favoriteAction(id, NeighborStories::OUTING);
+  const bool temperamentMatch =
+      temperament == NeighborStories::profile(id).favoriteTemperament;
+  const bool repeated = previous == memory;
+
+  subStat(energy, 2);
+  addStat(happy, 2);
+  addSkill(skillKind, 1);
+  changeRelation(id, NeighborStories::relationReward(
+      3, favorite, temperamentMatch, repeated));
+  if (favorite) changeTrust(1);
+  if (!repeated) changeBond(1);
+
+  NativeUI::Scope native(display_);
+  for (uint8_t frame = 0; frame < 7; ++frame) {
+    display_.clearDisplay();
+    NativeUI::header(display_, residentName(id), NeighborStories::outingName(outing));
+    NativeUI::town(display_, NeighborStories::outingCityPlace(outing), frame);
+    const int step = frame < 4 ? frame * 4 : (7 - frame) * 4;
+    NativeUI::pet(display_, 23 + step, 56, speciesType, stage, frame);
+    NativeUI::pet(display_, 82 - step, 56, residentSpecies(id), 4, frame);
+    if (frame & 1U) {
+      display_.drawPixel(62, 34, SSD1306_WHITE);
+      display_.drawPixel(67, 40, SSD1306_WHITE);
+    } else {
+      display_.drawPixel(67, 34, SSD1306_WHITE);
+      display_.drawPixel(62, 40, SSD1306_WHITE);
+    }
+    NativeUI::text(display_, invited ? "A promised day out" : "Out with a friend",
+                   4, 99, 120);
+    NativeUI::footer(display_, "", "TOGETHER", "");
+    display_.display();
+    delay(85);
+  }
+
+  markRoutineAction(ROUTINE_PLAY_CITY);
+  lifeRecordNeighborInteraction(id, NeighborStories::outingRecord(outing), relation_[id]);
+  rememberNeighbor(id, memory);
+  if (invited) lifeSetResidentInvitePending(id, false);
+  clampAll();
+  goodSound();
+  showNeighborMoment(id, NeighborStories::OUTING, outing, previous, visits,
+                     chapterBefore, lifeResidentStoryChapter(id), favorite, repeated);
+}
+
+void CityWorldSystem::runNeighborDate() {
+  const uint8_t id = selectedResident_;
+  if (stage < STAGE_ADULT_CITY) {
+    badSound(); popup(F("Grow up first"), F("Dating starts as an adult"));
+    return;
+  }
+  if (relation_[id] < 60) {
+    badSound(); popup(F("Build your friendship"), F("Reach bond 60 first"));
+    return;
+  }
+  if (partnerId != 255 && partnerId != id) {
+    badSound(); popup(F("Partner already set"), F("Use Family menu"));
+    return;
+  }
+
+  const uint8_t visits = lifeResidentInteractionCount(id);
+  const uint8_t chapterBefore = lifeResidentStoryChapter(id);
+  const uint8_t previous = lastNeighborMemory(id);
+  const uint8_t memory = NeighborStories::memoryCode(NeighborStories::DATE);
+  const bool repeated = previous == memory;
+  const bool favorite = NeighborStories::favoriteAction(id, NeighborStories::DATE);
+  const bool temperamentMatch =
+      temperament == NeighborStories::profile(id).favoriteTemperament;
+
+  if (partnerId == 255) {
+    partnerId = id;
+    partnerBond = relation_[id];
+    familyReady = 0;
+  }
+  changeRelation(id, NeighborStories::relationReward(
+      3, favorite, temperamentMatch, repeated));
+  partnerBond = max(partnerBond, relation_[id]);
+  if (partnerBond >= 80) familyReady = 1;
+  if (!repeated) changeBond(1);
+  changeTrust(1);
+  markSaveDirty();
+  lifeRecordNeighborInteraction(id, NeighborStories::DATE, relation_[id]);
+  rememberNeighbor(id, memory);
+  clampAll();
+  goodSound();
+  showNeighborMoment(id, NeighborStories::DATE, 0, previous, visits,
+                     chapterBefore, lifeResidentStoryChapter(id), favorite, repeated);
+}
+
 void CityWorldSystem::residentInteractionMenu() {
   if (!lifeResidentAvailable(selectedResident_, visualHour())) {
     badSound();
     popup(F("Resident is away"), lifeResidentLocation(selectedResident_, visualHour()));
     return;
   }
-  constexpr uint8_t ACTION_COUNT = 4;
+  constexpr uint8_t ACTION_COUNT = 5;
   uint8_t pick = 0;
-  uint8_t frame = 0;
   bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
   waitButtonRelease();
 
@@ -390,69 +950,26 @@ void CityWorldSystem::residentInteractionMenu() {
     }
     if (oldS == HIGH && s == LOW) {
       waitButtonRelease();
-      if (pick == 0) {
-        changeRelation(selectedResident_, 3);
-        addStat(happy, 1); addSkill(skillKind, 1); changeBond(1);
-        markRoutineAction(ROUTINE_TALK_CITY);
-        goodSound(); popup(F("Nice conversation"), residentName(selectedResident_));
-        lifeRecordNeighborInteraction(selectedResident_, 0, relation_[selectedResident_]);
-      } else if (pick == 1) {
-        if (energy == 0) {
-          badSound(); popup(F("Too tired to play"), F("Rest first"));
-        } else {
-          subStat(energy, 1); addStat(happy, 2);
-          changeRelation(selectedResident_, 4); addSkill(skillKind, 1);
-          markRoutineAction(ROUTINE_PLAY_CITY);
-          goodSound(); popup(F("Played together"), residentName(selectedResident_));
-          lifeRecordNeighborInteraction(selectedResident_, 1, relation_[selectedResident_]);
-        }
-      } else if (pick == 2) {
-        if (!spendCoins(3)) {
-          badSound(); popup(F("Need 3 coins"), F("Work or sell items"));
-        } else {
-          changeRelation(selectedResident_, 7); addSkill(skillStyle, 1);
-          changeTrust(1); winSound(); popup(F("Gift delivered"), residentName(selectedResident_));
-          lifeRecordNeighborInteraction(selectedResident_, 2, relation_[selectedResident_]);
-        }
-      } else {
-        if (stage < STAGE_ADULT_CITY) {
-          badSound(); popup(F("Adult stage needed"), F("Visit as friends now"));
-        } else if (relation_[selectedResident_] < 60) {
-          badSound(); popup(F("Build relation first"), F("Reach at least 60"));
-        } else if (partnerId != 255 && partnerId != selectedResident_) {
-          badSound(); popup(F("Partner already set"), F("Use Family menu"));
-        } else {
-          partnerId = selectedResident_;
-          partnerBond = max(partnerBond, relation_[selectedResident_]);
-          if (partnerBond >= 80) {
-            familyReady = 1;
-            winSound(); popup(F("Married and moved in"), residentName(selectedResident_));
-          } else {
-            familyReady = 0;
-            goodSound(); popup(F("Now dating"), F("Reach bond 80"));
-          }
-          changeRelation(selectedResident_, 3);
-          lifeRecordNeighborInteraction(selectedResident_, 3, relation_[selectedResident_]);
-        }
-      }
-      clampAll();
-      markSaveDirty();
+      if (pick == 0) chooseNeighborChat();
+      else if (pick == 1) runNeighborPlay();
+      else if (pick == 2) chooseNeighborGift();
+      else if (pick == 3) chooseNeighborOuting(lifeResidentInvitePending(selectedResident_));
+      else runNeighborDate();
       return;
     }
-
     oldL = l; oldS = s; oldR = r;
-    drawResidentRoom(selectedResident_, frame++, false);
-    display_.fillRect(3,101,122,12,SSD1306_BLACK);
-    const char *label=pick==0?"CHAT":pick==1?"PLAY TOGETHER":pick==2?"GIVE GIFT $3":relation_[selectedResident_]>=80?"MARRY / MOVE IN":"DATE / PROPOSE";
-    NativeUI::text(display_,label,7,104,114);NativeUI::footer(display_,"PREV","CHOOSE","NEXT");
-    display_.display();
-    delay(70);
+
+    const uint8_t action = actionFromPick(pick);
+    drawNeighborChoice(selectedResident_, action, 0,
+                       static_cast<uint8_t>(millis() / 350UL),
+                       action == NeighborStories::OUTING &&
+                           lifeResidentInvitePending(selectedResident_));
+    delay(30);
   }
 }
 
 void CityWorldSystem::visitResidents() {
   bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
-  uint8_t frame = 0;
   waitButtonRelease();
 
   while (true) {
@@ -475,7 +992,7 @@ void CityWorldSystem::visitResidents() {
     }
     oldL = l; oldS = s; oldR = r;
 
-    drawResidentRoom(selectedResident_, frame++, true);
+    drawResidentRoom(selectedResident_, static_cast<uint8_t>(millis() / 350UL), true);
     if (!lifeResidentAvailable(selectedResident_, visualHour())) {
       display_.fillRoundRect(22, 18, 84, 23, 5, SSD1306_BLACK);
       display_.drawRoundRect(22, 18, 84, 23, 5, SSD1306_WHITE);

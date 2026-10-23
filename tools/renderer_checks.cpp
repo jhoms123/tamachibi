@@ -2,12 +2,45 @@
 #include "AquariumArt.h"
 #include "ConversationMemory.h"
 #include "GrowthSprites.h"
+#include "NeighborStories.h"
 #include "RosterSprites.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 uint32_t fixtureMillis = 100;
 int main() {
+  using namespace NeighborStories;
+  for (uint8_t resident = 0; resident < RESIDENT_COUNT; ++resident) {
+    const ResidentProfile &p = profile(resident);
+    assert(p.favoriteAction <= OUTING);
+    assert(p.favoriteGift < GIFT_COUNT);
+    assert(p.favoriteOuting < OUTING_COUNT);
+    assert(p.favoriteTopic < TOPIC_COUNT);
+    assert(actionFromRecord(chatRecord(p.favoriteTopic)) == CHAT);
+    assert(likesRecordedInteraction(resident, chatRecord(p.favoriteTopic)));
+    assert(likesRecordedInteraction(resident,
+                                    static_cast<uint8_t>(6 + p.favoriteGift)));
+    assert(likesRecordedInteraction(resident, outingRecord(p.favoriteOuting)));
+  }
+  assert(actionFromRecord(PLAY) == PLAY);
+  assert(actionFromRecord(DATE) == DATE);
+  assert(actionFromRecord(OUTING) == OUTING);
+  assert(giftFromRecord(8) == CHARM);
+  assert(outingFromRecord(14) == NEIGHBORHOOD_WALK);
+  assert(responseVariant(0, CHAT, 0, 0, 0, 0) < 6);
+  assert(responseVariant(7, OUTING, 120, 23, 6, 100) < 6);
+  uint8_t neighborMemories[3]{};
+  for (uint8_t resident = 0; resident < RESIDENT_COUNT; ++resident)
+    writeMemory(neighborMemories, resident, resident);
+  for (uint8_t resident = 0; resident < RESIDENT_COUNT; ++resident)
+    assert(readMemory(neighborMemories, resident) == resident);
+  assert(interactionCount(100) == 100);
+  const uint8_t invitedProgress = progressWithPendingInvite(7, true);
+  assert(invitePending(invitedProgress) && interactionCount(invitedProgress) == 7);
+  assert(invitePending(progressWithInvite(invitedProgress, 8)));
+  assert(interactionCount(progressWithInvite(invitedProgress, 8)) == 8);
+  assert(!invitePending(progressWithPendingInvite(invitedProgress, false)));
+
   TamachibiMemoryContext memories{};
   char remembered[200];
   memories.careCount = 1; memories.careHead = 1;

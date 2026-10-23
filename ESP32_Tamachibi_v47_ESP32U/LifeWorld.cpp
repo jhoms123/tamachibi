@@ -1,4 +1,5 @@
 #include "LifeWorld.h"
+#include "NeighborStories.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -282,14 +283,62 @@ void LifeWorldSystem::awardQuest(uint8_t resident, uint8_t qstage) {
 }
 
 void LifeWorldSystem::recordNeighborInteraction(uint8_t resident, uint8_t interaction, uint8_t relation) {
-  resident %= LIFE_RESIDENT_COUNT; favoriteNeighbor_ = resident; changeByte(extraSkills_[5], interaction == 0 ? 2 : 1); changeByte(traits_[1], 1);
-  uint8_t q = residentQuest_[resident]; bool complete = false;
-  if (q == 0 && interaction == 0 && relation >= 10) complete = true;
-  else if (q == 1 && interaction == 1 && relation >= 30) complete = true;
-  else if (q == 2 && interaction == 2 && relation >= 55) complete = true;
-  if (complete) { residentQuest_[resident] = q + 1; awardQuest(resident, q + 1); }
-  else if (residentQuestProgress_[resident] < 100) residentQuestProgress_[resident]++;
+  resident %= LIFE_RESIDENT_COUNT;
+  favoriteNeighbor_ = resident;
+  const uint8_t action = NeighborStories::actionFromRecord(interaction);
+  changeByte(extraSkills_[5], action == NeighborStories::CHAT ? 2 : 1);
+  changeByte(traits_[1], 1);
+
+  const uint8_t oldProgress = residentQuestProgress_[resident];
+  const uint8_t visits = NeighborStories::interactionCount(oldProgress);
+  residentQuestProgress_[resident] = NeighborStories::progressWithInvite(
+      oldProgress, visits < 127 ? static_cast<uint8_t>(visits + 1) : visits);
+
+  const uint8_t q = residentQuest_[resident];
+  const bool favoriteGift = action == NeighborStories::GIFT &&
+      NeighborStories::likesRecordedInteraction(resident, interaction);
+  bool complete = false;
+  if (q == 0 && action == NeighborStories::CHAT && relation >= 10) {
+    complete = true;
+  } else if (q == 1 && relation >= 30 &&
+             (action == NeighborStories::PLAY ||
+              NeighborStories::likesRecordedInteraction(resident, interaction))) {
+    complete = true;
+  } else if (q == 2 && action == NeighborStories::GIFT &&
+             relation >= (favoriteGift ? 55 : 70)) {
+    complete = true;
+  }
+
+  if (complete) {
+    residentQuest_[resident] = static_cast<uint8_t>(q + 1);
+    awardQuest(resident, q + 1);
+    if (q + 1 == 3) setNeighborInvitePending(resident, true);
+  }
   markSaveDirty();
+}
+
+uint8_t LifeWorldSystem::neighborStoryChapter(uint8_t resident) const {
+  return residentQuest_[resident % LIFE_RESIDENT_COUNT];
+}
+
+uint8_t LifeWorldSystem::neighborInteractionCount(uint8_t resident) const {
+  return NeighborStories::interactionCount(
+      residentQuestProgress_[resident % LIFE_RESIDENT_COUNT]);
+}
+
+bool LifeWorldSystem::neighborInvitePending(uint8_t resident) const {
+  return NeighborStories::invitePending(
+      residentQuestProgress_[resident % LIFE_RESIDENT_COUNT]);
+}
+
+void LifeWorldSystem::setNeighborInvitePending(uint8_t resident, bool pending) {
+  resident %= LIFE_RESIDENT_COUNT;
+  const uint8_t next = NeighborStories::progressWithPendingInvite(
+      residentQuestProgress_[resident], pending);
+  if (next != residentQuestProgress_[resident]) {
+    residentQuestProgress_[resident] = next;
+    markSaveDirty();
+  }
 }
 
 uint8_t LifeWorldSystem::calculateLocation(uint8_t st, uint8_t hour, bool weekday) const {
@@ -513,7 +562,50 @@ void LifeWorldSystem::skillsPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;wai
 
 void LifeWorldSystem::routinePage(){bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(os==HIGH&&s==LOW){routineFlags_=0;routineScore_=50;goodSound();popup(F("Routine refreshed"),F("Today starts clean"));markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("DAILY ROUTINE"),1,1);display_.setCursor(2,15);display_.print(F("Now: "));display_.print(locationName(currentLocation_));display_.setCursor(2,27);display_.print(F("Hour "));display_.print(visualHour());display_.print(F("  Score "));display_.print(routineScore_);display_.setCursor(2,39);display_.print(F("7/12/18 Kitchen"));display_.setCursor(2,49);display_.print(F("School/work by age"));display_.setCursor(2,58);display_.print(F("D1 reset today"));display_.display();delay(40);}}
 
-void LifeWorldSystem::residentQuestPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p? p-1:7;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%8;clickSound();delay(100);}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("NEIGHBOR STORY"),p+1,8);drawSprite16((p*7+2)%50,6,22);display_.setCursor(30,16);display_.print(RESIDENT_NAMES[p]);display_.setCursor(30,27);display_.print(F("At: "));display_.print(residentLocationName(p,visualHour()));display_.setCursor(30,38);display_.print(F("Chapter "));display_.print(residentQuest_[p]);display_.print(F("/3"));display_.setCursor(30,49);if(residentQuest_[p]==0)display_.print(F("Chat at relation 10"));else if(residentQuest_[p]==1)display_.print(F("Play at relation 30"));else if(residentQuest_[p]==2)display_.print(F("Gift at relation 55"));else display_.print(F("Story complete"));display_.display();delay(30);}}
+void LifeWorldSystem::residentQuestPage() {
+  uint8_t p = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    const bool l = digitalRead(btnL_), s = digitalRead(btnS_), r = digitalRead(btnR_);
+    if (oldL == HIGH && l == LOW) {
+      p = p ? p - 1 : LIFE_RESIDENT_COUNT - 1;
+      clickSound(); delay(100);
+    }
+    if (oldR == HIGH && r == LOW) {
+      p = static_cast<uint8_t>((p + 1) % LIFE_RESIDENT_COUNT);
+      clickSound(); delay(100);
+    }
+    oldL = l; oldS = s; oldR = r;
+
+    display_.clearDisplay();
+    drawHeader(F("NEIGHBOR STORY"), p + 1, LIFE_RESIDENT_COUNT);
+    drawSprite16((p * 7 + 2) % 50, 6, 22);
+    display_.setCursor(30, 16); display_.print(RESIDENT_NAMES[p]);
+    display_.setCursor(30, 27); display_.print(F("At: "));
+    display_.print(residentLocationName(p, visualHour()));
+    display_.setCursor(30, 38); display_.print(F("Chapter "));
+    display_.print(residentQuest_[p]); display_.print(F("/3  Visits "));
+    display_.print(neighborInteractionCount(p));
+    display_.setCursor(4, 52);
+    if (neighborInvitePending(p)) {
+      display_.print(F("They saved you an invite"));
+    } else if (residentQuest_[p] == 0) {
+      display_.print(F("Start with a little chat"));
+    } else if (residentQuest_[p] == 1) {
+      display_.print(F("Try their favorite: "));
+      display_.print(NeighborStories::actionName(
+          NeighborStories::chapterAction(p)));
+    } else if (residentQuest_[p] == 2) {
+      display_.print(F("Favorite gift, or bond 70"));
+    } else {
+      display_.print(F("A close friend for life"));
+    }
+    display_.display();
+    delay(30);
+  }
+}
 
 void LifeWorldSystem::gameTalentPage(){uint8_t g=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){g=g?g-1:12;clickSound();delay(100);}if(orr==HIGH&&r==LOW){g=(g+1)%13;clickSound();delay(100);}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("GAME TALENTS"),g+1,13);drawHubIcon(4,6,18);display_.setCursor(43,18);display_.print(F("Game "));display_.print(g+1);display_.setCursor(43,30);display_.print(F("Assist +"));display_.print(gameAssist(g));display_.setCursor(43,42);display_.print(F("Practice skill "));static const uint8_t m[13]={4,5,7,7,4,6,7,4,7,4,4,0,7};display_.print(extraSkills_[m[g]]);display_.setCursor(2,56);display_.print(F("High skill widens rewards"));display_.display();delay(30);}}
 

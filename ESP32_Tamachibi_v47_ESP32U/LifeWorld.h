@@ -99,6 +99,10 @@ public:
   void recordAction(uint8_t action, uint32_t day, uint8_t hour, uint8_t weather);
   void recordGameResult(uint8_t gameId, bool won);
   void recordNeighborInteraction(uint8_t resident, uint8_t interaction, uint8_t relation);
+  uint8_t neighborStoryChapter(uint8_t resident) const;
+  uint8_t neighborInteractionCount(uint8_t resident) const;
+  bool neighborInvitePending(uint8_t resident) const;
+  void setNeighborInvitePending(uint8_t resident, bool pending);
   void recordMemory(uint8_t type, uint32_t day, uint8_t value = 0);
   void tick(uint32_t day, uint8_t hour, uint8_t stage, uint8_t weather, bool weekday);
 

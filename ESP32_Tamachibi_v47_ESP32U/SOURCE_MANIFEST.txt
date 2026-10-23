@@ -7,6 +7,7 @@ Botany.cpp
 Botany.h
 CityWorld.cpp
 CityWorld.h
+NeighborStories.h
 ConversationMemory.h
 DeepLife.cpp
 DeepLife.h

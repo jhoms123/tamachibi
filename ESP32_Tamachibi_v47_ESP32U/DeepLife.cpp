@@ -1,4 +1,5 @@
 #include "DeepLife.h"
+#include "NeighborStories.h"
 #include "LifeWorld.h"
 #include "Botany.h"
 #include "DeepLifeDialogueData.h"
@@ -855,7 +856,8 @@ void DeepLifeSystem::recordGameResult(uint8_t gameId, bool won, uint8_t score) {
 
 void DeepLifeSystem::recordNeighborInteraction(uint8_t resident, uint8_t interaction, uint8_t relation) {
   if (resident == rivalPersonality_ % 8) {
-    changeByte(rivalBond_, interaction == 0 ? 3 : 1);
+    changeByte(rivalBond_, NeighborStories::actionFromRecord(interaction) ==
+                               NeighborStories::CHAT ? 3 : 1);
     changeByte(rivalRespect_, relation >= 50 ? 2 : 1);
   }
   if (groupId_ < 8) { changeByte(groupLevel_, 1, 9); if (groupMeetings_ < 255) ++groupMeetings_; }

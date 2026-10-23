@@ -22,6 +22,7 @@
 #include "Aquarium.h"
 #include "Botany.h"
 #include "CityWorld.h"
+#include "NeighborStories.h"
 #include "PolishedScenes.h"
 #include "VisualOverhaul.h"
 #include "NeedsDisplay.h"
@@ -1103,6 +1104,10 @@ void openSaveProfiles();
 bool lifeResidentAvailable(byte resident, byte hour);
 const __FlashStringHelper* lifeResidentLocation(byte resident, byte hour);
 void lifeRecordNeighborInteraction(byte resident, byte interaction, byte relation);
+byte lifeResidentStoryChapter(byte resident);
+byte lifeResidentInteractionCount(byte resident);
+bool lifeResidentInvitePending(byte resident);
+void lifeSetResidentInvitePending(byte resident, bool pending);
 void developerCommit(bool saveNow = false);
 bool developerEditNumber(const __FlashStringHelper *title, long &value, long minimum, long maximum, long step);
 void developerApplyStage(byte newStage);
@@ -13189,7 +13194,15 @@ const __FlashStringHelper* lifeResidentLocation(byte resident, byte hour) { retu
 void lifeRecordNeighborInteraction(byte resident, byte interaction, byte relation) {
   lifeWorld.recordNeighborInteraction(resident, interaction, relation);
   deepLife.recordNeighborInteraction(resident, interaction, relation);
-  parentDialogue.recordSocialResult(relation >= 45 || interaction == 0);
+  parentDialogue.recordSocialResult(
+      relation >= 45 || NeighborStories::actionFromRecord(interaction) ==
+                            NeighborStories::CHAT);
+}
+byte lifeResidentStoryChapter(byte resident) { return lifeWorld.neighborStoryChapter(resident); }
+byte lifeResidentInteractionCount(byte resident) { return lifeWorld.neighborInteractionCount(resident); }
+bool lifeResidentInvitePending(byte resident) { return lifeWorld.neighborInvitePending(resident); }
+void lifeSetResidentInvitePending(byte resident, bool pending) {
+  lifeWorld.setNeighborInvitePending(resident, pending);
 }
 
 uint8_t detectMainOledAddress() {
