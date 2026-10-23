@@ -104,5 +104,6 @@ The evolution approach follows the care based branching pattern in the
 [1996 Tamagotchi character list](https://tamagotchi.fandom.com/wiki/Tamagotchi_(1996_Pet)/Character_list#Generation_1_2).
 All Tamachibi sprite designs in this project are original.
 
-[View the evolution lineup](../docs/evolution/Tamachibi_Evolution_Tree.png) and
+[View the evolution lineup](../docs/evolution/Tamachibi_Evolution_Tree.png),
+[walking preview](../docs/evolution/Tamachibi_Walking_Preview.gif), and
 [animated family features](../docs/evolution/Tamachibi_Part_Animation.gif).

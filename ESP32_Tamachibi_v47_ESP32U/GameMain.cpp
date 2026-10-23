@@ -5095,6 +5095,8 @@ void drawSquarePet() {
   char clock[8];snprintf(clock,sizeof(clock),"%02u:%02u",visualHour(),clockMinute());
   NativeUI::header(display,petName,clock,needsCare()||sick);
   NativeUI::room(display,0,roomStyle,visualHour(),anim);
+  // Draw partner/children first; the current Tamachibi is the foreground subject.
+  if(!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
   if(dead){
     display.fillRoundRect(51,54,26,31,8,BLACK);display.drawRoundRect(51,54,26,31,8,WHITE);
     display.drawLine(64,60,64,75,WHITE);display.drawLine(58,65,70,65,WHITE);
@@ -5119,7 +5121,6 @@ void drawSquarePet() {
     }
     if(poop>0){display.drawCircle(85,88,2,WHITE);display.drawLine(82,90,89,90,WHITE);}
   }
-  if(!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
   const char *notice=dead?"GOODNIGHT":petAway?"AWAY":isScheduledAwayTime()?"AT SCHOOL / WORK":
     sick?"NEEDS MEDICINE":full<=2?"HUNGRY":clean<=2||poop>0?"CLEAN UP":happy<=2?"LET'S PLAY":nullptr;
   if(notice){display.fillRoundRect(10,101,108,10,2,WHITE);NativeUI::text(display,notice,16,103,96,BLACK);}
