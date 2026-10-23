@@ -1,4 +1,5 @@
 #include "Aquarium.h"
+#include "GameplayActions.h"
 #include "NativeUI.h"
 #include "AquariumArt.h"
 #include <stddef.h>
@@ -862,12 +863,13 @@ void AquariumSystem::feedFish() {
         const uint8_t fedBit = static_cast<uint8_t>(1U << selectedSlot_);
         const bool firstMeal = (firstFedMask_ & fedBit) == 0;
         firstFedMask_ |= fedBit;
+        completeGameplayAction(M_AQUARIUM);
         --foodStock_;
         hunger_[selectedSlot_] = boundedAdd(hunger_[selectedSlot_], 4);
         const uint8_t personality = personalitySeed_[selectedSlot_] & 3U;
         if (food == fishFavoriteFood(selectedSlot_)) {
           mood_[selectedSlot_] = boundedAdd(mood_[selectedSlot_], 2);
-          friendship_[selectedSlot_] = boundedAdd(friendship_[selectedSlot_], 3, 100);
+          friendship_[selectedSlot_] = boundedAdd(friendship_[selectedSlot_], naturalActivity() == M_AQUARIUM ? 4 : 3, 100);
           if (firstMeal) {
             setMemory(selectedSlot_, AQUA_MEMORY_FIRST_MEAL);
             if (favoriteMemory_[selectedSlot_] == AQUA_MEMORY_NONE)
@@ -930,6 +932,7 @@ void AquariumSystem::cleanTankAction() {
     display_.display();
     delay(90);
   }
+  completeGameplayAction(M_AQUARIUM);
   tankClean_ = 10;
   waterQuality_ = 10;
   for (uint8_t i = 0; i < AQUARIUM_FISH_SLOTS; ++i) if (slotOccupied(i)) mood_[i] = boundedAdd(mood_[i], 1);
@@ -1146,6 +1149,7 @@ void AquariumSystem::treatFish() {
   selectedSlot_ = slotOccupied(selectedSlot_) ? selectedSlot_ : nextOccupiedSlot(0, 1);
   if (health_[selectedSlot_] >= 9) { showTextPopup(names_[selectedSlot_], "already feels well"); return; }
   if (remedyStock_ == 0) { showFlashPopup(F("No fish remedy"), F("Buy supplies")); return; }
+  completeGameplayAction(M_AQUARIUM);
   --remedyStock_;
   health_[selectedSlot_] = boundedAdd(health_[selectedSlot_], 5);
   mood_[selectedSlot_] = boundedAdd(mood_[selectedSlot_], 2);
@@ -1240,6 +1244,7 @@ void AquariumSystem::playBubbles() {
   }
 
   if (attempts > 0) {
+    completeGameplayAction(M_AQUARIUM);
     const uint8_t reward = catches ? catches : 1;
     mood_[selectedSlot_] = boundedAdd(mood_[selectedSlot_], reward);
     friendship_[selectedSlot_] = boundedAdd(friendship_[selectedSlot_], catches ? reward * 2U : 1U, 100);
@@ -1553,4 +1558,9 @@ void AquariumSystem::runMenu() {
     display_.display();
     delay(25);
   }
+}
+
+void AquariumSystem::recordFishingCatch(uint8_t quality) {
+  foodStock_ = boundedAdd(foodStock_, static_cast<uint8_t>(1 + quality / 5), 99);
+  markSaveDirty();
 }

@@ -76,6 +76,7 @@ public:
 
   uint16_t researchPoints() const { return researchPoints_; }
   void addResearch(uint16_t amount);
+  bool spendResearch(uint16_t amount);
 
 private:
   Esp32EEPROMStorage<ParadiseSave> storeA_;

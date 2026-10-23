@@ -53,6 +53,7 @@ public:
   uint8_t friendCountMet() const;
 
   void visitResidents();
+  void recordPartnerMoment(uint8_t amount);
   void drawResidentTiny(uint8_t id, int x, int y, bool wave = false) const;
   void drawPartnerAtHome(uint8_t id, int x, int y, bool wave = false) const;
   bool partnerLivesAtHome(uint8_t id, uint8_t bond) const;

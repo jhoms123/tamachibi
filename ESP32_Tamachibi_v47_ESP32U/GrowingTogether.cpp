@@ -1,4 +1,5 @@
 #include "GrowingTogether.h"
+#include "GameplayProgress.h"
 #include <cstring>
 #include <cstdio>
 #include <cstddef>
@@ -12,6 +13,9 @@ extern void markSaveDirty();
 extern unsigned long lastInputAt;
 
 namespace {
+GameplayProgress &growingActions() { static GameplayProgress ledger; return ledger; }
+GameplayProgress &growingDays() { static GameplayProgress ledger; return ledger; }
+
 constexpr int clampInt(const int value, const int minimum, const int maximum) {
   return value < minimum ? minimum : (value > maximum ? maximum : value);
 }
@@ -146,6 +150,7 @@ GrowingTogetherSystem::GrowingTogetherSystem(size_t storageBase,
 }
 
 void GrowingTogetherSystem::reset() {
+  growingActions().reset(); growingDays().reset();
   sequence_ = 0;
   nextPromptTick_ = 0;
   lastPromptTick_ = 0;
@@ -317,6 +322,8 @@ void GrowingTogetherSystem::fillSave(GrowingTogetherSave &s) const {
 }
 
 void GrowingTogetherSystem::applySave(const GrowingTogetherSave &s) {
+  growingActions().reset();
+  growingDays().reset();
   sequence_ = s.sequence;
   nextPromptTick_ = s.nextPromptTick;
   lastPromptTick_ = s.lastPromptTick;
@@ -420,6 +427,8 @@ void GrowingTogetherSystem::changeByte(uint8_t &value, int delta, uint8_t maximu
 }
 
 void GrowingTogetherSystem::startGeneration(const GrowingTogetherContext &ctx) {
+  growingActions().reset();
+  growingDays().reset();
   generationConversations_ = 0;
   pendingFeature_ = 255;
   dailyDay_ = ctx.ageDays;
@@ -712,7 +721,7 @@ void GrowingTogetherSystem::tick(const GrowingTogetherContext &ctx, bool catchUp
   }
   if (dailyDay_ != ctx.ageDays) {
     if (dailyDay_ != 65535) {
-      choreMissedMask_ |= static_cast<uint16_t>(choreAssignedMask_ & ~choreDoneMask_);
+      choreMissedMask_ = static_cast<uint16_t>(choreAssignedMask_ & ~choreDoneMask_);
       if (choreMissedMask_) changeByte(choreFairness_, -1);
     }
     dailyDay_ = ctx.ageDays;
@@ -767,7 +776,7 @@ uint8_t GrowingTogetherSystem::promiseCount() const {
 }
 
 void GrowingTogetherSystem::recordAction(uint8_t action, const GrowingTogetherContext &ctx) {
-  action %= 14;
+  if (action >= 14 || !growingActions().claim(action, ctx.ageTicks, ctx.generation)) return;
   for (uint8_t i = 0; i < GT_PROMISE_SLOTS; ++i) {
     if (promiseStatus_[i] == 1 && promiseType_[i] == action && ctx.ageDays <= promiseDueDay_[i]) {
       promiseStatus_[i] = 2;
@@ -778,12 +787,17 @@ void GrowingTogetherSystem::recordAction(uint8_t action, const GrowingTogetherCo
   }
   if (action == GTA_BED) {
     const uint8_t ritual = static_cast<uint8_t>((ctx.ageDays + ctx.temperament) % GT_RITUAL_COUNT);
-    changeByte(ritualStreak_[ritual], 1, 99);
+    if (growingDays().claim(ritual, ctx.ageDays, ctx.generation))
+      changeByte(ritualStreak_[ritual], 1, 99);
     if (ritualStreak_[ritual] >= 3) traditionMask_ |= (1U << (ritual % GT_TRADITION_COUNT));
   }
-  if (action == GTA_GARDEN || action == GTA_COMPANION || action == GTA_CLEAN || action == GTA_CARE) {
-    choreDoneMask_ |= choreAssignedMask_;
-  }
+  // Chore slots correspond to clean, garden, companion, food, study,
+  // family, creative, and general care. Only the matching job is completed.
+  const uint8_t chore = action == GTA_CLEAN ? 0 : action == GTA_GARDEN ? 1 :
+      action == GTA_COMPANION ? 2 : action == GTA_COOK ? 3 :
+      action == GTA_SCHOOL ? 4 : action == GTA_FAMILY ? 5 :
+      action == GTA_HOBBY ? 6 : action == GTA_CARE ? 7 : 255;
+  if (chore < 8) choreDoneMask_ |= choreAssignedMask_ & (1U << chore);
   if (action == GTA_PLAY || action == GTA_GARDEN || action == GTA_COOK ||
       action == GTA_EXPLORE || action == GTA_COMPANION ||
       action == GTA_HOBBY) {
@@ -798,7 +812,8 @@ void GrowingTogetherSystem::recordAction(uint8_t action, const GrowingTogetherCo
     changeByte(hobbyBond_[hobby], 2);
     if (hobbyBond_[hobby] >= 12) {
       traditionMask_ |= (1U << (hobby % GT_TRADITION_COUNT));
-      changeByte(traditionStreak_[hobby % GT_TRADITION_COUNT], 1, 99);
+      if (growingDays().claim(16 + hobby, ctx.ageDays, ctx.generation))
+        changeByte(traditionStreak_[hobby % GT_TRADITION_COUNT], 1, 99);
     }
   }
   if (action == GTA_SCHOOL) {

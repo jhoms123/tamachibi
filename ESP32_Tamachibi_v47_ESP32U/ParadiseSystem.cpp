@@ -211,3 +211,9 @@ uint8_t ParadiseSystem::visitedDestinationCount() const {
 void ParadiseSystem::addResearch(uint16_t amount) {
   { const uint32_t total = static_cast<uint32_t>(researchPoints_) + amount; researchPoints_ = total > 9999U ? 9999U : static_cast<uint16_t>(total); }
 }
+
+bool ParadiseSystem::spendResearch(uint16_t amount) {
+  if (researchPoints_ < amount) return false;
+  researchPoints_ -= amount;
+  return true;
+}

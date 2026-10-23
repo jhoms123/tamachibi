@@ -69,6 +69,7 @@ public:
   void saveNow();
   void tick(bool catchUpMode);
   void runMenu();
+  void recordFishingCatch(uint8_t quality);
   void drawSmallIcon(int x, int y, bool inverse = false);
   void showPetComment();
 

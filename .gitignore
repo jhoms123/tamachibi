@@ -1,3 +1,7 @@
 core
 __pycache__/
 *.pyc
+
+# PlatformIO build products and temporary Arduino conversion files
+.pio/
+*.ino.cpp

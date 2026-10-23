@@ -57,6 +57,7 @@ public:
   bool gardenReady() const;
   bool needsCare() const;
   bool hasIndoorPlants() const;
+  bool indoorNeedsTending() const;
   uint8_t gardenCount() const;
   uint8_t indoorCount() const;
   uint8_t gardenMatureCount() const;

@@ -33,6 +33,8 @@
 #include "GrowingTogether.h"
 #include "SaveProfiles.h"
 #include "MusicPlayer.h"
+#include "GameplayActions.h"
+#include "GameplayProgress.h"
 
 #define OLED_W 128
 #define OLED_H 128
@@ -110,44 +112,7 @@ const byte AQUARIUM_MENU_COUNT = 10;
 #define BATTERY_DIVIDER_TOP_K 220UL
 #define BATTERY_DIVIDER_BOTTOM_K 100UL
 
-#define M_FOOD  0
-#define M_LIGHT 1
-#define M_GAME  2
-#define M_MED   3
-#define M_CLEAN 4
-#define M_LOVE  5
-#define M_CALL  6
-#define M_WALK  7
-#define M_TRAIN 8
-#define M_STUDY 9
-#define M_GARDEN 10
-#define M_MUSIC 11
-#define M_STATS 12
-#define M_SHOP 13
-#define M_TOY 14
-#define M_EXPLORE 15
-#define M_COOK 16
-#define M_JOB 17
-#define M_ROOM 18
-#define M_TALK 19
-#define M_SETTINGS 20
-#define M_ALBUM 21
-#define M_SITTER 22
-#define M_NEW_EGG 23
-#define M_BOOK 24
-#define M_CRAFT 25
-#define M_HABITAT 26
-#define M_EVENT 27
-#define M_FAMILY 28
-#define M_INSPECT 29
-#define M_HISTORY 30
-#define M_DIAG 31
-#define M_DIARY 32
-#define M_AQUARIUM 33
-#define M_PLANTROOM 34
-#define M_PARADISE 35
-#define M_LIFE 36
-#define M_PLAYER 37
+// Gameplay action IDs are shared with location systems.
 #define MENU_COUNT 38
 
 #define FOOD_BERRY 0
@@ -267,6 +232,10 @@ byte favoriteGameId = 0;
 byte dislikedGameId = 1;
 byte activeGameId = 255;
 unsigned long activeGameStartedAt = 0;
+bool activeGameResolved = false;
+bool activeGameWon = false;
+byte activeGameScore = 0;
+GameplayProgress gameplayProgress;
 unsigned long lastGameBondTick = 0;
 byte featuredPlayedMask = 0;
 unsigned long featuredDay = 0;
@@ -1535,8 +1504,9 @@ void applyMedicine(byte medId) {
   bool boughtDose = false;
 
   if (*stock == 0) {
-    if (coins >= MEDICINE_PRICE) {
-      spendCoins(MEDICINE_PRICE);
+    const byte price = MEDICINE_PRICE - lifeWorld.projectLevel(2);
+    if (coins >= price) {
+      spendCoins(price);
       *stock = 1;
       boughtDose = true;
     } else {
@@ -1590,6 +1560,7 @@ void applyMedicine(byte medId) {
 
   recovered = wasSick && conditionType == 0 && !sick;
   if (correct) {
+    completeGameplayAction(M_MED);
     markRoutineAction(ROUTINE_CARE);
     recordGoalEvent(0, 1);
     changeTrust(2);
@@ -1850,6 +1821,7 @@ void fillSaveData(SaveData &d) {
 }
 
 void applySaveData(const SaveData &d) {
+  gameplayProgress.reset();
   saveSequence = d.sequence;
   menu = d.menu; mainCategory = d.mainCategory % CATEGORY_COUNT;
   eggType = d.eggType; geneA = d.geneA; geneB = d.geneB; geneC = d.geneC;
@@ -1993,6 +1965,10 @@ byte petLineage() {
   return eggType % TAMACHIBI_FAMILY_COUNT;
 }
 
+uint8_t naturalActivity() {
+  return GameplayProgress::interest(petLineage(), temperament, birthCode);
+}
+
 byte currentEvolutionPath() {
   return (idleStyle & 0x80U) ? 1 : 0;
 }
@@ -2120,10 +2096,9 @@ void markRoutineAction(byte routineBit) {
     if (routineBit == ROUTINE_TALK) lastTalkTick = ageTicks;
     markSaveDirty();
   }
-  if (routineBit == ROUTINE_CARE) recordGrowingAction(GTA_CARE);
-  else if (routineBit == ROUTINE_TALK || routineBit == ROUTINE_GREET) recordGrowingAction(GTA_TALK);
-  else if (routineBit == ROUTINE_PLAY) recordGrowingAction(GTA_PLAY);
-  else if (routineBit == ROUTINE_BED) recordGrowingAction(GTA_BED);
+  // Routine flags describe the day; completed activities own narrative credit.
+  if (routineBit == ROUTINE_BED && gameplayProgress.claimRoutine(routineBit, ageTicks, generation))
+    recordGrowingAction(GTA_BED);
 }
 
 void finishRoutineDay() {
@@ -2680,8 +2655,12 @@ void updateGrowthStage() {
   if (stage == STAGE_TEEN) lockTeenEvolutionPath();
   if (stage == STAGE_ADULT) {
     speciesType = deepLife.applySecretEvolution(chooseAdultEvolution());
-    favoriteGameId = (byte)((speciesType + temperament * 3) % 13);
-    dislikedGameId = (byte)((favoriteGameId + 6) % 13);
+    bool learnedGame = false;
+    for (byte i = 0; i < 13; ++i) if (gameCounts[i] >= 4) learnedGame = true;
+    if (!learnedGame) {
+      favoriteGameId = (byte)((speciesType + temperament * 3) % 13);
+      dislikedGameId = (byte)((favoriteGameId + 6) % 13);
+    }
     discoverSpecies(speciesType);
   }
   stageCareMistakes = 0;
@@ -3466,7 +3445,7 @@ void drawIcon(byte id, int x, int y, bool inv) {
   else if (id == M_COOK) drawCookIcon(x, y, inv);
   else if (id == M_JOB) drawJobIcon(x, y, inv);
   else if (id == M_ROOM) drawRoomIcon(x, y, inv);
-  else if (id == M_TALK || id == M_FAMILY || id == M_DIARY) drawTalkIcon(x, y, inv);
+  else if (id == M_TALK || id == M_FAMILY || id == M_DIARY || id == M_NEIGHBORS) drawTalkIcon(x, y, inv);
   else if (id == M_AQUARIUM) drawAquariumIcon(x, y, inv);
   else if (id == M_PLANTROOM) drawPlantRoomIcon(x, y, inv);
   else if (id == M_CRAFT) drawCookIcon(x, y, inv);
@@ -4218,6 +4197,7 @@ void drawBigMenuEmoji(byte id, int x, int y, bool inv) {
 
 
 const __FlashStringHelper* menuShortTitle(byte id) {
+  if (id == M_NEIGHBORS) return F("TOWN");
   if (id == M_FOOD) return F("FOOD");
   if (id == M_LIGHT) return sleeping ? F("SLEEP") : F("BED");
   if (id == M_GAME) return F("GAME");
@@ -4250,6 +4230,7 @@ const __FlashStringHelper* menuShortTitle(byte id) {
 }
 
 const __FlashStringHelper* menuTitle(byte id) {
+  if (id == M_NEIGHBORS) return F("Neighbors");
   if (id == M_FOOD) return F("Food");
   if (id == M_LIGHT) return sleeping ? F("Sleeping") : F("Bedtime");
   if (id == M_GAME) return F("Games");
@@ -4291,6 +4272,7 @@ const __FlashStringHelper* menuTitle(byte id) {
 }
 
 const __FlashStringHelper* menuDescription(byte id) {
+  if (id == M_NEIGHBORS) return F("Friendship and dates");
   if (id == M_FOOD) return F("Meals/snack");
   if (id == M_LIGHT) return F("Sleep time");
   if (id == M_GAME) return F("All games");
@@ -4336,7 +4318,7 @@ const __FlashStringHelper* menuUnlockShort(byte action) {
   if (action == M_GAME) return F("NEEDS BABY");
   if (action == M_WALK || action == M_TRAIN || action == M_MUSIC ||
       action == M_TOY || action == M_GARDEN || action == M_PLANTROOM ||
-      action == M_AQUARIUM) return F("NEEDS CHILD");
+      action == M_AQUARIUM || action == M_NEIGHBORS) return F("NEEDS CHILD");
   if (action == M_JOB) return F("NEEDS ADULT");
   return F("NEEDS TEEN");
 }
@@ -5798,7 +5780,15 @@ void drawMiniPet() {
 }
 
 
+void resolveArcadeSession(byte score, byte goal) {
+  if (activeGameId >= 13) return;
+  activeGameResolved = true;
+  activeGameWon = score >= goal;
+  activeGameScore = score;
+}
+
 void showGameResult(byte score, byte goal) {
+  if (!activeGameResolved) resolveArcadeSession(score, goal);
   byte shown = score;
   if (shown > goal) shown = goal;
 
@@ -5845,10 +5835,7 @@ void rewardGameScore(byte score, byte goal, bool smartGame, bool fitGame) {
   // Fun games usually do not drain energy.
   if (random(0, 4) == 0) subStat(energy, 1);
 
-  if (activeGameId < 13) {
-    lifeWorld.recordGameResult(activeGameId, score >= adjustedGoal);
-    deepLife.recordGameResult(activeGameId, score >= adjustedGoal, score);
-  }
+  resolveArcadeSession(score, adjustedGoal);
   clampAll();
 }
 
@@ -6156,6 +6143,7 @@ void numberGame() {
     }
   }
 
+  resolveArcadeSession(won ? 1 : 0, 1);
   display.clearDisplay();
   display.drawRoundRect(13, 17, 102, 31, 5, WHITE);
   display.setTextSize(1);
@@ -7497,7 +7485,8 @@ void slidePuzzleGame() {
   if (random(0, 4) == 0) subStat(energy, 1);
 
   clampAll();
-  showGameResult(matches, mistakes);
+  resolveArcadeSession(matches, 6);
+  showGameResult(matches, 6);
   waitButtonRelease();
 }
 
@@ -7540,8 +7529,11 @@ int featuredGameSlot(byte gameId) {
 }
 
 void finishGameSession(byte gameId) {
-  unsigned long playedMs = millis() - activeGameStartedAt;
-  if (playedMs < 2500UL) return; // prevents opening/closing a game to grind rewards
+  if (gameId >= 13 || !GameplayProgress::finishedGame(activeGameResolved)) return;
+  activeGameResolved = false; // consume the result exactly once
+  completeGameplayAction(M_GAME);
+  lifeWorld.recordGameResult(gameId, activeGameWon);
+  deepLife.recordGameResult(gameId, activeGameWon, activeGameScore);
 
   if (gameCounts[gameId] < 255) gameCounts[gameId]++;
   logCareEvent(14);
@@ -7584,6 +7576,9 @@ void showGameIntro(byte gameId);
 void launchGame(byte gameId) {
   showGameIntro(gameId);
   activeGameId = gameId;
+  activeGameResolved = false;
+  activeGameWon = false;
+  activeGameScore = 0;
   activeGameStartedAt = millis();
   if (gameId == 0) starCatchGame();
   else if (gameId == 1) rpsGame();
@@ -7808,7 +7803,7 @@ void stageRoutineReward(byte lifeStage, byte gameId, byte score, byte goal) {
 
   markRoutineAction(ROUTINE_PLAY);
   recordGoalEvent(2, 1);
-  recordGrowingAction(GTA_PLAY);
+  completeGameplayAction(M_GAME);
   clampAll();
   markSaveDirty();
   showGameResult(score, goal);
@@ -8368,6 +8363,7 @@ void walkGame() {
     display.display();
   }
 
+  completeGameplayAction(M_WALK);
   addStat(happy, score > 8 ? 8 : score);
   addStat(health, score > 18 ? 2 : 0);
   if (score > 25 || random(0, 2) == 0) subStat(energy, 1);
@@ -8474,6 +8470,8 @@ void trainGame() {
     roundNo++;
   }
 
+  completeGameplayAction(M_TRAIN);
+  if (score > 0 && naturalActivity() == M_TRAIN) addSkill(skillFit, 1);
   trainStars += score;
   addSkill(skillFit, score);
 
@@ -8573,6 +8571,8 @@ void studyGame() {
     correct++;
     popup(F("Used our study plan"), F("Calm focus bonus +1"), 650);
   }
+  completeGameplayAction(M_STUDY);
+  if (correct > 0 && lifeWorld.projectLevel(0) > 0) addSkill(skillSmart, lifeWorld.projectLevel(0));
   studyStars += correct;
   addSkill(skillSmart, correct);
   addCoins(correct);
@@ -8811,6 +8811,8 @@ void musicGame() {
     display.display();
   }
 
+  completeGameplayAction(M_MUSIC);
+  if (score > 0 && naturalActivity() == M_MUSIC) addSkill(skillStyle, 1);
   musicStars += score;
   addSkill(skillStyle, score);
   addStat(happy, score > 7 ? 7 : score);
@@ -8873,8 +8875,8 @@ void shopClothes() {
         const byte saleDay = (byte)(petAgeDays() % 30UL) + 1;
         if (saleDay == 10 || saleDay == 20 || saleDay == 30) cost = max((byte)1, (byte)((cost + 1) / 2));
         if (!spendCoins(cost)) { badSound(); popup(F("Need coins"), F("Work or explore"), 750); }
-        else { outfitOwned |= (1UL << pick); outfit = pick; goodSound(); addSkill(skillStyle, 1); changeBond(1); popup(F("Hat purchased!"), outfitName(pick), 800); break; }
-      } else { outfit = pick; goodSound(); popup(F("Hat equipped"), outfitName(pick), 700); break; }
+        else { outfitOwned |= (1UL << pick); outfit = pick; completeGameplayAction(M_SHOP); goodSound(); addSkill(skillStyle, 1); changeBond(1); popup(F("Hat purchased!"), outfitName(pick), 800); break; }
+      } else { if (outfit != pick) completeGameplayAction(M_SHOP); outfit = pick; goodSound(); popup(F("Hat equipped"), outfitName(pick), 700); break; }
       waitButtonRelease();
     }
     ol = l; os = s; orr = r;
@@ -8944,6 +8946,7 @@ void toyActivity() {
     else { display.drawCircle(x,y,4,WHITE); display.drawLine(x,y+4,x,y+10,WHITE); }
     display.display(); delay(95);
   }
+  if (!completeGameplayAction(M_TOY)) { popup(F("Already played together"), F("Try another activity")); return; }
   if (pick==0) { addStat(happy,2); addSkill(skillFit,2); }
   else if (pick==1) { addStat(happy,3); addSkill(skillStyle,2); }
   else if (pick==2) { addStat(happy,1); addSkill(skillSmart,2); addStat(discipline,1); }
@@ -9037,7 +9040,8 @@ void exploreTrip() {
   else if (loc == 2 || loc == 7) addSkill(skillKind, 1);
   else if (loc == 4 || loc == 8) addSkill(skillSmart, 1);
   else if (loc == 6) addSkill(skillFit, 1);
-  addStat(happy, 1); subStat(energy, 2); subStat(full, 1);
+  addStat(happy, 1); subStat(energy, lifeWorld.projectLevel(1) >= 2 ? 1 : 2); subStat(full, 1);
+  completeGameplayAction(M_EXPLORE);
   lastTripEvent = loc; logCareEvent(15); markRoutineAction(ROUTINE_PLAY); recordGoalEvent(5, 1); changeBond(1);
   clampAll(); goodSound(); markSaveDirty();
 }
@@ -9120,6 +9124,8 @@ void cookActivity() {
   }
 
   addMeal(pick);
+  if (naturalActivity() == M_COOK) addSkill(skillKind, 1);
+  completeGameplayAction(M_COOK);
   cookedMeals++;
   addSkill(skillStyle, 1);
   if (pick == 1) addSkill(skillKind, 1);       // soup is care-focused
@@ -9152,9 +9158,10 @@ void roomActivity() {
     if (ol == HIGH && l == LOW) { pick = (pick == 0) ? ROOM_STYLE_COUNT - 1 : pick - 1; clickSound(); delay(120); }
     if (orr == HIGH && r == LOW) { pick++; if (pick >= ROOM_STYLE_COUNT) pick = 0; clickSound(); delay(120); }
     if (os == HIGH && s == LOW) {
+      if (pick == roomStyle) { popup(F("This is already home"), roomName(pick)); return; }
       byte cost = roomCost(pick);
       if (!(roomOwned & (1UL << pick)) && !spendCoins(cost)) { badSound(); popup(F("Need coins"), F("Work first")); waitButtonRelease(); }
-      else { roomOwned |= (1UL << pick); roomStyle = pick; goodSound(); addStat(happy, 1); changeBond(1); popup(F("Room changed"), roomName(pick), 750); break; }
+      else { roomOwned |= (1UL << pick); roomStyle = pick; goodSound(); if (completeGameplayAction(M_ROOM)) { addStat(happy, 1); changeBond(1); } popup(F("Room changed"), roomName(pick), 750); break; }
     }
     ol = l; os = s; orr = r;
     display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
@@ -9539,6 +9546,7 @@ GrowingTogetherContext makeGrowingTogetherContext() {
 
 void applyGrowingTogetherOutcome(const GrowingTogetherOutcome &o) {
   if (!o.resolved && !o.postponed) return;
+  if (o.resolved) completeGameplayAction(M_TALK);
   changeBond(o.bond); changeTrust(o.trust);
   if (o.happy > 0) addStat(happy, static_cast<byte>(o.happy));
   else if (o.happy < 0) subStat(happy, static_cast<byte>(-o.happy));
@@ -9569,6 +9577,7 @@ void applyGrowingTogetherOutcome(const GrowingTogetherOutcome &o) {
 }
 
 void runGrowingTogetherCheckIn(bool manual) {
+  if (sitterTicksRemaining > 0 || petAway || sleeping) return;
   GrowingTogetherContext context = makeGrowingTogetherContext();
   if (manual) growingTogether.scheduleManual(context);
   if (!growingTogether.hasPending()) return;
@@ -9593,6 +9602,7 @@ void applyParentDialogueOutcome(const ParentDialogueOutcome &o) {
   if (o.kindness > 0) addSkill(skillKind, static_cast<byte>(o.kindness));
   if (o.mischief != 0) mischief = static_cast<byte>(constrain(static_cast<int>(mischief) + o.mischief, 0, 20));
   if (o.dismissed) { clampAll(); markSaveDirty(); return; }
+  completeGameplayAction(M_TALK);
   if (lifeWorld.hasCompanion() && (o.companionBond || o.companionMood || o.companionEnergy)) {
     lifeWorld.eventAdjustCompanion(o.companionBond, o.companionMood, o.companionEnergy, o.companionBond > 0 ? 2 : 0);
   }
@@ -9609,6 +9619,7 @@ void applyParentDialogueOutcome(const ParentDialogueOutcome &o) {
 }
 
 void runParentDialogueCheckIn(bool manual) {
+  if (sitterTicksRemaining > 0 || petAway || sleeping) return;
   ParentDialogueContext context = makeParentDialogueContext();
   if (manual) parentDialogue.scheduleManual(context);
   if (!parentDialogue.hasPending()) return;
@@ -9745,6 +9756,7 @@ void talkActivity() {
 
   bool firstTalkToday = (dailyRoutineMask & ROUTINE_TALK) == 0;
   lastTalkChoice = q;
+  completeGameplayAction(M_TALK);
   markRoutineAction(ROUTINE_GREET); markRoutineAction(ROUTINE_TALK);
   rewardBirthdayIfRemembered(); recordGoalEvent(1, 1);
   if (!parentConversation) {
@@ -9770,8 +9782,8 @@ void statusPage() {
     const bool l = digitalRead(BTN_L);
     const bool sBtn = digitalRead(BTN_S);
     const bool r = digitalRead(BTN_R);
-    if (oldLeft == HIGH && l == LOW) { page = page == 0 ? 6 : page - 1; clickSound(); delay(100); }
-    if (oldRight == HIGH && r == LOW) { page = (page + 1) % 7; clickSound(); delay(100); }
+    if (oldLeft == HIGH && l == LOW) { page = page == 0 ? 7 : page - 1; clickSound(); delay(100); }
+    if (oldRight == HIGH && r == LOW) { page = (page + 1) % 8; clickSound(); delay(100); }
     if (oldSel == HIGH && sBtn == LOW) break;
     oldLeft = l; oldSel = sBtn; oldRight = r;
 
@@ -9780,7 +9792,7 @@ void statusPage() {
     display.setTextSize(1);
     display.setTextColor(WHITE);
     V46UI::drawHeader(display, F("STATUS"), visualHour(), clockMinute(), false, 0);
-    display.setCursor(105, 10); display.print(page + 1); display.print(F("/7"));
+    display.setCursor(105, 10); display.print(page + 1); display.print(F("/8"));
 
     if (page == 0) {
       const byte values[5] = {health, full, energy, happy, clean};
@@ -9833,7 +9845,7 @@ void statusPage() {
       display.print((dailyRoutineMask & ROUTINE_TALK) ? 'T' : '-');
       display.print((dailyRoutineMask & ROUTINE_PLAY) ? 'P' : '-');
       display.setCursor(88, 12); display.print(F("St")); display.print(caredDayStreak);
-      display.setCursor(0, 23); display.print(F("Care days")); display.setCursor(72, 23); display.print(countCareWeekBits(weeklyCareBits)); display.print(F("/7"));
+      display.setCursor(0, 23); display.print(F("Care days")); display.setCursor(72, 23); display.print(countCareWeekBits(weeklyCareBits)); display.print(F("/8"));
       display.setCursor(0, 34); display.print(F("Daily goal")); display.setCursor(72, 34); display.print(dailyGoalProgress); display.print(F("/")); display.print(dailyGoalTarget);
       display.setCursor(0, 45); display.print(F("Weekly goal")); display.setCursor(72, 45); display.print(weeklyGoalProgress); display.print(F("/")); display.print(weeklyGoalTarget);
       display.setCursor(0, 56); display.print(F("Good day: 4 of 5 care"));
@@ -9854,6 +9866,12 @@ void statusPage() {
       else if (stage == STAGE_TEEN) display.print(F("adult day 6"));
       else if (stage == STAGE_ADULT) display.print(F("elder day 20"));
       else display.print(F("legacy"));
+    } else if (page == 7) {
+      display.setCursor(2, 12); display.print(temperamentName());
+      display.setCursor(2, 24); display.print(F("Natural talent:"));
+      display.setCursor(2, 35); display.print(menuTitle(naturalActivity()));
+      display.setCursor(2, 47); display.print(F("Practice earns more."));
+      display.setCursor(2, 57); display.print(F("Likes grow with care."));
     } else {
       display.setCursor(2, 12); display.print(weekdayName(clockWeekday())); display.print(' '); drawClock12Hour(visualHour(), clockMinute());
       display.setCursor(70, 12); display.print(scheduledPlaceName());
@@ -9873,7 +9891,7 @@ byte categoryActionCount(byte category) {
   if (category == 0) return 2;
   if (category == 1) return 5;
   if (category == 2) return 6;
-  if (category == 3) return 3;
+  if (category == 3) return 4;
   if (category == 4) return 13;
   return 7;
 }
@@ -9882,13 +9900,13 @@ byte categoryActionAt(byte category, byte index) {
   static const byte foodActions[2] = {M_FOOD, M_COOK};
   static const byte careActions[5] = {M_LIGHT, M_MED, M_CLEAN, M_LOVE, M_CALL};
   static const byte playActions[6] = {M_GAME, M_WALK, M_TRAIN, M_MUSIC, M_TOY, M_PLAYER};
-  static const byte talkActions[3] = {M_TALK, M_DIARY, M_FAMILY};
+  static const byte talkActions[4] = {M_TALK, M_DIARY, M_NEIGHBORS, M_FAMILY};
   static const byte activityActions[13] = {M_LIFE, M_PARADISE, M_STUDY, M_GARDEN, M_PLANTROOM, M_AQUARIUM, M_JOB, M_EXPLORE, M_CRAFT, M_HABITAT, M_EVENT, M_SHOP, M_ROOM};
   static const byte statusActions[7] = {M_STATS, M_INSPECT, M_BOOK, M_HISTORY, M_SETTINGS, M_ALBUM, M_SITTER};
   if (category == 0) return foodActions[index % 2];
   if (category == 1) return careActions[index % 5];
   if (category == 2) return playActions[index % 6];
-  if (category == 3) return talkActions[index % 3];
+  if (category == 3) return talkActions[index % 4];
   if (category == 4) return activityActions[index % 13];
   return statusActions[index % 7];
 }
@@ -9896,6 +9914,7 @@ byte categoryActionAt(byte category, byte index) {
 bool actionUnlocked(byte action) {
   if (action == M_PLAYER || action == M_LIGHT || action == M_TALK || action == M_STATS || action == M_SETTINGS || action == M_ALBUM || action == M_SITTER || action == M_BOOK || action == M_INSPECT || action == M_HISTORY || action == M_DIARY || action == M_PARADISE || action == M_LIFE) return true;
   if (stage == STAGE_EGG) return false;
+  if (action == M_NEIGHBORS) return stage >= STAGE_CHILD;
   if (action == M_FOOD || action == M_MED || action == M_CLEAN || action == M_LOVE || action == M_CALL) return true;
   if (stage >= STAGE_BABY && action == M_GAME) return true;
   if (stage >= STAGE_CHILD && (action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY || action == M_GARDEN || action == M_PLANTROOM || action == M_AQUARIUM)) return true;
@@ -9906,6 +9925,7 @@ bool actionUnlocked(byte action) {
 
 const __FlashStringHelper* unlockHint(byte action) {
   if (stage == STAGE_EGG) return F("Hatches soon");
+  if (action == M_NEIGHBORS) return F("Unlocks: child");
   if (action == M_GAME) return F("Unlocks: baby");
   if (action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY || action == M_GARDEN || action == M_PLANTROOM || action == M_AQUARIUM) return F("Unlocks: child");
   if (action == M_JOB) return F("Unlocks: adult");
@@ -10100,10 +10120,14 @@ const __FlashStringHelper* craftRecipeName(byte id) {
   }
 }
 
+byte craftMaterialCost(byte id) {
+  return 1 + id / 6 - ((naturalActivity() == M_CRAFT && id >= 6) ? 1 : 0);
+}
+
 bool craftCanMake(byte id) {
   id %= CRAFT_RECIPE_COUNT;
   byte a = id % MATERIAL_COUNT, b = (id + 2) % MATERIAL_COUNT;
-  byte needA = 1 + id / 6, needB = 1;
+  byte needA = craftMaterialCost(id), needB = 1;
   return craftMaterials[a] >= needA && craftMaterials[b] >= needB;
 }
 
@@ -10113,6 +10137,7 @@ void applyCraftReward(byte id) {
   else if (id == 10) { medCold++; medTummy++; medSkin++; medEnergy++; medMood++; }
   else { mealRoyalStew++; cookedMeals++; }
   recipesCrafted |= (1U << id);
+  completeGameplayAction(M_CRAFT);
   addSkill(skillStyle, 1); changeBond(1); addStat(happy, 1);
 }
 
@@ -10124,13 +10149,13 @@ void craftPage() {
     if (ol==HIGH && l==LOW) { pick=(pick==0)?CRAFT_RECIPE_COUNT-1:pick-1; clickSound(); delay(120); }
     if (orr==HIGH && r==LOW) { pick=(pick+1)%CRAFT_RECIPE_COUNT; clickSound(); delay(120); }
     if (os==HIGH && sb==LOW) {
-      byte a=pick%MATERIAL_COUNT, b=(pick+2)%MATERIAL_COUNT, needA=1+pick/6;
+      byte a=pick%MATERIAL_COUNT, b=(pick+2)%MATERIAL_COUNT, needA=craftMaterialCost(pick);
       if (!craftCanMake(pick)) { badSound(); popup(F("Need materials"), F("Explore more"), 700); }
       else { craftMaterials[a]-=needA; craftMaterials[b]--; applyCraftReward(pick); winSound(); popup(F("DIY complete!"), craftRecipeName(pick), 750); markSaveDirty(); return; }
       waitButtonRelease();
     }
     ol=l; os=sb; orr=r;
-    byte a=pick%MATERIAL_COUNT, b=(pick+2)%MATERIAL_COUNT, needA=1+pick/6;
+    byte a=pick%MATERIAL_COUNT, b=(pick+2)%MATERIAL_COUNT, needA=craftMaterialCost(pick);
     display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
     display.setCursor(25,0); display.print(F("DIY Workshop")); drawRightScore(pick+1,CRAFT_RECIPE_COUNT);
     display.drawRoundRect(5,14,118,34,5,WHITE); display.setCursor(13,21); display.print(craftRecipeName(pick));
@@ -10149,8 +10174,8 @@ void habitatPage() {
     if (ol==HIGH && l==LOW) { pick=(pick==0)?HABITAT_COUNT-1:pick-1; clickSound(); delay(120); }
     if (orr==HIGH && r==LOW) { pick=(pick+1)%HABITAT_COUNT; clickSound(); delay(120); }
     if (os==HIGH && sb==LOW) {
-      if (!(habitatOwned&(1U<<pick))) { byte cost=4+pick; if (!spendCoins(cost)) { badSound(); popup(F("Need coins"),F("Explore/work")); } else { habitatOwned|=(1U<<pick); habitat=pick; winSound(); popup(F("Field unlocked"),habitatName(pick)); } }
-      else { habitat=pick; goodSound(); popup(F("Moved habitat"),habitatName(pick)); }
+      if (!(habitatOwned&(1U<<pick))) { byte cost=4+pick; if (!spendCoins(cost)) { badSound(); popup(F("Need coins"),F("Explore/work")); } else { habitatOwned|=(1U<<pick); habitat=pick; completeGameplayAction(M_HABITAT); winSound(); popup(F("Field unlocked"),habitatName(pick)); } }
+      else { if (habitat != pick) completeGameplayAction(M_HABITAT); habitat=pick; goodSound(); popup(F("Moved habitat"),habitatName(pick)); }
       markSaveDirty(); return;
     }
     ol=l; os=sb; orr=r;
@@ -10179,6 +10204,7 @@ byte runSeasonEvent(byte event, bool practice) {
     waitButtonRelease();
     if(hit){score++;goodSound();} else stepSound();
   }
+  completeGameplayAction(M_EVENT);
   if(score>seasonalEventBest) seasonalEventBest=score;
   return score;
 }
@@ -10234,51 +10260,12 @@ void familyPage() {
   }
 
   if (partnerId == 255) {
-    byte pick = 0;
-    bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
-    waitButtonRelease();
-    while (true) {
-      if (rightHoldExitCheck()) return;
-      const bool l = digitalRead(BTN_L);
-      const bool sBtn = digitalRead(BTN_S);
-      const bool r = digitalRead(BTN_R);
-      if (oldL == HIGH && l == LOW) {
-        pick = pick == 0 ? PARTNER_COUNT - 1 : pick - 1;
-        clickSound(); delay(100);
-      }
-      if (oldR == HIGH && r == LOW) {
-        pick = (pick + 1) % PARTNER_COUNT;
-        clickSound(); delay(100);
-      }
-      if (oldS == HIGH && sBtn == LOW) {
-        partnerId = pick;
-        partnerBond = partnerCompatibility(pick) / 2;
-        familyReady = 0;
-        goodSound();
-        popup(F("Started dating"), partnerName(pick));
-        markSaveDirty();
-        return;
-      }
-      oldL = l; oldS = sBtn; oldR = r;
-
-      display.clearDisplay();
-      display.setTextWrap(false);
-      display.setTextSize(1);
-      display.setTextColor(WHITE);
-      display.setCursor(27, 0); display.print(F("MEET A PARTNER"));
-      display.drawRoundRect(5, 14, 118, 39, 5, WHITE);
-      cityWorld.drawResidentTiny(pick, 17, 25, (anim / 5) & 1);
-      display.setCursor(51, 22); display.print(partnerName(pick));
-      display.setCursor(51, 36); display.print(F("MATCH "));
-      display.print(partnerCompatibility(pick)); display.print(F("%"));
-      display.display();
-      delay(50);
-    }
+    popup(F("Meet someone in town"), F("Friendship 60, then date"));
+    cityWorld.visitResidents();
+    return;
   }
-
   const byte match = partnerCompatibility(partnerId);
-  if (partnerBond < 100) partnerBond = min((byte)100, (byte)(partnerBond + 5));
-  if (partnerBond >= 80 && match >= 55) familyReady = 1;
+  familyReady = GameplayProgress::familyReady(stage, partnerBond) ? 1 : 0;
 
   waitButtonRelease();
   while (true) {
@@ -10785,8 +10772,8 @@ void fieldLifePage() {
       else if (pick == 1) chooseOutdoorToy();
       else if (paradise.fieldExpanded(habitat)) popup(F("Already expanded"), habitatName(habitat));
       else if (planetLevel() < 10) popup(F("Planet Lv.10 needed"), F("Raise more generations"));
-      else if (!spendCoins(50)) popup(F("Need 50 coins"), F("Expansion is permanent"));
-      else { paradise.expandField(habitat); paradise.addResearch(50); winSound(); popup(F("Field expanded!"), F("Daily bonuses doubled")); markSaveDirty(); }
+      else if (coins < 50 || paradise.researchPoints() < 50) popup(F("Need 50G + 50 research"), F("Missions fund research"));
+      else { spendCoins(50); paradise.spendResearch(50); paradise.expandField(habitat); winSound(); popup(F("Field expanded!"), F("Toy effects now doubled")); markSaveDirty(); }
     }
     oldL = l; oldS = sBtn; oldR = r;
 
@@ -10799,7 +10786,7 @@ void fieldLifePage() {
     display.setCursor(4, 53);
     if (pick == 0) display.print(F("D1 change field"));
     else if (pick == 1) display.print(F("D1 place outside toy"));
-    else display.print(paradise.fieldExpanded(habitat) ? F("Expanded permanently") : F("D1 expand for 50G"));
+    else display.print(paradise.fieldExpanded(habitat) ? F("Expanded permanently") : F("Expand: 50G + 50 R"));
     display.display(); delay(20);
   }
 }
@@ -10878,7 +10865,7 @@ const __FlashStringHelper *spaceDestinationName(byte destination) {
   }
 }
 
-byte spaceTravelCost(byte destination) { return 8 + (destination % PARADISE_DESTINATION_COUNT) * 2; }
+byte spaceTravelCost(byte destination) { return 8 + (destination % PARADISE_DESTINATION_COUNT) * 2 - lifeWorld.projectLevel(5) * 2; }
 
 void spaceTravelPage() {
   byte pick = 0;
@@ -11025,16 +11012,14 @@ void maybeScheduleParadiseEmergency() {
 
 void applyParadiseDailyEffects() {
   const byte toy = paradise.placedToy(habitat);
-  if (toy < PARADISE_TOY_COUNT) {
+  const byte repeats = paradise.fieldExpanded(habitat) ? 2 : 1;
+  for (byte i = 0; i < repeats; ++i) {
     if (toy == 0 || toy == 1) { addStat(happy, 1); addSkill(skillFit, 1); }
     else if (toy == 2 || toy == 5) { addStat(clean, 1); addStat(happy, 1); }
     else if (toy == 3) { addSkill(skillKind, 1); addSkill(skillStyle, 1); }
     else if (toy == 4) addSkill(skillSmart, 1);
     else if (toy == 6) { addSkill(skillStyle, 1); addStat(happy, 1); }
-    else { addStat(happy, 1); paradise.addResearch(1); }
-  }
-  if (paradise.fieldExpanded(habitat)) {
-    addStat(happy, 1); addStat(health, 1); paradise.addResearch(1);
+    else if (toy == 7) { addStat(happy, 1); paradise.addResearch(1); }
   }
 }
 
@@ -11200,8 +11185,56 @@ void enterParadiseCode() {
   markSaveDirty();
 }
 
+void researchProjectsPage() {
+  if (stage < STAGE_CHILD) { popup(F("Research opens at child"), F("Grow a little first")); return; }
+  byte pick = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    bool l = digitalRead(BTN_L), sb = digitalRead(BTN_S), r = digitalRead(BTN_R);
+    if (oldL == HIGH && l == LOW) { pick = (pick + 3) % 4; clickSound(); }
+    if (oldR == HIGH && r == LOW) { pick = (pick + 1) % 4; clickSound(); }
+    if (oldS == HIGH && sb == LOW) {
+      waitButtonRelease();
+      if (energy < 1) { popup(F("Research needs energy"), F("Rest first")); return; }
+      if (pick == 0 && (!botany.gardenCount() || botany.gardenAverageWater() >= 6)) {
+        popup(F("Garden needs no water"), F("Grow food crops first")); return;
+      }
+      if (pick == 1 && !botany.indoorNeedsTending()) { popup(F("No plants need tending"), F("Adopt or grow decor")); return; }
+      if (pick == 2 && (stage < STAGE_ADULT || lifeWorld.careerId() >= LIFE_CAREER_COUNT)) {
+        popup(F("Choose an adult career"), F("Research builds its XP")); return;
+      }
+      const byte project = petAgeDays() % LIFE_PROJECT_COUNT;
+      if (pick == 3 && lifeWorld.projectLevel(project) >= 3) { popup(F("Project is complete"), F("Tomorrow: next district")); return; }
+      if (paradise.researchPoints() < 10) { popup(F("Need 10 research"), F("Missions and space trips")); return; }
+      if (!completeGameplayAction(M_RESEARCH)) { popup(F("Project already studied"), F("Try another activity")); return; }
+      paradise.spendResearch(10);
+      subStat(energy, 1);
+      if (pick == 0) { botany.eventWaterGarden(3); botany.eventTendGarden(2); }
+      else if (pick == 1) botany.eventTendIndoor(3);
+      else if (pick == 2) lifeWorld.eventCareerProgress(10, 2, 1);
+      else lifeWorld.eventCommunityProgress(project, 25, 0, 2);
+      lifeWorld.recordMemory(21, petAgeDays(), pick);
+      markSaveDirty(); popup(F("Research put to work"), F("A real project improved")); return;
+    }
+    oldL = l; oldS = sb; oldR = r;
+    display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);
+    display.setCursor(10, 0); display.print(F("APPLIED RESEARCH"));
+    display.setCursor(5, 18);
+    if (pick == 0) display.print(F("Food crop irrigation"));
+    else if (pick == 1) display.print(F("Florist plant care"));
+    else if (pick == 2) display.print(F("Career study +10 XP"));
+    else display.print(F("City project +25%"));
+    display.setCursor(5, 33); display.print(F("10 research + 1 energy"));
+    display.setCursor(5, 45); display.print(F("Research: ")); display.print(paradise.researchPoints());
+    display.setCursor(0, 57); display.print(F("D0/D2 pick  D1 apply"));
+    display.display(); delay(25);
+  }
+}
+
 void paradiseLabPage() {
-  static const byte count = 9;
+  static const byte count = 10;
   byte pick = 0;
   bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
   waitButtonRelease();
@@ -11220,6 +11253,7 @@ void paradiseLabPage() {
       else if (pick == 5) emergencyPage();
       else if (pick == 6) connectionLabPage();
       else if (pick == 7) cellLabPage();
+      else if (pick == 8) researchProjectsPage();
       else enterParadiseCode();
     }
     oldL = l; oldS = sBtn; oldR = r;
@@ -11236,6 +11270,7 @@ void paradiseLabPage() {
     else if (pick == 5) display.print(F("Planet emergencies"));
     else if (pick == 6) display.print(F("Moon connection lab"));
     else if (pick == 7) display.print(F("Tama cell research"));
+    else if (pick == 8) display.print(F("Apply research to life"));
     else display.print(F("Enter an 8-char code"));
     display.setCursor(8, 39);
     if (paradise.emergencyPending()) display.print(F("! EMERGENCY WAITING !"));
@@ -11848,6 +11883,7 @@ void categoryMenu(byte category) {
 // ---------- actions ----------
 
 void startNewPet() {
+  gameplayProgress.reset();
   bool nextGeneration = archivedCurrent != 0;
   const byte familyPartnerId = partnerId;
   const byte familyPartnerSpecies =
@@ -12191,6 +12227,7 @@ void foodMenu() {
     varietyStreak = 0;
   }
   lastFood = pick;
+  completeGameplayAction(M_FOOD);
 
   if (disliked) {
     subStat(happy, 1);
@@ -12324,6 +12361,7 @@ void doMedicine() {
     display.print(stock);
     display.print(F("  $"));
     display.print(coins);
+    display.print(F(" Dose ")); display.print(MEDICINE_PRICE - lifeWorld.projectLevel(2));
 
     display.setCursor(0, 55);
     if (stock == 0) display.print(F("D1 buy/use  Hold D2 exit"));
@@ -12347,6 +12385,7 @@ void doClean() {
   zeroCleanTicks = 0; cleanMistakeOpen = false;
 
   if (needed) {
+    completeGameplayAction(M_CLEAN);
     cleanlinessScore = min((byte)100, (byte)(cleanlinessScore + 3));
     addStat(clean, 5);
     addStat(happy, 1);
@@ -12429,6 +12468,7 @@ void doLove() {
       (pick == 2 && (temperament == 0 || temperament == 5 || temperament == 7));
 
   careChoiceAnimation(pick);
+  if (!completeGameplayAction(M_LOVE)) { popup(F("Still happy you are here"), F("A quiet moment together")); return; }
   if (pick == 0) {
     addStat(happy, happy <= 4 ? 3 : 1);
     if (repeats < 2) changeBond(personalityMatch ? 2 : 1);
@@ -12499,13 +12539,52 @@ void doCall() {
   else if (ownerBond >= 80) animCallBubble(F("You are my best friend"));
   else animCallBubble(lifeWorld.personalityThought());
   deepLife.drawEmotionBadge(108, 12, anim);
+  const bool credited = completeGameplayAction(M_CALL);
   markRoutineAction(ROUTINE_TALK);
-  changeBond(1);
+  if (credited) changeBond(1);
+}
+
+bool completeGameplayAction(uint8_t action) {
+  if (action > M_ADVENTURE || dead || sleeping || sitterTicksRemaining > 0 ||
+      !gameplayProgress.claim(action, ageTicks, generation)) return false;
+  lifeWorld.recordAction(action, petAgeDays(), visualHour(), visualWeather());
+  deepLife.recordAction(action, petAgeDays(), visualHour(), visualWeather());
+  if (action == M_MED || action == M_CLEAN || action == M_FOOD) recordGrowingAction(GTA_CARE);
+  if (action == M_GAME || action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY || action == M_EVENT || action == M_FESTIVAL) recordGrowingAction(GTA_PLAY);
+  else if (action == M_STUDY) recordGrowingAction(GTA_SCHOOL);
+  else if (action == M_GARDEN) recordGrowingAction(GTA_GARDEN);
+  else if (action == M_PLANTROOM || action == M_RESEARCH || action == M_CRAFT || action == M_ROOM || action == M_SHOP) recordGrowingAction(GTA_HOBBY);
+  else if (action == M_AQUARIUM || action == M_COMPANION) recordGrowingAction(GTA_COMPANION);
+  else if (action == M_EXPLORE || action == M_ADVENTURE || action == M_HABITAT) recordGrowingAction(GTA_EXPLORE);
+  else if (action == M_COOK || action == M_FOOD) recordGrowingAction(GTA_COOK);
+  else if (action == M_JOB) recordGrowingAction(GTA_WORK);
+  else if (action == M_CLEAN) recordGrowingAction(GTA_CLEAN);
+  else if (action == M_FAMILY) recordGrowingAction(GTA_FAMILY);
+  else if (action == M_TALK || action == M_LOVE || action == M_CALL) recordGrowingAction(GTA_TALK);
+  if (!sleeping && (action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY || action == M_GARDEN || action == M_PLANTROOM || action == M_STUDY || action == M_AQUARIUM)) {
+    dailyRoutineMask |= ROUTINE_PLAY;
+  }
+  if (!sleeping && (action == M_WALK || action == M_TRAIN)) {
+    if (exerciseScore < 100) exerciseScore++;
+    if (weight > 1) weight--;
+  }
+  // Strong friendships slightly improve trips and job earnings, without becoming grindable.
+  if (action == M_EXPLORE && ownerBond >= 60) addCoins(1);
+  if (action == M_JOB && ownerBond >= 70) addCoins(1);
+
+  markSaveDirty();
+  return true;
 }
 
 void executeAction(byte action) {
   menu = action;
   if (dead) { startReplacementEgg(); drawScreen(true); return; }
+  if (!actionUnlocked(action)) { popup(F("Keep growing"), unlockHint(action)); return; }
+  if (sitterTicksRemaining > 0 && action != M_SITTER && action != M_SETTINGS &&
+      action != M_STATS && action != M_INSPECT && action != M_HISTORY &&
+      action != M_DIARY && action != M_ALBUM && action != M_BOOK && action != M_PLAYER) {
+    popup(F("Sitter is caring for us"), F("End sitter to play")); return;
+  }
   if (petAway && action != M_CALL && action != M_STATS && action != M_INSPECT && action != M_HISTORY && action != M_SETTINGS && action != M_PLAYER) {
     badSound(); popup(F("Pet is away"), F("Use Call to search"), 750); drawScreen(true); return;
   }
@@ -12545,6 +12624,7 @@ void executeAction(byte action) {
   else if (menu == M_PLANTROOM) botany.runPlantRoom();
   else if (menu == M_PARADISE) paradiseLabPage();
   else if (menu == M_LIFE) lifeWorld.runHub();
+  else if (menu == M_NEIGHBORS) cityWorld.visitResidents();
   else if (menu == M_MUSIC) musicGame();
   else if (menu == M_PLAYER) {
     musicPlayer.run();
@@ -12575,29 +12655,6 @@ void executeAction(byte action) {
   else if (menu == M_DIAG) diagnosticsPage();
   else if (menu == M_NEW_EGG) startReplacementEgg();
 
-  lifeWorld.recordAction(action, petAgeDays(), visualHour(), visualWeather());
-  deepLife.recordAction(action, petAgeDays(), visualHour(), visualWeather());
-  if (action == M_GAME || action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY) recordGrowingAction(GTA_PLAY);
-  else if (action == M_STUDY) recordGrowingAction(GTA_SCHOOL);
-  else if (action == M_GARDEN) recordGrowingAction(GTA_GARDEN);
-  else if (action == M_PLANTROOM) recordGrowingAction(GTA_HOBBY);
-  else if (action == M_AQUARIUM) recordGrowingAction(GTA_COMPANION);
-  else if (action == M_EXPLORE) recordGrowingAction(GTA_EXPLORE);
-  else if (action == M_COOK || action == M_FOOD) recordGrowingAction(GTA_COOK);
-  else if (action == M_JOB) recordGrowingAction(GTA_WORK);
-  else if (action == M_CLEAN) recordGrowingAction(GTA_CLEAN);
-  else if (action == M_FAMILY) recordGrowingAction(GTA_FAMILY);
-  else if (action == M_TALK || action == M_LOVE || action == M_CALL) recordGrowingAction(GTA_TALK);
-  if (!sleeping && (action == M_WALK || action == M_TRAIN || action == M_MUSIC || action == M_TOY || action == M_GARDEN || action == M_PLANTROOM || action == M_STUDY || action == M_AQUARIUM)) {
-    markRoutineAction(ROUTINE_PLAY);
-  }
-  if (!sleeping && (action == M_WALK || action == M_TRAIN)) {
-    if (exerciseScore < 100) exerciseScore++;
-    if (weight > 1) weight--;
-  }
-  // Strong friendships slightly improve trips and job earnings, without becoming grindable.
-  if (action == M_EXPLORE && ownerBond >= 60) addCoins(1);
-  if (action == M_JOB && ownerBond >= 70) addCoins(1);
 
   markSaveDirty();
   drawScreen(true);
@@ -12629,6 +12686,14 @@ void createPetCallIfNeeded() {
 
 void gameTick() {
   if (dead) return;
+  if (sitterCooldownTicks > 0) sitterCooldownTicks--;
+  if (sitterTicksRemaining > 0) {
+    --sitterTicksRemaining;
+    if (sitterTicksRemaining == 0) sitterCooldownTicks = TICKS_PER_DAY;
+    markSaveDirty();
+    return;
+  }
+
   synchronizeDailySchedule(false);
 
   const bool scheduledAwayNow = isScheduledAwayTime();
@@ -12657,16 +12722,6 @@ void gameTick() {
     markSaveDirty(); return;
   }
 
-  if (sitterCooldownTicks > 0) sitterCooldownTicks--;
-  if (sitterTicksRemaining > 0) {
-    sitterTicksRemaining--;
-    if (sitterTicksRemaining % TICKS_PER_HOUR == 0) {
-      addStat(energy, 1); addStat(health, 1); addStat(clean, 1);
-    }
-    if (sitterTicksRemaining == 0) sitterCooldownTicks = TICKS_PER_DAY;
-    markSaveDirty();
-    return;
-  }
 
   ageTicks++;
   updateRoutineCalendar();
@@ -13064,37 +13119,14 @@ void drawCityWorldView() {
 }
 
 void enterHouseSelection() {
-  const byte room = cityWorld.houseRoom();
-  V46UI::playCheckerTransition(display, deepLife.reducedMotion(), room & 1);
-  if (dead) { popup(F("Start a new egg"), F("The house is quiet")); return; }
-  if ((room == 1 || room == 2 || room == 3) && stage < STAGE_CHILD) { popup(F("Unlocks at child"), F("Keep caring and growing")); return; }
-  if (room == 4 && stage < STAGE_TEEN) { popup(F("Unlocks at teen"), F("Kitchen is still closed")); return; }
-
-  if (room == 0) roomActivity();
-  else if (room == 1) aquariumActivity();
-  else if (room == 2) botany.runPlantRoom();
-  else if (room == 3) botany.runGarden();
-  else cookActivity();
-  markSaveDirty();
+  static const byte actions[HOUSE_ROOM_COUNT] = {M_ROOM, M_AQUARIUM, M_PLANTROOM, M_GARDEN, M_COOK};
+  executeAction(actions[cityWorld.houseRoom() % HOUSE_ROOM_COUNT]);
   waitButtonRelease();
 }
 
 void enterCitySelection() {
-  const byte place = cityWorld.cityPlace();
-  V46UI::playCheckerTransition(display, deepLife.reducedMotion(), (place + 1) & 1);
-  if (dead) { popup(F("Start a new egg"), F("No city trip yet")); return; }
-  if (petAway) { popup(F("Pet is away"), F("Use Call to search")); return; }
-  if (place == 0 && stage < STAGE_ADULT) { popup(F("Work needs adult"), F("Visit later")); return; }
-  if ((place == 1 || place == 3) && stage < STAGE_TEEN) { popup(F("Unlocks at teen"), F("Visit later")); return; }
-  if ((place == 2 || place == 4 || place == 5) && stage < STAGE_CHILD) { popup(F("Unlocks at child"), F("Visit later")); return; }
-
-  if (place == 0) jobActivity();
-  else if (place == 1) shopClothes();
-  else if (place == 2) cookActivity();
-  else if (place == 3) studyGame();
-  else if (place == 4) exploreTrip();
-  else cityWorld.visitResidents();
-  markSaveDirty();
+  static const byte actions[CITY_PLACE_COUNT] = {M_JOB, M_SHOP, M_COOK, M_STUDY, M_EXPLORE, M_NEIGHBORS};
+  executeAction(actions[cityWorld.cityPlace() % CITY_PLACE_COUNT]);
   waitButtonRelease();
 }
 

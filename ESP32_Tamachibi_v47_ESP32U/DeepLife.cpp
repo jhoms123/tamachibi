@@ -1,4 +1,8 @@
 #include "DeepLife.h"
+#include "CityWorld.h"
+#include "Aquarium.h"
+#include "GameplayActions.h"
+#include "GameplayProgress.h"
 #include "NeighborStories.h"
 #include "LifeWorld.h"
 #include "Botany.h"
@@ -10,6 +14,8 @@ extern byte health, full, energy, happy, clean, discipline, stage, temperament;
 extern byte ownerBond, ownerTrust;
 extern byte gardenLevel, gardenHarvests;
 extern LifeWorldSystem lifeWorld;
+extern CityWorldSystem cityWorld;
+extern AquariumSystem aquarium;
 extern BotanySystem botany;
 extern byte speciesType, partnerId, partnerBond, outfit, roomStyle, habitat;
 extern byte favoriteGameId, difficultyMode, rescueMode, soundMode, brightnessLevel;
@@ -41,6 +47,8 @@ extern void drawSprite16(byte id, int x, int y);
 extern byte inheritedTemperament, inheritedFavoriteGame, inheritedBodyType, inheritedTrait;
 
 namespace {
+GameplayProgress &deepDailyProgress() { static GameplayProgress ledger; return ledger; }
+
 const uint8_t ACTION_FOOD = 0;
 const uint8_t ACTION_GAME = 2;
 const uint8_t ACTION_MED = 3;
@@ -197,6 +205,7 @@ DeepLifeSystem::DeepLifeSystem(size_t storageBase, GameDisplay &display,
 }
 
 void DeepLifeSystem::reset() {
+  deepDailyProgress().reset();
   sequence_ = 0;
   emotion_ = 0; emotionIntensity_ = 1; emotionMinutes_ = 0; lastEmotionCause_ = 0;
   rivalSpecies_ = 0; rivalPersonality_ = 0; rivalBond_ = 5; rivalRespect_ = 5;
@@ -273,6 +282,7 @@ void DeepLifeSystem::fillSave(DeepLifeSave &s) const {
 }
 
 void DeepLifeSystem::applySave(const DeepLifeSave &s) {
+  deepDailyProgress().reset();
   sequence_ = s.sequence;
   emotion_ = s.emotion % 10; emotionIntensity_ = constrain(s.emotionIntensity, 1, 10); emotionMinutes_ = s.emotionMinutes; lastEmotionCause_ = s.lastEmotionCause;
   rivalSpecies_ = s.rivalSpecies % 50; rivalPersonality_ = s.rivalPersonality % 8; rivalBond_ = min<uint8_t>(s.rivalBond, 100); rivalRespect_ = min<uint8_t>(s.rivalRespect, 100); rivalRank_ = min<uint8_t>(s.rivalRank, 9); rivalWins_ = s.rivalWins; rivalLosses_ = s.rivalLosses; rivalStory_ = min<uint8_t>(s.rivalStory, 5);
@@ -611,8 +621,8 @@ void DeepLifeSystem::resolveProceduralEvent(uint8_t event, uint8_t choice, bool 
       else { changeTrust((ownerTrust < 40 ? 4 : 2) + amount); addStat(energy, 1); addStat(discipline, amount); setEmotion(7, 3 + amount, event); }
       break;
     case 6: // Marriage, compromise and partner bond.
-      if (choice == 0) { changeByte(partnerHarmony_, (partnerHarmony_ < 40 ? 5 : 2) + amount); changeByte(partnerBond, 1 + amount); changeByte(familyMood_, 2 + amount); argumentState_ = 0; setEmotion(1, 5, event); }
-      else { changeByte(partnerHarmony_, 1 + amount); changeByte(partnerBond, amount); addSkill(skillKind, amount); if (argumentState_) argumentState_ = 0; setEmotion(0, 4, event); }
+      if (choice == 0) { changeByte(partnerHarmony_, (partnerHarmony_ < 40 ? 5 : 2) + amount); cityWorld.recordPartnerMoment(1 + amount); changeByte(familyMood_, 2 + amount); argumentState_ = 0; setEmotion(1, 5, event); }
+      else { changeByte(partnerHarmony_, 1 + amount); cityWorld.recordPartnerMoment(amount); addSkill(skillKind, amount); if (argumentState_) argumentState_ = 0; setEmotion(0, 4, event); }
       if ((variant % 8U) == 0U) anniversaryDay_ = static_cast<uint16_t>(petAgeDays());
       break;
     case 7: { // Parenting, siblings and family bond.
@@ -744,6 +754,7 @@ uint8_t DeepLifeSystem::effectiveDifficulty() const {
 
 void DeepLifeSystem::startGeneration(uint8_t species, uint16_t gen, uint16_t birthCode,
                                      uint8_t temperamentValue) {
+  deepDailyProgress().reset();
   emotion_ = 0; emotionIntensity_ = 2; emotionMinutes_ = 120;
   rivalSpecies_ = static_cast<uint8_t>((species + 7 + (birthCode % 23)) % 50);
   if (rivalSpecies_ == species) rivalSpecies_ = static_cast<uint8_t>((rivalSpecies_ + 11) % 50);
@@ -792,19 +803,19 @@ void DeepLifeSystem::tick(uint32_t dayLong, uint8_t hour, uint8_t stageValue, ui
   configureGoals(day); updateSeason(day, weather); generateDailyEvent(day, stageValue, weather);
   if (emotionMinutes_ > 0) --emotionMinutes_; else if (emotion_ != 0) { emotion_ = 0; emotionIntensity_ = 1; }
   if (economyDay_ != day) { economyDay_ = day; economyDayEarned_ = 0; economyDaySpent_ = 0; }
-  if (stageValue >= 2 && groupId_ < 8 && hour == 16 && (day % 3U) == (groupId_ % 3U)) {
+  if (stageValue >= 2 && groupId_ < 8 && hour == 16 && (day % 3U) == (groupId_ % 3U) && deepDailyProgress().claim(0, day, generation)) {
     if (groupMeetings_ < 255) ++groupMeetings_;
     changeByte(groupLevel_, 1, 9); changeByte(rivalBond_, 1); setEmotion(1, 3, 30);
   }
   if (partnerId < 8 && stageValue >= 4) {
     if (anniversaryDay_ == 0) anniversaryDay_ = day;
-    if (day > anniversaryDay_ && ((day - anniversaryDay_) % 30U) == 0U) {
+    if (day > anniversaryDay_ && ((day - anniversaryDay_) % 30U) == 0U && deepDailyProgress().claim(1, day, generation)) {
       changeByte(partnerHarmony_, 5); changeByte(familyMood_, 4); setEmotion(3, 6, 31); setAchievement(25);
     }
     if (partnerHarmony_ < 25 && argumentState_ == 0) argumentState_ = 1;
   }
   for (uint8_t i = 0; i < childCount_; ++i) {
-    if (childAge_[i] < 99 && hour == 7 && (day % 2U) == (i % 2U)) ++childAge_[i];
+    if (childAge_[i] < 99 && hour == 7 && (day % 2U) == (i % 2U) && deepDailyProgress().claim(2 + i, day, generation)) ++childAge_[i];
   }
   evaluateAchievements();
 }
@@ -818,8 +829,11 @@ void DeepLifeSystem::recordAction(uint8_t action, uint32_t dayLong, uint8_t hour
   else if (action == ACTION_STUDY || action == ACTION_EXPLORE) setEmotion(7, 4, action);
   else if (action == ACTION_JOB || action == ACTION_TRAIN) setEmotion(3, 3, action);
   else if (action == ACTION_TALK || action == ACTION_LOVE || action == ACTION_FAMILY) {
-    setEmotion(0, 4, action); changeByte(partnerHarmony_, partnerId < 8 ? 2 : 0); changeByte(familyMood_, 2);
-    for (uint8_t i = 0; i < childCount_; ++i) changeByte(childBond_[i], 1);
+    setEmotion(0, 4, action);
+    if (action == ACTION_FAMILY) {
+      changeByte(partnerHarmony_, partnerId < 8 ? 2 : 0); changeByte(familyMood_, 2);
+      for (uint8_t i = 0; i < childCount_; ++i) changeByte(childBond_[i], 1);
+    }
   } else if (action == ACTION_CLEAN || action == ACTION_MED) setEmotion(0, 2, action);
   else if (action == ACTION_CALL && happy < 3) setEmotion(4, 4, action);
   else if (action == ACTION_COOK || action == ACTION_FOOD) { changeByte(familyMood_, 1); if (groupId_ == 7) changeByte(groupLevel_, 1, 9); }
@@ -1139,7 +1153,12 @@ void DeepLifeSystem::runHub() {
     if (oldL == HIGH && l == LOW) { pick = pick == 0 ? 17 : pick - 1; clickSound(); delay(100); }
     if (oldR == HIGH && r == LOW) { pick = static_cast<uint8_t>((pick + 1) % 18); clickSound(); delay(100); }
     if (oldS == HIGH && s == LOW) {
-      waitButtonRelease(); playTransition(pick);
+      waitButtonRelease();
+      if ((stage < 2 && (pick == 2 || pick == 3 || pick == 6 || pick == 9 || pick == 12)) ||
+          (stage < 3 && (pick == 2 || pick == 6))) {
+        popup(F("Keep growing first"), F("This activity opens later")); oldL = oldS = oldR = HIGH; continue;
+      }
+      playTransition(pick);
       switch (pick) {
         case 0: todayPage(); break; case 1: storyPage(); break; case 2: rivalPage(); break;
         case 3: groupsPage(); break; case 4: familyPage(); break; case 5: mentoringPage(); break;
@@ -1185,7 +1204,7 @@ void DeepLifeSystem::todayPage() {
     if (oldL == HIGH && l == LOW) { page = page == 0 ? 2 : page - 1; clickSound(); delay(100); }
     if (oldR == HIGH && r == LOW) { page = static_cast<uint8_t>((page + 1) % 3); clickSound(); delay(100); }
     if (oldS == HIGH && s == LOW) {
-      if (page == 0) { setEmotion(0, 3, 60); changeBond(1); popup(F("You checked in"), F("Calm and understood")); }
+      if (page == 0) { setEmotion(0, 3, 60); if (completeGameplayAction(M_TALK)) changeBond(1); popup(F("You checked in"), F("Calm and understood")); }
       else if (page == 1 && dailyProgress_ < dailyTarget_) popup(F("Daily goal"), DAILY_GOALS[dailyGoal_]);
       else if (page == 2 && weeklyProgress_ < weeklyTarget_) popup(F("Weekly goal"), WEEKLY_GOALS[weeklyGoal_]);
       markSaveDirty();
@@ -1318,9 +1337,14 @@ void DeepLifeSystem::rivalPage() {
     if (oldS == HIGH && s == LOW) {
       waitButtonRelease();
       if (stage < 3) { popup(F("Rival is still young"), F("Starts at teen stage")); return; }
+      if (action < 2 && energy < 1) { popup(F("Too tired to compete"), F("Rest first")); return; }
+      if (action == 2 && coins < 1) { popup(F("Need 1 coin"), F("For a shared snack")); return; }
+      if (!deepDailyProgress().claim(8 + action, petAgeDays(), generation)) { popup(F("Let this moment settle"), F("Return tomorrow")); return; }
+      if (action < 2) subStat(energy, 1); else spendCoins(1);
+      completeGameplayAction(action < 2 ? M_TRAIN : M_TALK);
       if (action == 0) { bool won = random(0, 100) < 45 + rivalRespect_ / 5 + skillFit; recordGameResult(favoriteGameId, won, won ? 9 : 3); won ? winSound() : badSound(); popup(won ? F("You won the challenge") : F("Rival won this time"), won ? F("Respect increased") : F("Bond still increased")); }
       else if (action == 1) { changeByte(rivalBond_, 5); changeByte(rivalRespect_, 1); setEmotion(1, 4, 70); goodSound(); popup(F("Trained together"), F("Rival became a friend")); }
-      else { changeByte(rivalBond_, 2); addCoins(1); setEmotion(0, 3, 71); popup(F("Shared a quiet snack"), F("Competition cooled")); }
+      else { changeByte(rivalBond_, 2); setEmotion(0, 3, 71); popup(F("Shared a quiet snack"), F("Competition cooled")); }
       evaluateAchievements(); markSaveDirty(); return;
     }
     oldL = l; oldS = s; oldR = r;
@@ -1343,7 +1367,11 @@ void DeepLifeSystem::groupsPage() {
       waitButtonRelease();
       if (stage < 2) { popup(F("Clubs unlock at child"), F("Grow a little more")); return; }
       if (groupId_ != pick && !confirm(F("JOIN GROUP"), F("Replace current club?"))) continue;
-      groupId_ = pick; changeByte(groupLevel_, 1, 9); ++groupMeetings_; changeByte(rivalBond_, 1); setEmotion(1, 5, pick); goodSound(); popup(F("Group meeting held"), GROUP_NAMES[pick]); evaluateAchievements(); markSaveDirty(); return;
+      if (energy == 0) { popup(F("Too tired for a meeting"), F("Rest first")); return; }
+      if (!deepDailyProgress().claim(0, petAgeDays(), generation)) { popup(F("Met your group today"), F("Practice its hobby")); return; }
+      subStat(energy, 1);
+      if (groupId_ != pick) { groupLevel_ = 0; groupMeetings_ = 0; groupQuest_ = 0; }
+      groupId_ = pick; completeGameplayAction(M_TALK); changeByte(groupLevel_, 1, 9); ++groupMeetings_; changeByte(rivalBond_, 1); setEmotion(1, 5, pick); goodSound(); popup(F("Group meeting held"), GROUP_NAMES[pick]); evaluateAchievements(); markSaveDirty(); return;
     }
     oldL = l; oldS = s; oldR = r;
     display_.clearDisplay(); drawHeader(F("FRIEND GROUPS"), pick + 1, 8); drawHubIcon(3, 5, 18);
@@ -1365,12 +1393,16 @@ void DeepLifeSystem::familyPage() {
       waitButtonRelease();
       if (action == 4) { legacyRelativesPage(); oldL = oldS = oldR = HIGH; continue; }
       if (partnerId >= 8) { popup(F("No spouse at home"), F("Build city romance")); return; }
-      if (action == 0) { changeByte(partnerHarmony_, 4); changeByte(familyMood_, 4); addStat(happy, 1); setEmotion(1, 5, 80); popup(F("Family outing"), F("Everyone feels closer")); }
+      if (action == 1 && argumentState_ == 0) { popup(F("Home is peaceful"), F("No argument today")); return; }
+      if (action != 2 && !completeGameplayAction(M_FAMILY)) { popup(F("Family needs a pause"), F("Make time for others")); return; }
+      if (action == 0) { cityWorld.recordPartnerMoment(2); changeByte(partnerHarmony_, 4); changeByte(familyMood_, 4); addStat(happy, 1); setEmotion(1, 5, 80); popup(F("Family outing"), F("Everyone feels closer")); }
       else if (action == 1) { if (argumentState_ > 0) { argumentState_ = 0; changeByte(partnerHarmony_, 8); setEmotion(0, 5, 81); popup(F("Talked it through"), F("Argument resolved")); } else popup(F("Home is peaceful"), F("No argument today")); }
       else if (action == 2) {
         if (stage < 4 || partnerBond < 60) { popup(F("Family not ready"), F("Adult + bond 60")); return; }
         if (childCount_ >= DEEP_CHILD_COUNT) { popup(F("Home is full"), F("Three children max")); return; }
         if (!confirm(F("NEW CHILD"), F("Welcome a new child?"))) continue;
+        if (!deepDailyProgress().claim(5, petAgeDays(), generation)) { popup(F("One child at a time"), F("Enjoy today together")); return; }
+        completeGameplayAction(M_FAMILY);
         const uint8_t i = childCount_++;
         childSpecies_[i] = static_cast<uint8_t>((speciesType + rivalSpecies_ + partnerId * 7 + generation + i * 11) % 50);
         childPersonality_[i] = static_cast<uint8_t>((temperament + partnerId + i * 3) % 8);
@@ -1379,6 +1411,7 @@ void DeepLifeSystem::familyPage() {
         chosenHeir_ = chosenHeir_ == 255 ? 0 : chosenHeir_;
         changeByte(partnerHarmony_, 5); setEmotion(3, 8, 82); setAchievement(26); winSound(); popup(F("A child joined"), F("Traits mixed uniquely"));
       } else {
+        cityWorld.recordPartnerMoment(1);
         changeByte(partnerHarmony_, 2); changeByte(familyMood_, 6); for (uint8_t i = 0; i < childCount_; ++i) changeByte(childBond_[i], 2); popup(F("Shared family dinner"), F("Chores were divided"));
       }
       evaluateAchievements(); markSaveDirty(); return;
@@ -1406,7 +1439,7 @@ void DeepLifeSystem::legacyRelativesPage() {
     const uint8_t relativeSpecies = grand ? grandparentSpecies_ : legacySiblingSpecies_[siblingIndex];
     uint8_t &relativeBond = grand ? grandparentBond_ : legacySiblingBond_[siblingIndex];
     if (oldS == HIGH && s == LOW) {
-      waitButtonRelease(); changeByte(relativeBond, 4); changeByte(familyMood_, 3); addSkill(skillKind, 1); setEmotion(0, 5, 91); addEventLog(28, relativeSpecies, static_cast<uint16_t>(petAgeDays())); popup(grand ? F("Grandparent visited") : F("Sibling visited"), F("Family bond increased")); markSaveDirty(); return;
+      waitButtonRelease(); if (!deepDailyProgress().claim(16 + pick, petAgeDays(), generation)) { popup(F("Visited today already"), F("Come back tomorrow")); return; } completeGameplayAction(M_FAMILY); changeByte(relativeBond, 4); changeByte(familyMood_, 3); addSkill(skillKind, 1); setEmotion(0, 5, 91); addEventLog(28, relativeSpecies, static_cast<uint16_t>(petAgeDays())); popup(grand ? F("Grandparent visited") : F("Sibling visited"), F("Family bond increased")); markSaveDirty(); return;
     }
     oldL = l; oldS = s; oldR = r;
     display_.clearDisplay(); drawHeader(F("FAMILY IN CITY"), pick + 1, count);
@@ -1502,6 +1535,7 @@ void DeepLifeSystem::expeditionMapGame() {
     int px = 3 + min<uint8_t>(column, 11) * 10; display_.fillRoundRect(px, 16 + lane * 13, 8, 10, 3, SSD1306_BLACK); display_.drawRoundRect(px, 16 + lane * 13, 8, 10, 3, SSD1306_WHITE);
     display_.setCursor(1, 56); display_.print(F("D0/D2 lane D1 go L")); display_.print(lives); display_.print(F(" S")); display_.print(score); display_.display(); delay(25);
   }
+  completeGameplayAction(M_ADVENTURE);
   if (lives > 0) {
     ++expeditionWins_; expeditionDepth_ = min<uint8_t>(9, expeditionDepth_ + 1); setEmotion(3, 6, 100);
     const uint8_t wild = static_cast<uint8_t>((expeditionSeed_ + score + season_ * 3) % DEEP_WILD_COUNT); wildSeenMask_ |= (1UL << wild); if (score >= 3) wildFriendMask_ |= (1UL << wild);
@@ -1543,7 +1577,7 @@ void DeepLifeSystem::fossilsPage() {
       waitButtonRelease();
       if ((fossilCompleteMask_ & (1U << pick)) == 0) { popup(F("Fossil incomplete"), F("Find 4 fragments")); }
       else if ((fossilDonatedMask_ & (1U << pick)) != 0) { popup(F("Already in museum"), F("Display is permanent")); }
-      else { fossilDonatedMask_ |= static_cast<uint8_t>(1U << pick); ++museumDonations_; museumLevel_ = min<uint8_t>(9, museumDonations_ / 3); addCoins(4); setAchievement(27); winSound(); popup(F("Fossil donated"), FOSSIL_NAMES[pick]); }
+      else { fossilDonatedMask_ |= static_cast<uint8_t>(1U << pick); ++museumDonations_; museumLevel_ = min<uint8_t>(9, museumDonations_ / 3); lifeWorld.eventCommunityProgress(4, 15, 3, 2); completeGameplayAction(M_COMMUNITY); addCoins(4); setAchievement(27); winSound(); popup(F("Fossil donated"), FOSSIL_NAMES[pick]); }
       evaluateAchievements(); markSaveDirty();
     }
     oldL = l; oldS = s; oldR = r;
@@ -1586,7 +1620,8 @@ void DeepLifeSystem::fishingGame() {
         fishSeenMask_ |= static_cast<uint16_t>(1U << fish); if (quality > fishBest_[fish]) fishBest_[fish] = quality;
         fishingXp_ = static_cast<uint8_t>(min<int>(255, fishingXp_ + quality)); if (fishingXp_ >= 20 && fishingLevel_ < 9) { fishingXp_ -= 20; ++fishingLevel_; }
         if (weeklyGoal_ == 5 && weeklyProgress_ < weeklyTarget_) ++weeklyProgress_;
-        addCoins(static_cast<byte>(1 + quality / 4)); setEmotion(3, 5, 120); goodSound(); popup(F("Fish caught!"), FISH_NAMES[fish]);
+        aquarium.recordFishingCatch(quality); completeGameplayAction(M_ADVENTURE);
+        addCoins(static_cast<byte>(1 + quality / 4)); setEmotion(3, 5, 120); goodSound(); popup(F("Catch + tank food"), FISH_NAMES[fish]);
       } else { setEmotion(6, 3, 121); badSound(); popup(F("It slipped away"), F("Press near the center")); }
       evaluateAchievements(); markSaveDirty(); return;
     }

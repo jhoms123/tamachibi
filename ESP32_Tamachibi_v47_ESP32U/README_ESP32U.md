@@ -194,3 +194,17 @@ different response from a first visit. Their story page shows chapter progress,
 visit count, and invitations. The new three-byte neighbor-memory field uses padding
 in the existing 32-byte city save record; version 2 saves remain loadable and keep
 their relations and resident choices.
+
+## Connected gameplay
+
+Successful activities now share completion events across skills, goals, personal
+promises and memories. Cancelling an activity does not earn progress. House and
+City shortcuts follow the same stage, schedule and Sitter rules as the main menu;
+Sitter pauses plants and fish as well as the Tama. Talk includes a direct Neighbors
+entry, and family readiness grows from actual town relationships and shared life.
+Status page 8 shows the individual pet's natural talent. Paradise has Applied
+Research projects that improve crops, ornamentals, careers and community projects.
+
+See [`../docs/GAMEPLAY_OVERHAUL.md`](../docs/GAMEPLAY_OVERHAUL.md) for the complete
+resource connections and balance rules. Run `python3 tools/check_gameplay.py` from
+the repository root for gameplay regression checks.

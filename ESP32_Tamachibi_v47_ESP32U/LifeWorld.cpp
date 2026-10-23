@@ -1,5 +1,8 @@
 #include "LifeWorld.h"
 #include "NeighborStories.h"
+#include "CityWorld.h"
+#include "GameplayActions.h"
+#include "GameplayProgress.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -12,6 +15,7 @@ extern byte stage, temperament, roomStyle, habitat, favoriteGameId;
 extern byte craftMaterials[];
 extern unsigned int coins, generation;
 extern unsigned long ageTicks;
+extern CityWorldSystem cityWorld;
 extern bool sleeping, sick;
 extern byte visualHour();
 extern byte visualWeather();
@@ -37,6 +41,12 @@ extern void openSaveProfiles();
 extern void openDeepLife();
 
 namespace {
+GameplayProgress &lifeProgress() { static GameplayProgress ledger; return ledger; }
+uint8_t careerSkill(uint8_t career) {
+  static const uint8_t skills[10] = {0,2,7,1,3,7,6,4,5,4};
+  return skills[career % 10];
+}
+
 constexpr uint8_t STAGE_EGG_L = 0;
 constexpr uint8_t STAGE_BABY_L = 1;
 constexpr uint8_t STAGE_CHILD_L = 2;
@@ -121,6 +131,7 @@ LifeWorldSystem::LifeWorldSystem(size_t storageBase, GameDisplay &display,
 }
 
 void LifeWorldSystem::reset() {
+  lifeProgress().reset();
   sequence_ = 0;
   for (uint8_t &v : traits_) v = 50;
   memset(extraSkills_, 0, sizeof(extraSkills_));
@@ -175,6 +186,7 @@ void LifeWorldSystem::fillSave(LifeWorldSave &s) const {
 }
 
 void LifeWorldSystem::applySave(const LifeWorldSave &s) {
+  lifeProgress().reset();
   sequence_ = s.sequence; memcpy(traits_, s.traits, sizeof(traits_)); memcpy(extraSkills_, s.extraSkills, sizeof(extraSkills_));
   careerId_ = s.careerId < LIFE_CAREER_COUNT ? s.careerId : 255; careerRank_ = min<uint8_t>(s.careerRank, 9); careerXp_ = s.careerXp;
   currentLocation_ = s.currentLocation % 8; routineScore_ = min<uint8_t>(s.routineScore, 100); routineFlags_ = s.routineFlags; routineDay_ = s.routineDay; lastRoutineHour_ = s.lastRoutineHour;
@@ -219,6 +231,7 @@ uint8_t LifeWorldSystem::dominantAdvancedSkill() const {
 }
 
 void LifeWorldSystem::startGeneration(uint8_t species, uint16_t gen, uint16_t code, uint8_t temp, uint8_t favoriteFood) {
+  lifeProgress().reset();
   const uint8_t legacySkill = dominantAdvancedSkill();
   const uint8_t legacyValue = extraSkills_[legacySkill];
   memset(extraSkills_, 0, sizeof(extraSkills_));
@@ -268,9 +281,16 @@ void LifeWorldSystem::recordFloristOrder(uint8_t species, uint32_t day) {
 }
 
 void LifeWorldSystem::recordAction(uint8_t action, uint32_t day, uint8_t hour, uint8_t weather) {
-  routineDay_ = day; lastRoutineHour_ = hour; routineFlags_ |= static_cast<uint8_t>(1U << (action % 8));
+  routineDay_ = day; lastRoutineHour_ = hour; const uint8_t category = action == ACTION_FOOD || action == ACTION_COOK ? 0 :
+      action == ACTION_CLEAN || action == ACTION_MED ? 1 :
+      action == ACTION_GAME || action == ACTION_TRAIN || action == ACTION_MUSIC || action == ACTION_TOY ? 2 :
+      action == ACTION_STUDY || action == ACTION_JOB ? 3 :
+      action == ACTION_GARDEN || action == ACTION_PLANTROOM ? 4 :
+      action == ACTION_EXPLORE || action == ACTION_WALK || action == M_ADVENTURE ? 5 :
+      action == ACTION_TALK || action == ACTION_LOVE || action == ACTION_CALL || action == ACTION_FAMILY ? 6 : 7;
+  routineFlags_ |= static_cast<uint8_t>(1U << category);
   if (routineScore_ < 100) ++routineScore_;
-  favoriteWeather_ = weather % 5;
+  (void)weather; // Preferences survive changing weather rather than tracking the last action.
   if (action == ACTION_COOK || action == ACTION_FOOD) { changeByte(extraSkills_[0], 2); changeByte(traits_[3], 1); currentLocation_ = 1; }
   else if (action == ACTION_GARDEN) { changeByte(extraSkills_[1], 2); changeByte(traits_[3], 1); currentLocation_ = 5; }
   else if (action == ACTION_PLANTROOM) { changeByte(extraSkills_[6], 2); changeByte(traits_[0], 1); favoriteRoom_ = 2; if (roomVisits_[2] < 255) ++roomVisits_[2]; currentLocation_ = 0; }
@@ -283,6 +303,14 @@ void LifeWorldSystem::recordAction(uint8_t action, uint32_t day, uint8_t hour, u
   else if (action == ACTION_TRAIN) { changeByte(traits_[2], 2); changeByte(reputation_[2], 1); }
   else if (action == ACTION_JOB) { changeByte(traits_[3], 2); changeByte(reputation_[2], 1); }
   else if (action == ACTION_GAME) { changeByte(traits_[1], 1); changeByte(reputation_[1], 1); }
+  for (uint8_t room = 0; room < 5; ++room)
+    if (roomVisits_[room] > roomVisits_[favoriteRoom_]) favoriteRoom_ = room;
+  if (action == naturalActivity()) {
+    const uint8_t talentSkill = action == ACTION_GARDEN ? 1 : action == ACTION_PLANTROOM || action == ACTION_CRAFT ? 6 :
+        action == M_AQUARIUM ? 3 : action == ACTION_STUDY ? 7 : action == ACTION_MUSIC ? 2 :
+        action == ACTION_COOK ? 0 : 4;
+    changeByte(extraSkills_[talentSkill], 1);
+  }
   markSaveDirty();
 }
 
@@ -290,7 +318,7 @@ void LifeWorldSystem::recordGameResult(uint8_t gameId, bool won) {
   static const uint8_t skillMap[13] = {4,5,7,7,4,6,7,4,7,4,4,0,7};
   uint8_t s = skillMap[gameId % 13]; changeByte(extraSkills_[s], won ? 3 : 1);
   changeByte(reputation_[1], won ? 2 : 1); if (won) changeByte(reputation_[3], 1);
-  if (companionType_ < 8) { changeByte(companionMood_, 1, 10); changeByte(companionBond_, 1); companionXp_ += won ? 3 : 1; }
+  if (companionType_ < 8) eventAdjustCompanion(1, 1, 0, won ? 3 : 1);
 }
 
 void LifeWorldSystem::awardQuest(uint8_t resident, uint8_t qstage) {
@@ -301,7 +329,7 @@ void LifeWorldSystem::awardQuest(uint8_t resident, uint8_t qstage) {
 
 void LifeWorldSystem::recordNeighborInteraction(uint8_t resident, uint8_t interaction, uint8_t relation) {
   resident %= LIFE_RESIDENT_COUNT;
-  favoriteNeighbor_ = resident;
+  if (relation >= cityWorld.relation(favoriteNeighbor_)) favoriteNeighbor_ = resident;
   const uint8_t action = NeighborStories::actionFromRecord(interaction);
   changeByte(extraSkills_[5], action == NeighborStories::CHAT ? 2 : 1);
   changeByte(traits_[1], 1);
@@ -379,7 +407,10 @@ void LifeWorldSystem::tick(uint32_t day, uint8_t hour, uint8_t st, uint8_t weath
   currentLocation_ = calculateLocation(st, hour, weekday);
   if (lastDailyUpdate_ != day) {
     lastDailyUpdate_ = day;
-    if (routineFlags_ >= 3) changeByte(routineScore_, 2); else changeByte(routineScore_, -2);
+    if (__builtin_popcount(static_cast<unsigned int>(routineFlags_)) >= 3) {
+      changeByte(routineScore_, 2);
+      if (routineScore_ >= 80) { changeTrust(1); changeByte(traits_[3], 1); }
+    } else changeByte(routineScore_, -2);
     routineFlags_ = 0;
     if (companionType_ < 8) {
       changeByte(companionEnergy_, -1, 10); changeByte(companionMood_, -1, 10);
@@ -419,8 +450,8 @@ void LifeWorldSystem::eventCommunityProgress(uint8_t project, uint8_t progress, 
   project %= LIFE_PROJECT_COUNT;
   if (projectLevel_[project] < 3) {
     uint16_t total = static_cast<uint16_t>(projectProgress_[project]) + progress;
-    while (total >= 10 && projectLevel_[project] < 3) { total -= 10; ++projectLevel_[project]; recordMemory(8, petAgeDays(), project); }
-    projectProgress_[project] = static_cast<uint8_t>(min<uint16_t>(9, total));
+    while (total >= 100 && projectLevel_[project] < 3) { total -= 100; ++projectLevel_[project]; recordMemory(8, petAgeDays(), project); }
+    projectProgress_[project] = static_cast<uint8_t>(min<uint16_t>(99, total));
   }
   changeByte(reputation_[reputationKind % 5], reputationDelta);
   markSaveDirty();
@@ -468,7 +499,7 @@ const __FlashStringHelper *LifeWorldSystem::careerName(uint8_t c) const {
   switch (c % LIFE_CAREER_COUNT) { case 0:return F("Chef"); case 1:return F("Musician"); case 2:return F("Scientist"); case 3:return F("Gardener"); case 4:return F("Doctor"); case 5:return F("Teacher"); case 6:return F("Artist"); case 7:return F("Astronaut"); case 8:return F("Shopkeeper"); default:return F("Athlete"); }
 }
 
-uint8_t LifeWorldSystem::careerPayBonus() const { return careerId_ < LIFE_CAREER_COUNT ? static_cast<uint8_t>(careerRank_ + extraSkills_[careerId_ % LIFE_SKILL_COUNT] / 20) : 0; }
+uint8_t LifeWorldSystem::careerPayBonus() const { return careerId_ < LIFE_CAREER_COUNT ? static_cast<uint8_t>(careerRank_ + extraSkills_[careerSkill(careerId_)] / 18) : 0; }
 
 void LifeWorldSystem::addCareerXp(uint16_t amount) {
   careerXp_ = min<uint16_t>(65000, careerXp_ + amount); uint16_t need = static_cast<uint16_t>((careerRank_ + 1) * 25);
@@ -481,8 +512,8 @@ void LifeWorldSystem::workCareer() {
   while (true) {
     if (rightHoldExitCheck()) return; bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);
     if (ol==HIGH&&l==LOW){pick=pick?pick-1:LIFE_CAREER_COUNT-1;clickSound();delay(100);} if(orr==HIGH&&r==LOW){pick=(pick+1)%LIFE_CAREER_COUNT;clickSound();delay(100);}
-    if(os==HIGH&&s==LOW){waitButtonRelease(); if(careerId_!=pick){careerId_=pick;careerRank_=0;careerXp_=0;goodSound();popup(F("Career selected"),careerName(pick));return;} if(energy<2){badSound();popup(F("Too tired"),F("Rest first"));return;} uint8_t skill=extraSkills_[pick%LIFE_SKILL_COUNT]; uint8_t pay=static_cast<uint8_t>(3+careerRank_+skill/18); addCoins(pay); addCareerXp(static_cast<uint16_t>(5+skill/20)); subStat(energy,2); subStat(full,1); changeByte(reputation_[2],2); changeByte(reputation_[3],1); recordMemory(5,petAgeDays(),pick); markSaveDirty(); goodSound(); popup(F("Work complete"),careerName(pick));return;}
-    ol=l;os=s;orr=r; display_.clearDisplay();drawHeader(F("CAREERS"),pick+1,LIFE_CAREER_COUNT);display_.drawRoundRect(4,15,120,38,5,SSD1306_WHITE);drawCurrentPetTiny(10,31);display_.setCursor(40,22);display_.print(careerName(pick));display_.setCursor(40,34);display_.print(F("Rank "));display_.print(careerId_==pick?careerRank_:0);display_.setCursor(40,44);display_.print(F("Skill "));display_.print(extraSkills_[pick%LIFE_SKILL_COUNT]);display_.setCursor(2,56);display_.print(careerId_==pick?F("D1 work"):F("D1 choose career"));display_.display();delay(25);
+    if(os==HIGH&&s==LOW){waitButtonRelease(); if(careerId_!=pick){careerId_=pick;careerRank_=0;careerXp_=0;goodSound();popup(F("Career selected"),careerName(pick));return;} if(energy<2){badSound();popup(F("Too tired"),F("Rest first"));return;} if(!completeGameplayAction(M_JOB)){popup(F("Shift already finished"),F("Try another activity"));return;} uint8_t skill=extraSkills_[careerSkill(pick)]; uint8_t pay=static_cast<uint8_t>(3+careerPayBonus()); addCoins(pay); addCareerXp(static_cast<uint16_t>(5+skill/20)); subStat(energy,2); subStat(full,1); changeByte(reputation_[2],2); changeByte(reputation_[3],1); recordMemory(5,petAgeDays(),pick); markSaveDirty(); goodSound(); popup(F("Work complete"),careerName(pick));return;}
+    ol=l;os=s;orr=r; display_.clearDisplay();drawHeader(F("CAREERS"),pick+1,LIFE_CAREER_COUNT);display_.drawRoundRect(4,15,120,38,5,SSD1306_WHITE);drawCurrentPetTiny(10,31);display_.setCursor(40,22);display_.print(careerName(pick));display_.setCursor(40,34);display_.print(F("Rank "));display_.print(careerId_==pick?careerRank_:0);display_.setCursor(40,44);display_.print(F("Skill "));display_.print(extraSkills_[careerSkill(pick)]);display_.setCursor(2,56);display_.print(careerId_==pick?F("D1 work"):F("D1 choose career"));display_.display();delay(25);
   }
 }
 
@@ -570,14 +601,14 @@ void LifeWorldSystem::popup(const __FlashStringHelper *a,const char *b,uint16_t 
 
 void LifeWorldSystem::runHub() {
   uint8_t pick=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();
-  while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){pick=pick?pick-1:15;clickSound();delay(100);}if(orr==HIGH&&r==LOW){pick=(pick+1)%16;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();switch(pick){case 0:personalityPage();break;case 1:skillsPage();break;case 2:routinePage();break;case 3:residentQuestPage();break;case 4:gameTalentPage();break;case 5:decorPage();break;case 6:expeditionPage();break;case 7:companionPage();break;case 8:familyTreePage();break;case 9:scrapbookPage();break;case 10:clinicPage();break;case 11:communityPage();break;case 12:festivalPage();break;case 13:reputationPage();break;case 14:openDeepLife();break;default:openSaveProfiles();break;}ol=os=orr=HIGH;waitButtonRelease();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("LIVING WORLD"),pick+1,16);display_.drawRoundRect(4,15,120,37,5,SSD1306_WHITE);drawHubIcon(pick,10,19);display_.setCursor(46,23);display_.print(HUB_NAMES[pick]);display_.setCursor(46,36);if(pick==0)display_.print(F("Memories shape behavior"));else if(pick==1)display_.print(F("12 skills, 10 careers"));else if(pick==2)display_.print(locationName(currentLocation_));else if(pick==3)display_.print(F("8 resident questlines"));else if(pick==4)display_.print(F("Practice changes play"));else if(pick==5)display_.print(F("3 safe decor slots"));else if(pick==6)display_.print(F("6 branching regions"));else if(pick==7)display_.print(companionType_<8?COMPANION_NAMES[companionType_]:"Adopt a small friend");else if(pick==8)display_.print(F("Heirlooms and ancestors"));else if(pick==9)display_.print(F("Automatic memories"));else if(pick==10)display_.print(F("Symptoms and treatment"));else if(pick==11)display_.print(F("Build the whole city"));else if(pick==12)display_.print(F("8 recurring contests"));else if(pick==13)display_.print(F("Choices change reputation"));else if(pick==14)display_.print(F("Stories, rivals, museum"));else display_.print(F("Main / test / backup"));display_.setCursor(1,56);display_.print(F("D0/D2 browse  D1 open"));display_.display();delay(25);}
+  while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){pick=pick?pick-1:15;clickSound();delay(100);}if(orr==HIGH&&r==LOW){pick=(pick+1)%16;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(((pick==5||pick==6)&&stage<STAGE_TEEN_L)||((pick==7||pick==11||pick==12)&&stage<STAGE_CHILD_L)){popup(F("Keep growing"),F("This activity opens later"));ol=os=orr=HIGH;continue;}switch(pick){case 0:personalityPage();break;case 1:skillsPage();break;case 2:routinePage();break;case 3:residentQuestPage();break;case 4:gameTalentPage();break;case 5:decorPage();break;case 6:expeditionPage();break;case 7:companionPage();break;case 8:familyTreePage();break;case 9:scrapbookPage();break;case 10:clinicPage();break;case 11:communityPage();break;case 12:festivalPage();break;case 13:reputationPage();break;case 14:openDeepLife();break;default:openSaveProfiles();break;}ol=os=orr=HIGH;waitButtonRelease();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("LIVING WORLD"),pick+1,16);display_.drawRoundRect(4,15,120,37,5,SSD1306_WHITE);drawHubIcon(pick,10,19);display_.setCursor(46,23);display_.print(HUB_NAMES[pick]);display_.setCursor(46,36);if(pick==0)display_.print(F("Memories shape behavior"));else if(pick==1)display_.print(F("12 skills, 10 careers"));else if(pick==2)display_.print(locationName(currentLocation_));else if(pick==3)display_.print(F("8 resident questlines"));else if(pick==4)display_.print(F("Practice changes play"));else if(pick==5)display_.print(F("3 safe decor slots"));else if(pick==6)display_.print(F("6 branching regions"));else if(pick==7)display_.print(companionType_<8?COMPANION_NAMES[companionType_]:"Adopt a small friend");else if(pick==8)display_.print(F("Heirlooms and ancestors"));else if(pick==9)display_.print(F("Automatic memories"));else if(pick==10)display_.print(F("Symptoms and treatment"));else if(pick==11)display_.print(F("Build the whole city"));else if(pick==12)display_.print(F("8 recurring contests"));else if(pick==13)display_.print(F("Choices change reputation"));else if(pick==14)display_.print(F("Stories, rivals, museum"));else display_.print(F("Main / test / backup"));display_.setCursor(1,56);display_.print(F("D0/D2 browse  D1 open"));display_.display();delay(25);}
 }
 
-void LifeWorldSystem::personalityPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p? p-1:2;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%3;clickSound();delay(100);}if(os==HIGH&&s==LOW){changeByte(traits_[p%4],1);changeBond(1);goodSound();popup(F("Quiet reflection"),F("A memory grew"));markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("PERSONALITY"),p+1,3);if(p==0){display_.setCursor(3,16);display_.print(F("Curious "));display_.print(traits_[0]);display_.setCursor(3,27);display_.print(F("Social  "));display_.print(traits_[1]);display_.setCursor(3,38);display_.print(F("Brave   "));display_.print(traits_[2]);display_.setCursor(3,49);display_.print(F("Reliable "));display_.print(traits_[3]);}else if(p==1){display_.setCursor(3,16);display_.print(F("Favorite room: "));display_.print(favoriteRoom_);display_.setCursor(3,28);display_.print(F("Weather: "));display_.print(favoriteWeather_);display_.setCursor(3,40);display_.print(F("Best friend: "));display_.print(RESIDENT_NAMES[favoriteNeighbor_]);display_.setCursor(3,52);display_.print(F("Fear type: "));display_.print(fearType_);}else{display_.setCursor(3,16);display_.print(F("Memory types found"));display_.setCursor(3,29);display_.print(F("Mask 0x"));display_.print(importantMemoryMask_);display_.setCursor(3,42);display_.print(F("Routine shapes traits"));display_.setCursor(3,54);display_.print(F("D1 reflect together"));}display_.display();delay(25);}}
+void LifeWorldSystem::personalityPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p? p-1:2;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%3;clickSound();delay(100);}if(os==HIGH&&s==LOW){popup(F("Personality grows"),F("Through lived choices"));}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("PERSONALITY"),p+1,3);if(p==0){display_.setCursor(3,16);display_.print(F("Curious "));display_.print(traits_[0]);display_.setCursor(3,27);display_.print(F("Social  "));display_.print(traits_[1]);display_.setCursor(3,38);display_.print(F("Brave   "));display_.print(traits_[2]);display_.setCursor(3,49);display_.print(F("Reliable "));display_.print(traits_[3]);}else if(p==1){display_.setCursor(3,16);display_.print(F("Favorite room: "));display_.print(favoriteRoom_);display_.setCursor(3,28);display_.print(F("Weather: "));display_.print(favoriteWeather_);display_.setCursor(3,40);display_.print(F("Best friend: "));display_.print(RESIDENT_NAMES[favoriteNeighbor_]);display_.setCursor(3,52);display_.print(F("Fear type: "));display_.print(fearType_);}else{display_.setCursor(3,16);display_.print(F("Memory types found"));display_.setCursor(3,29);display_.print(F("Mask 0x"));display_.print(importantMemoryMask_);display_.setCursor(3,42);display_.print(F("Routine shapes traits"));display_.setCursor(3,54);display_.print(F("D1 reflect together"));}display_.display();delay(25);}}
 
 void LifeWorldSystem::skillsPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p? p-1:3;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%4;clickSound();delay(100);}if(os==HIGH&&s==LOW){workCareer();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("SKILLS"),p+1,4);if(p<2){uint8_t start=p*4;for(uint8_t i=0;i<4;i++){display_.setCursor(2,15+i*11);display_.print(SKILL_NAMES[start+i]);display_.setCursor(104,15+i*11);display_.print(extraSkills_[start+i]);}}else if(p==2){display_.setCursor(2,16);display_.print(F("Smart "));display_.print(skillSmart);display_.setCursor(2,28);display_.print(F("Fitness "));display_.print(skillFit);display_.setCursor(2,40);display_.print(F("Style "));display_.print(skillStyle);display_.setCursor(2,52);display_.print(F("Kindness "));display_.print(skillKind);}else{display_.setCursor(2,16);display_.print(F("Career: "));display_.print(careerId_<LIFE_CAREER_COUNT?careerName(careerId_):F("None"));display_.setCursor(2,29);display_.print(F("Rank "));display_.print(careerRank_);display_.print(F(" XP "));display_.print(careerXp_);display_.setCursor(2,42);display_.print(F("Pay bonus +"));display_.print(careerPayBonus());display_.setCursor(2,55);display_.print(F("D1 choose/work"));}display_.display();delay(25);}}
 
-void LifeWorldSystem::routinePage(){bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(os==HIGH&&s==LOW){routineFlags_=0;routineScore_=50;goodSound();popup(F("Routine refreshed"),F("Today starts clean"));markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("DAILY ROUTINE"),1,1);display_.setCursor(2,15);display_.print(F("Now: "));display_.print(locationName(currentLocation_));display_.setCursor(2,27);display_.print(F("Hour "));display_.print(visualHour());display_.print(F("  Score "));display_.print(routineScore_);display_.setCursor(2,39);display_.print(F("7/12/18 Kitchen"));display_.setCursor(2,49);display_.print(F("School/work by age"));display_.setCursor(2,58);display_.print(F("D1 reset today"));display_.display();delay(40);}}
+void LifeWorldSystem::routinePage(){bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(os==HIGH&&s==LOW){popup(F("Build a steady day"),F("Care, talk, play, rest"));}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("DAILY ROUTINE"),1,1);display_.setCursor(2,15);display_.print(F("Now: "));display_.print(locationName(currentLocation_));display_.setCursor(2,27);display_.print(F("Hour "));display_.print(visualHour());display_.print(F("  Score "));display_.print(routineScore_);display_.setCursor(2,39);display_.print(F("Steady days build trust"));display_.setCursor(2,49);display_.print(F("School/work by age"));display_.setCursor(2,58);display_.print(F("D1 routine advice"));display_.display();delay(40);}}
 
 void LifeWorldSystem::residentQuestPage() {
   uint8_t p = 0;
@@ -626,11 +657,49 @@ void LifeWorldSystem::residentQuestPage() {
 
 void LifeWorldSystem::gameTalentPage(){uint8_t g=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){g=g?g-1:12;clickSound();delay(100);}if(orr==HIGH&&r==LOW){g=(g+1)%13;clickSound();delay(100);}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("GAME TALENTS"),g+1,13);drawHubIcon(4,6,18);display_.setCursor(43,18);display_.print(F("Game "));display_.print(g+1);display_.setCursor(43,30);display_.print(F("Assist +"));display_.print(gameAssist(g));display_.setCursor(43,42);display_.print(F("Practice skill "));static const uint8_t m[13]={4,5,7,7,4,6,7,4,7,4,4,0,7};display_.print(extraSkills_[m[g]]);display_.setCursor(2,56);display_.print(F("High skill widens rewards"));display_.display();delay(30);}}
 
-void LifeWorldSystem::decorPage(){uint8_t item=0,slot=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){item=item?item-1:LIFE_DECOR_COUNT-1;clickSound();delay(100);}if(orr==HIGH&&r==LOW){item=(item+1)%LIFE_DECOR_COUNT;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(!(decorOwnedMask_&(1U<<item))){uint8_t cost=2+item/3;if(!spendCoins(cost)){badSound();popup(F("Need more coins"),F("Work or explore"));}else{decorOwnedMask_|=(1U<<item);goodSound();popup(F("Decor purchased"),F("Select again to place"));}}else{decorPlaced_[slot]=item;slot=(slot+1)%3;favoriteRoom_=roomStyle%5;changeByte(extraSkills_[6],2);goodSound();popup(F("Placed safely"),slot==0?F("Next: left floor"):(slot==1?F("Next: right floor"):F("Next: wall")));}markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("DECOR"),item+1,LIFE_DECOR_COUNT);display_.fillRect(2,15,34,35,SSD1306_BLACK);display_.drawRoundRect(2,15,34,35,5,SSD1306_WHITE);drawDecorSprite(item,10,25);display_.setCursor(43,19);display_.print(DECOR_NAMES[item]);display_.setCursor(43,31);display_.print((decorOwnedMask_&(1U<<item))?F("Owned"):F("Not owned"));display_.setCursor(43,43);display_.print(F("Place slot "));display_.print(slot+1);display_.setCursor(2,56);display_.print(F("Side slots keep pet clear"));display_.display();delay(25);}}
+void LifeWorldSystem::decorPage(){uint8_t item=0,slot=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){item=item?item-1:LIFE_DECOR_COUNT-1;clickSound();delay(100);}if(orr==HIGH&&r==LOW){item=(item+1)%LIFE_DECOR_COUNT;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(!(decorOwnedMask_&(1U<<item))){uint8_t cost=2+item/3;if(!spendCoins(cost)){badSound();popup(F("Need more coins"),F("Work or explore"));}else{decorOwnedMask_|=(1U<<item);goodSound();popup(F("Decor purchased"),F("Select again to place"));}}else{if(decorPlaced_[slot]!=item)completeGameplayAction(M_ROOM);decorPlaced_[slot]=item;slot=(slot+1)%3;favoriteRoom_=roomStyle%5;goodSound();popup(F("Placed safely"),slot==0?F("Next: left floor"):(slot==1?F("Next: right floor"):F("Next: wall")));}markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("DECOR"),item+1,LIFE_DECOR_COUNT);display_.fillRect(2,15,34,35,SSD1306_BLACK);display_.drawRoundRect(2,15,34,35,5,SSD1306_WHITE);drawDecorSprite(item,10,25);display_.setCursor(43,19);display_.print(DECOR_NAMES[item]);display_.setCursor(43,31);display_.print((decorOwnedMask_&(1U<<item))?F("Owned"):F("Not owned"));display_.setCursor(43,43);display_.print(F("Place slot "));display_.print(slot+1);display_.setCursor(2,56);display_.print(F("Side slots keep pet clear"));display_.display();delay(25);}}
 
-void LifeWorldSystem::expeditionPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:5;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%6;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(energy<2){badSound();popup(F("Too tired"),F("Rest first"));return;}uint8_t challenge=20+p*10;uint8_t power=extraSkills_[4]+traits_[2]/2+(companionType_<8?companionLevel_*4:0);subStat(energy,2);expeditionVisitedMask_|=(1U<<p);if(power+random(0,31)>=challenge){changeByte(expeditionMastery_[p],1,10);changeByte(extraSkills_[4],3);changeByte(reputation_[4],3);uint8_t mat=p%6;if(craftMaterials[mat]<250)craftMaterials[mat]++;addCoins(2+p);recordMemory(4,petAgeDays(),p);winSound();popup(F("Expedition success"),F("Material discovered"));}else{changeByte(extraSkills_[4],1);goodSound();popup(F("Trail mapped"),F("Try again stronger"));}markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("EXPEDITION"),p+1,6);drawHubIcon(6,5,19);display_.setCursor(40,17);display_.print(EXPEDITION_NAMES[p]);display_.setCursor(40,29);display_.print(F("Mastery "));display_.print(expeditionMastery_[p]);display_.setCursor(40,41);display_.print(F("Need explore "));display_.print(20+p*10);display_.setCursor(2,56);display_.print(F("D1 choose path and search"));display_.display();delay(25);}}
+void LifeWorldSystem::expeditionPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:5;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%6;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(energy<2){badSound();popup(F("Too tired"),F("Rest first"));return;}uint8_t challenge=20+p*10;uint8_t power=extraSkills_[4]+traits_[2]/2+(companionType_<8?companionLevel_*4:0);subStat(energy,2);completeGameplayAction(M_ADVENTURE);expeditionVisitedMask_|=(1U<<p);if(power+random(0,31)>=challenge){changeByte(expeditionMastery_[p],1,10);changeByte(extraSkills_[4],3);changeByte(reputation_[4],3);uint8_t mat=p%6;if(craftMaterials[mat]<250)craftMaterials[mat]++;addCoins(2+p);recordMemory(4,petAgeDays(),p);winSound();popup(F("Expedition success"),F("Material discovered"));}else{changeByte(extraSkills_[4],1);goodSound();popup(F("Trail mapped"),F("Try again stronger"));}markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("EXPEDITION"),p+1,6);drawHubIcon(6,5,19);display_.setCursor(40,17);display_.print(EXPEDITION_NAMES[p]);display_.setCursor(40,29);display_.print(F("Mastery "));display_.print(expeditionMastery_[p]);display_.setCursor(40,41);display_.print(F("Need explore "));display_.print(20+p*10);display_.setCursor(2,56);display_.print(F("D1 choose path and search"));display_.display();delay(25);}}
 
-void LifeWorldSystem::companionPage(){uint8_t p=companionType_<8?companionType_:0;uint8_t act=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(companionType_>=8){if(ol==HIGH&&l==LOW){p=p?p-1:7;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%8;clickSound();delay(100);}}else{if(ol==HIGH&&l==LOW){act=act?act-1:2;clickSound();delay(100);}if(orr==HIGH&&r==LOW){act=(act+1)%3;clickSound();delay(100);}}if(os==HIGH&&s==LOW){waitButtonRelease();if(companionType_>=8){if(!spendCoins(8)){badSound();popup(F("Need 8 coins"),F("Adoption fee"));}else{companionType_=p;companionBond_=20;companionEnergy_=8;companionMood_=8;recordMemory(7,petAgeDays(),p);winSound();popup(F("Companion adopted"),F("Lives beside your Tama"));}}else if(act==0){if(!spendCoins(1)){badSound();popup(F("Need 1 coin"),F("Companion snack"));}else{changeByte(companionEnergy_,3,10);changeByte(companionBond_,2);goodSound();popup(F("Snack shared"),COMPANION_NAMES[companionType_]);}}else if(act==1){changeByte(companionMood_,3,10);changeByte(companionBond_,2);companionXp_+=3;goodSound();popup(F("Played together"),COMPANION_NAMES[companionType_]);}else{if(companionEnergy_<2){badSound();popup(F("Companion tired"),F("Feed first"));}else{changeByte(companionEnergy_,-2,10);companionXp_+=5;changeByte(companionBond_,1);if(companionXp_>=(companionLevel_+1)*20&&companionLevel_<9){companionXp_=0;companionLevel_++;winSound();popup(F("Companion leveled"),COMPANION_NAMES[companionType_]);}else goodSound();}}markSaveDirty();}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("COMPANION"),companionType_<8?act+1:p+1,companionType_<8?3:8);drawCompanionSprite(companionType_<8?companionType_:p,9,24,0);display_.setCursor(40,17);display_.print(COMPANION_NAMES[companionType_<8?companionType_:p]);if(companionType_>=8){display_.setCursor(40,30);display_.print(F("Adopt for 8 coins"));display_.setCursor(40,43);display_.print(F("D1 adopt"));}else{display_.setCursor(40,29);display_.print(F("Bond "));display_.print(companionBond_);display_.print(F(" Lv "));display_.print(companionLevel_);display_.setCursor(40,41);display_.print(F("E"));display_.print(companionEnergy_);display_.print(F(" M"));display_.print(companionMood_);display_.setCursor(2,56);display_.print(act==0?F("D1 feed"):act==1?F("D1 play"):F("D1 train"));}display_.display();delay(25);}}
+void LifeWorldSystem::companionPage() {
+  uint8_t pick = companionType_ < 8 ? companionType_ : 0, action = 0;
+  bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  waitButtonRelease();
+  while (true) {
+    if (rightHoldExitCheck()) return;
+    bool l = digitalRead(btnL_), sb = digitalRead(btnS_), r = digitalRead(btnR_);
+    if (oldL == HIGH && l == LOW) { if (hasCompanion()) action = (action + 2) % 3; else pick = (pick + 7) % 8; clickSound(); }
+    if (oldR == HIGH && r == LOW) { if (hasCompanion()) action = (action + 1) % 3; else pick = (pick + 1) % 8; clickSound(); }
+    if (oldS == HIGH && sb == LOW) {
+      waitButtonRelease();
+      if (!hasCompanion()) {
+        if (stage < STAGE_CHILD_L) { popup(F("Companions need child"), F("Grow together soon")); return; }
+        if (!spendCoins(8)) { popup(F("Need 8 coins"), F("Adoption fee")); return; }
+        companionType_ = pick; companionBond_ = 20; companionEnergy_ = companionMood_ = 8;
+        recordMemory(7, petAgeDays(), pick); completeGameplayAction(M_COMPANION);
+        popup(F("A friend moved in"), COMPANION_NAMES[pick]); markSaveDirty(); return;
+      }
+      if (action == 0 && companionEnergy_ >= 9) { popup(F("Friend is already full"), F("Play or train instead")); return; }
+      if (action == 0 && coins < 1) { popup(F("Need 1 coin"), F("Companion snack")); return; }
+      if (action != 0 && companionEnergy_ < 2) { popup(F("Companion is tired"), F("Share food first")); return; }
+      if (!completeGameplayAction(M_COMPANION)) { popup(F("Friend needs a pause"), F("Try another activity")); return; }
+      if (action == 0) { spendCoins(1); eventAdjustCompanion(2, 1, 3, 1); }
+      else if (action == 1) { eventAdjustCompanion(2, 3, -1, 3); addStat(happy, 1); }
+      else eventAdjustCompanion(1, 1, -2, 5);
+      markSaveDirty(); popup(F("Shared a real moment"), COMPANION_NAMES[companionType_]); return;
+    }
+    oldL = l; oldS = sb; oldR = r;
+    display_.clearDisplay(); drawHeader(F("COMPANION"), hasCompanion() ? action + 1 : pick + 1, hasCompanion() ? 3 : 8);
+    drawCompanionSprite(hasCompanion() ? companionType_ : pick, 9, 24, 0);
+    display_.setCursor(40, 17); display_.print(COMPANION_NAMES[hasCompanion() ? companionType_ : pick]);
+    display_.setCursor(40, 30);
+    if (!hasCompanion()) display_.print(F("Adopt for 8 coins"));
+    else { display_.print(F("Bond ")); display_.print(companionBond_); display_.print(F(" Lv ")); display_.print(companionLevel_); }
+    display_.setCursor(40, 43); display_.print(F("Energy ")); display_.print(companionEnergy_);
+    display_.setCursor(2, 56); display_.print(!hasCompanion() ? F("D1 adopt") : action == 0 ? F("D1 share snack") : action == 1 ? F("D1 play") : F("D1 train for expeditions"));
+    display_.display(); delay(25);
+  }
+}
 
 void LifeWorldSystem::familyTreePage(){if(familyCount_==0){popup(F("No ancestors yet"),F("Complete a generation"));return;}uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:familyCount_-1;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%familyCount_;clickSound();delay(100);}ol=l;os=s;orr=r;uint8_t idx=(familyHead_+LIFE_FAMILY_COUNT-familyCount_+p)%LIFE_FAMILY_COUNT;display_.clearDisplay();drawHeader(F("FAMILY LEGACY"),p+1,familyCount_);drawSprite16(familySpecies_[idx]%50,6,23);display_.setCursor(30,16);display_.print(F("Generation "));display_.print(familyGeneration_[idx]);display_.setCursor(30,28);display_.print(F("Career "));display_.print(familyCareer_[idx]<LIFE_CAREER_COUNT?careerName(familyCareer_[idx]):F("None"));display_.setCursor(30,40);display_.print(F("Achievement "));display_.print(familyAchievement_[idx]);display_.setCursor(30,52);display_.print(F("Heirloom "));display_.print(DECOR_NAMES[familyHeirloom_[idx]%LIFE_DECOR_COUNT]);display_.display();delay(25);}}
 
@@ -638,9 +707,9 @@ void LifeWorldSystem::scrapbookPage(){if(scrapCount_==0){popup(F("Scrapbook empt
 
 void LifeWorldSystem::clinicPage(){uint8_t pick=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){pick=pick?pick-1:2;clickSound();delay(100);}if(orr==HIGH&&r==LOW){pick=(pick+1)%3;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(pick==0){changeByte(extraSkills_[3],1);goodSound();popup(F("Diagnosis recorded"),conditionType?F("Symptoms identified"):F("Healthy today"));}else if(pick==1){if(conditionType==0){popup(F("No treatment needed"),F("Healthy"));}else if(!spendCoins(2)){badSound();popup(F("Need 2 coins"),F("Clinic supplies"));}else{conditionSeverity=conditionSeverity>0?conditionSeverity-1:0;conditionTicks=0;if(conditionSeverity==0){conditionType=0;sick=false;}changeByte(extraSkills_[3],3);changeByte(reputation_[0],2);winSound();popup(F("Treatment complete"),F("Rest and recover"));}}else{addStat(energy,2);addStat(health,1);sleeping=false;changeByte(traits_[3],1);goodSound();popup(F("Recovery plan"),F("Energy restored"));}markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("HEALTH CLINIC"),pick+1,3);drawHubIcon(10,5,19);display_.setCursor(40,17);display_.print(conditionType?F("Condition active"):F("No condition"));display_.setCursor(40,29);display_.print(F("Severity "));display_.print(conditionSeverity);display_.setCursor(40,41);display_.print(pick==0?F("Inspect symptoms"):pick==1?F("Target treatment"):F("Rest plan"));display_.setCursor(2,56);display_.print(F("D1 select"));display_.display();delay(25);}}
 
-void LifeWorldSystem::communityPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:5;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%6;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(projectLevel_[p]>=3){popup(F("Project complete"),PROJECT_NAMES[p]);}else if(!spendCoins(3)){badSound();popup(F("Need 3 coins"),F("Community fund"));}else{projectProgress_[p]+=25;if(projectProgress_[p]>=100){projectProgress_[p]=0;projectLevel_[p]++;changeByte(reputation_[0],5);changeByte(reputation_[3],2);recordMemory(10,petAgeDays(),p);winSound();popup(F("City upgraded"),PROJECT_NAMES[p]);}else{goodSound();popup(F("Contribution added"),PROJECT_NAMES[p]);}markSaveDirty();}}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("COMMUNITY"),p+1,6);drawHubIcon(11,5,19);display_.setCursor(40,17);display_.print(PROJECT_NAMES[p]);display_.setCursor(40,29);display_.print(F("Level "));display_.print(projectLevel_[p]);display_.print(F("/3"));display_.setCursor(40,41);display_.print(F("Progress "));display_.print(projectProgress_[p]);display_.print(F("%"));display_.setCursor(2,56);display_.print(F("D1 donate 3 coins"));display_.display();delay(25);}}
+void LifeWorldSystem::communityPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:5;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%6;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(projectLevel_[p]>=3){popup(F("Project complete"),PROJECT_NAMES[p]);}else if(!spendCoins(3)){badSound();popup(F("Need 3 coins"),F("Community fund"));}else{completeGameplayAction(M_COMMUNITY);projectProgress_[p]+=25;if(projectProgress_[p]>=100){projectProgress_[p]-=100;projectLevel_[p]++;changeByte(reputation_[0],5);changeByte(reputation_[3],2);recordMemory(10,petAgeDays(),p);winSound();popup(F("City upgraded"),PROJECT_NAMES[p]);}else{goodSound();popup(F("Contribution added"),PROJECT_NAMES[p]);}markSaveDirty();}}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("COMMUNITY"),p+1,6);drawHubIcon(11,5,19);display_.setCursor(40,17);display_.print(PROJECT_NAMES[p]);display_.setCursor(40,29);display_.print(F("Level "));display_.print(projectLevel_[p]);display_.print(F("/3"));display_.setCursor(40,41);display_.print(F("Progress "));display_.print(projectProgress_[p]);display_.print(F("%"));display_.setCursor(2,56);display_.print(F("D1 donate 3 coins"));display_.display();delay(25);}}
 
-void LifeWorldSystem::festivalPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:7;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%8;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();uint8_t today=petAgeDays()%8;if(p!=today){badSound();popup(F("Festival not today"),F("Return on its event day"));return;}uint8_t skillMap[8]={0,1,2,4,6,7,7,4};uint8_t score=static_cast<uint8_t>(min<int>(99,extraSkills_[skillMap[p]]/2+traits_[p%4]/3+random(0,31)));if(score>festivalBest_[p])festivalBest_[p]=score;if(score>=55){festivalWins_[p]++;festivalTrophyMask_|=(1U<<p);addCoins(8);changeByte(reputation_[3],5);recordMemory(8,petAgeDays(),p);winSound();popup(F("Festival victory!"),F("Trophy and 8 coins"));}else{changeByte(extraSkills_[skillMap[p]],2);goodSound();popup(F("Good performance"),F("Practice for next time"));}markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("FESTIVAL"),p+1,8);drawHubIcon(12,5,19);display_.setCursor(40,17);display_.print(FESTIVAL_NAMES[p]);display_.setCursor(40,29);display_.print(F("Wins "));display_.print(festivalWins_[p]);display_.setCursor(40,41);display_.print(F("Best "));display_.print(festivalBest_[p]);display_.setCursor(2,53);display_.print(p==petAgeDays()%8?F("TODAY - D1 enter"):F("Scheduled another day"));display_.display();delay(25);}}
+void LifeWorldSystem::festivalPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:7;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%8;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();uint8_t today=petAgeDays()%8;if(p!=today){badSound();popup(F("Festival not today"),F("Return on its event day"));return;}if(!lifeProgress().claim(M_FESTIVAL,petAgeDays(),generation)){popup(F("Entered today already"),F("Return next event day"));return;}completeGameplayAction(M_FESTIVAL);uint8_t skillMap[8]={0,1,2,4,6,7,7,4};uint8_t score=static_cast<uint8_t>(min<int>(99,extraSkills_[skillMap[p]]/2+traits_[p%4]/3+random(0,31)));if(score>festivalBest_[p])festivalBest_[p]=score;if(score>=55){festivalWins_[p]++;festivalTrophyMask_|=(1U<<p);addCoins(8);changeByte(reputation_[3],5);recordMemory(8,petAgeDays(),p);winSound();popup(F("Festival victory!"),F("Trophy and 8 coins"));}else{changeByte(extraSkills_[skillMap[p]],2);goodSound();popup(F("Good performance"),F("Practice for next time"));}markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("FESTIVAL"),p+1,8);drawHubIcon(12,5,19);display_.setCursor(40,17);display_.print(FESTIVAL_NAMES[p]);display_.setCursor(40,29);display_.print(F("Wins "));display_.print(festivalWins_[p]);display_.setCursor(40,41);display_.print(F("Best "));display_.print(festivalBest_[p]);display_.setCursor(2,53);display_.print(p==petAgeDays()%8?F("TODAY - D1 enter"):F("Scheduled another day"));display_.display();delay(25);}}
 
 void LifeWorldSystem::reputationPage(){uint8_t p=0;bool ol=HIGH,os=HIGH,orr=HIGH;waitButtonRelease();while(true){if(rightHoldExitCheck())return;bool l=digitalRead(btnL_),s=digitalRead(btnS_),r=digitalRead(btnR_);if(ol==HIGH&&l==LOW){p=p?p-1:2;clickSound();delay(100);}if(orr==HIGH&&r==LOW){p=(p+1)%3;clickSound();delay(100);}if(os==HIGH&&s==LOW){waitButtonRelease();if(p==0){changeByte(reputation_[0],3);changeByte(reputation_[2],2);changeByte(traits_[3],2);popup(F("Returned lost item"),F("Helpful + Reliable"));}else if(p==1){changeByte(reputation_[1],4);changeByte(traits_[2],2);if(coins<65000)coins++;popup(F("Played a harmless prank"),F("Playful + Brave"));}else{changeByte(reputation_[4],4);changeByte(traits_[0],2);subStat(energy,1);popup(F("Took the risky trail"),F("Adventurous + Curious"));}goodSound();markSaveDirty();return;}ol=l;os=s;orr=r;display_.clearDisplay();drawHeader(F("REPUTATION"),p+1,3);display_.setCursor(2,14);display_.print(F("Helpful "));display_.print(reputation_[0]);display_.setCursor(66,14);display_.print(F("Play "));display_.print(reputation_[1]);display_.setCursor(2,26);display_.print(F("Reliable "));display_.print(reputation_[2]);display_.setCursor(66,26);display_.print(F("Fame "));display_.print(reputation_[3]);display_.setCursor(2,38);display_.print(F("Adventure "));display_.print(reputation_[4]);display_.setCursor(2,50);display_.print(p==0?F("Choice: return item"):p==1?F("Choice: playful prank"):F("Choice: risky trail"));display_.display();delay(25);}}
 

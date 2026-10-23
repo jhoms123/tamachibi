@@ -1,4 +1,6 @@
 #include "CityWorld.h"
+#include "GameplayActions.h"
+#include "GameplayProgress.h"
 #include "NeighborStories.h"
 #include "NativeUI.h"
 #include "PolishedScenes.h"
@@ -8,7 +10,8 @@
 
 extern byte happy, energy, health, ownerBond, ownerTrust, skillKind, skillStyle;
 extern byte stage, speciesType, temperament, friendCount, partnerId, partnerBond, familyReady;
-extern unsigned int coins;
+extern unsigned int coins, generation;
+extern unsigned long ageTicks;
 extern bool spendCoins(byte amount);
 extern void addStat(byte &value, byte amount);
 extern void subStat(byte &value, byte amount);
@@ -36,6 +39,8 @@ extern void lifeSetResidentInvitePending(byte resident, bool pending);
 extern byte visualHour();
 
 namespace {
+GameplayProgress &neighborProgress() { static GameplayProgress ledger; return ledger; }
+
 constexpr uint8_t STAGE_ADULT_CITY = 4;
 constexpr uint8_t ROUTINE_TALK_CITY = 8;
 constexpr uint8_t ROUTINE_PLAY_CITY = 16;
@@ -168,6 +173,7 @@ CityWorldSystem::CityWorldSystem(size_t storageBase, GameDisplay &display,
 }
 
 void CityWorldSystem::reset() {
+  neighborProgress().reset();
   sequence_ = 0;
   memset(relation_, 0, sizeof(relation_));
   metMask_ = 0;
@@ -208,6 +214,7 @@ void CityWorldSystem::fillSave(CityWorldSave &save) const {
 }
 
 void CityWorldSystem::applySave(const CityWorldSave &save) {
+  neighborProgress().reset();
   sequence_ = save.sequence;
   memcpy(relation_, save.relation, sizeof(relation_));
   for (uint8_t i = 0; i < CITY_RESIDENT_COUNT; ++i) {
@@ -488,7 +495,7 @@ void CityWorldSystem::changeRelation(uint8_t id, int amount) {
   // the player's home room.
   if (partnerId == id) {
     partnerBond = max(partnerBond, relation_[id]);
-    if (partnerBond >= 80) familyReady = 1;
+    familyReady = GameplayProgress::familyReady(stage, partnerBond) ? 1 : 0;
   }
   markSaveDirty();
 }
@@ -662,6 +669,10 @@ void CityWorldSystem::chooseNeighborChat() {
       temperament == NeighborStories::profile(id).favoriteTemperament;
   const bool repeated = previous == memory;
 
+  if (!neighborProgress().claim(selectedResident_ * 5 + 0, ageTicks, generation)) {
+    popup(F("Give this moment time"), F("Try a different visit")); return;
+  }
+  completeGameplayAction(M_TALK);
   changeRelation(id, NeighborStories::relationReward(2, favorite, temperamentMatch, repeated));
   addStat(happy, favorite ? 2 : 1);
   addSkill(skillKind, 1);
@@ -699,6 +710,11 @@ void CityWorldSystem::chooseNeighborGift() {
     delay(35);
   }
 
+  if (coins < 3) { popup(F("Need 3 coins"), F("For a neighbor gift")); return; }
+  if (!neighborProgress().claim(selectedResident_ * 5 + 1, ageTicks, generation)) {
+    popup(F("Give this moment time"), F("Try a different visit")); return;
+  }
+  completeGameplayAction(M_LOVE);
   if (!spendCoins(3)) {
     badSound(); popup(F("Need 3 coins"), F("For a neighbor gift"));
     return;
@@ -771,6 +787,10 @@ void CityWorldSystem::runNeighborPlay() {
     if (answer == target) ++score;
   }
 
+  if (!neighborProgress().claim(selectedResident_ * 5 + 2, ageTicks, generation)) {
+    popup(F("Give this moment time"), F("Try a different visit")); return;
+  }
+  completeGameplayAction(M_GAME);
   subStat(energy, 1);
   const bool favorite = NeighborStories::favoriteAction(id, NeighborStories::PLAY);
   const bool temperamentMatch =
@@ -839,6 +859,10 @@ void CityWorldSystem::runNeighborOuting(uint8_t outing, bool invited) {
       temperament == NeighborStories::profile(id).favoriteTemperament;
   const bool repeated = previous == memory;
 
+  if (!neighborProgress().claim(selectedResident_ * 5 + 3, ageTicks, generation)) {
+    popup(F("Give this moment time"), F("Try a different visit")); return;
+  }
+  completeGameplayAction(M_WALK);
   subStat(energy, 2);
   addStat(happy, 2);
   addSkill(skillKind, 1);
@@ -894,6 +918,9 @@ void CityWorldSystem::runNeighborDate() {
     return;
   }
 
+  if (!neighborProgress().claim(selectedResident_ * 5 + 4, ageTicks, generation)) {
+    popup(F("Give this moment time"), F("Try a different visit")); return;
+  }
   const uint8_t visits = lifeResidentInteractionCount(id);
   const uint8_t chapterBefore = lifeResidentStoryChapter(id);
   const uint8_t previous = lastNeighborMemory(id);
@@ -911,8 +938,9 @@ void CityWorldSystem::runNeighborDate() {
   changeRelation(id, NeighborStories::relationReward(
       3, favorite, temperamentMatch, repeated));
   partnerBond = max(partnerBond, relation_[id]);
-  if (partnerBond >= 80) familyReady = 1;
+  familyReady = GameplayProgress::familyReady(stage, partnerBond) ? 1 : 0;
   if (!repeated) changeBond(1);
+  completeGameplayAction(M_FAMILY);
   changeTrust(1);
   markSaveDirty();
   lifeRecordNeighborInteraction(id, NeighborStories::DATE, relation_[id]);
@@ -1016,4 +1044,12 @@ void CityWorldSystem::developerResetRelations() {
   metMask_ = 0;
   selectedResident_ = 0;
   saveNow();
+}
+
+void CityWorldSystem::recordPartnerMoment(uint8_t amount) {
+  if (partnerId >= CITY_RESIDENT_COUNT || stage < STAGE_ADULT_CITY) return;
+  changeRelation(partnerId, amount);
+  partnerBond = relation_[partnerId] = max(partnerBond, relation_[partnerId]);
+  familyReady = GameplayProgress::familyReady(stage, partnerBond) ? 1 : 0;
+  markSaveDirty();
 }

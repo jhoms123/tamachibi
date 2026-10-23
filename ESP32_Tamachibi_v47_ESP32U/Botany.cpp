@@ -1,6 +1,7 @@
 #include "Botany.h"
 #include "NativeUI.h"
 #include "LifeWorld.h"
+#include "GameplayActions.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -295,6 +296,12 @@ bool BotanySystem::needsCare() const {
 }
 
 bool BotanySystem::hasIndoorPlants() const { return indoorCount() > 0; }
+
+bool BotanySystem::indoorNeedsTending() const {
+  for (uint8_t i = 0; i < indoorCapacity_; ++i)
+    if (indoorSpecies_[i] != EMPTY_PLANT && (indoorCare_[i] < 6 || indoorHealth_[i] < 10)) return true;
+  return false;
+}
 
 uint8_t BotanySystem::gardenCount() const {
   uint8_t count = 0;
@@ -649,6 +656,7 @@ void BotanySystem::chooseCrop() {
       cropCare_[selectedGarden_] = 0;
       discoveredCrops_ |= static_cast<uint16_t>(1U << pick);
       addSkill(skillKind, 1); changeBond(1); careSound(); markSaveDirty();
+      completeGameplayAction(M_GARDEN);
       popup(F("Food seed planted"), cropName(pick));
       return;
     }
@@ -677,11 +685,12 @@ void BotanySystem::chooseIndoorPlant() {
   if (!spendCoins(indoorCost(pick))) { badSound(); popup(F("Not enough coins"), F("Work or sell plants")); return; }
       indoorSpecies_[selectedIndoor_] = pick;
       indoorAge_[selectedIndoor_] = 0;
-      indoorWater_[selectedIndoor_] = 6;
+      indoorWater_[selectedIndoor_] = (indoorIdealLow(pick) + indoorIdealHigh(pick)) / 2;
       indoorHealth_[selectedIndoor_] = 10;
       indoorCare_[selectedIndoor_] = 0;
       discoveredIndoor_ |= static_cast<uint16_t>(1U << pick);
       addSkill(skillKind, 1); changeBond(1); careSound(); markSaveDirty();
+      completeGameplayAction(M_PLANTROOM);
       popup(F("Plant adopted"), indoorName(pick));
       return;
     }
@@ -698,22 +707,27 @@ void BotanySystem::chooseIndoorPlant() {
 
 void BotanySystem::waterCrop() {
   if (cropSpecies_[selectedGarden_] == EMPTY_PLANT) { popup(F("Empty plot"), F("Plant a seed first")); return; }
+  if (cropWater_[selectedGarden_] >= 6) { popup(F("Soil is still moist"), F("No watering needed")); return; }
   cropWater_[selectedGarden_] = addBounded(cropWater_[selectedGarden_], 4);
   cropHealth_[selectedGarden_] = addBounded(cropHealth_[selectedGarden_], 1);
   addSkill(skillKind, 1); markRoutineAction(ROUTINE_CARE_BT); careSound(); markSaveDirty();
+  completeGameplayAction(M_GARDEN);
   popup(F("Crop watered"), cropName(cropSpecies_[selectedGarden_]));
 }
 
 void BotanySystem::tendCrop() {
   if (cropSpecies_[selectedGarden_] == EMPTY_PLANT) { popup(F("Empty plot"), F("Nothing to tend")); return; }
+  if (cropCare_[selectedGarden_] >= 6) { popup(F("Crop is already tended"), F("Let it grow")); return; }
+  if (energy < 1) { popup(F("Too tired"), F("Rest first")); return; }
   cropCare_[selectedGarden_] = addBounded(cropCare_[selectedGarden_], 2);
   cropHealth_[selectedGarden_] = addBounded(cropHealth_[selectedGarden_], 2);
   subStat(energy, 1); addSkill(skillKind, 1); changeBond(1); markRoutineAction(ROUTINE_CARE_BT); goodSound(); markSaveDirty();
+  completeGameplayAction(M_GARDEN);
   popup(F("Crop tended"), F("Pests and weeds cleared"));
 }
 
 void BotanySystem::applyCropHarvest(uint8_t species, uint8_t quality) {
-  const uint8_t bonus = quality >= 8 ? 1 : 0;
+  const uint8_t bonus = quality >= 8 ? (naturalActivity() == M_GARDEN ? 2 : 1) : 0;
   switch (species % BOTANY_CROP_COUNT) {
     case 0: vegInv = addBounded(vegInv, static_cast<uint8_t>(2 + bonus), 99); break;
     case 1: berryInv = addBounded(berryInv, static_cast<uint8_t>(2 + bonus), 99); break;
@@ -748,6 +762,7 @@ void BotanySystem::harvestCrop() {
   gardenHarvests = addBounded(gardenHarvests, 1, 250);
   addStat(happy, 2); addSkill(skillKind, 2); changeBond(1); recordGoalEvent(2, 1); markRoutineAction(ROUTINE_PLAY_BT);
   winSound(); markSaveDirty();
+  completeGameplayAction(M_GARDEN);
   popup(F("Added to the pantry"), cropName(species));
 }
 
@@ -764,18 +779,22 @@ void BotanySystem::clearCrop() {
 
 void BotanySystem::waterIndoor() {
   if (indoorSpecies_[selectedIndoor_] == EMPTY_PLANT) { popup(F("Empty pot"), F("Adopt a plant first")); return; }
+  if (indoorWater_[selectedIndoor_] >= indoorIdealHigh(indoorSpecies_[selectedIndoor_])) { popup(F("Soil has enough water"), F("Too much harms roots")); return; }
   indoorWater_[selectedIndoor_] = addBounded(indoorWater_[selectedIndoor_], 3);
   const uint8_t species = indoorSpecies_[selectedIndoor_];
   if (indoorWater_[selectedIndoor_] <= indoorIdealHigh(species) + 1) indoorHealth_[selectedIndoor_] = addBounded(indoorHealth_[selectedIndoor_], 1);
   addSkill(skillKind, 1); markRoutineAction(ROUTINE_CARE_BT); careSound(); markSaveDirty();
+  completeGameplayAction(M_PLANTROOM);
   popup(F("Plant watered"), indoorName(species));
 }
 
 void BotanySystem::tendIndoor() {
   if (indoorSpecies_[selectedIndoor_] == EMPTY_PLANT) { popup(F("Empty pot"), F("Nothing to tend")); return; }
+  if (indoorCare_[selectedIndoor_] >= 6) { popup(F("Leaves already tended"), F("Let the plant settle")); return; }
   indoorCare_[selectedIndoor_] = addBounded(indoorCare_[selectedIndoor_], 2);
   indoorHealth_[selectedIndoor_] = addBounded(indoorHealth_[selectedIndoor_], 2);
   addStat(happy, 1); addSkill(skillKind, 1); changeBond(1); goodSound(); markSaveDirty();
+  completeGameplayAction(M_PLANTROOM);
   popup(F("Plant tended"), F("Leaves cleaned and turned"));
 }
 
@@ -790,9 +809,11 @@ void BotanySystem::sellIndoor() {
                           species == order && stage >= 4 &&
                           indoorHealth_[selectedIndoor_] >= 7;
   uint16_t rawPrice = static_cast<uint16_t>((indoorCost(species) * (stage + 1) * indoorHealth_[selectedIndoor_]) / 18);
+  if (stage >= 4) rawPrice += lifeWorld.projectLevel(3) + lifeWorld.reputation(3) / 25 + (naturalActivity() == M_PLANTROOM ? 2 : 0);
   if (rawPrice < 1) rawPrice = 1;
   if (rawPrice > 255) rawPrice = 255;
   const uint8_t price = static_cast<uint8_t>(rawPrice);
+  completeGameplayAction(M_PLANTROOM);
   addCoins(price);
   uint8_t bonus = 0;
   if (fillsOrder) {
