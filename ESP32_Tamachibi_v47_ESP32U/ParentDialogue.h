@@ -176,7 +176,9 @@ public:
   uint8_t socialConfidence() const { return socialConfidence_; }
   uint8_t attachmentSecurity() const { return attachmentSecurity_; }
   uint32_t lifetimeConversations() const { return lifetimeConversations_; }
-  uint32_t estimatedLinePool() const { return 9216UL; }
+  uint32_t estimatedLinePool() const {
+    return static_cast<uint32_t>(PARENT_DIALOGUE_TOPIC_COUNT) * 4UL * 8UL * 3UL;
+  }
 
   void developerMax();
   void developerReset();

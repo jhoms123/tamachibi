@@ -2,10 +2,12 @@ Tamachibi v47 ESP32-U target folder
 
 Aquarium.cpp
 Aquarium.h
+AquariumArt.h
 Botany.cpp
 Botany.h
 CityWorld.cpp
 CityWorld.h
+ConversationMemory.h
 DeepLife.cpp
 DeepLife.h
 DeepLifeDialogueData.h
@@ -21,6 +23,8 @@ VisualOverhaul.h
 GrowingTogether.cpp
 GrowingTogether.h
 GrowingTogetherData.h
+GrowthSprites.cpp
+GrowthSprites.h
 LifeWorld.cpp
 LifeWorld.h
 MusicPlayer.cpp
@@ -34,6 +38,8 @@ ParentDialogue.h
 ParentDialogueResponseData.h
 PolishedScenes.cpp
 PolishedScenes.h
+RosterSprites.cpp
+RosterSprites.h
 README_ESP32U.md
 SaveProfiles.cpp
 SaveProfiles.h

@@ -380,6 +380,10 @@ const __FlashStringHelper *LifeWorldSystem::locationName(uint8_t l) const {
   switch (l % 8) { case 0:return F("Pet Room"); case 1:return F("Kitchen"); case 2:return F("School"); case 3:return F("Work"); case 4:return F("Park"); case 5:return F("Garden"); case 6:return F("Market"); default:return F("Sleeping"); }
 }
 
+const char *LifeWorldSystem::companionName() const {
+  return companionType_ < 8 ? COMPANION_NAMES[companionType_] : nullptr;
+}
+
 const __FlashStringHelper *LifeWorldSystem::personalityThought() const {
   uint8_t best = 0;
   for (uint8_t i = 1; i < 4; ++i) if (traits_[i] > traits_[best]) best = i;

@@ -45,7 +45,8 @@ See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the 128×128 OL
 
 The main UI uses the physical 128×128 grid. Install/copy the whole sketch folder,
 including **GameDisplay.cpp**, **GameDisplay.h**, **NativeUI.cpp**, **NativeUI.h**,
-**GrowthSprites.cpp**, **GrowthSprites.h**, **RosterSprites.cpp** and **RosterSprites.h**.
+**GrowthSprites.cpp**, **GrowthSprites.h**, **RosterSprites.cpp**, **RosterSprites.h**,
+**AquariumArt.h**, and **ConversationMemory.h**.
 No SD image pack, font download, or new Arduino library is needed beyond the existing
 Adafruit SH110X / GFX / BusIO and audio libraries.
 
@@ -107,3 +108,45 @@ All Tamachibi sprite designs in this project are original.
 [View the evolution lineup](../docs/evolution/Tamachibi_Evolution_Tree.png),
 [walking preview](../docs/evolution/Tamachibi_Walking_Preview.gif), and
 [animated family features](../docs/evolution/Tamachibi_Part_Animation.gif).
+
+## Aquarium life
+
+The Aquarium activity unlocks at Child. It now has twelve original fish with
+distinct silhouettes and independently animated tails, fins, gills, and eyes.
+Each fish keeps a generated temperament (bold, shy, curious, or sociable), a
+swimming quirk, a favorite food, and a preferred tank decoration. These traits
+change its route, how it reacts to greetings and meals, and where it spends
+time when its favorite decoration is installed.
+
+Use **Watch Tank** to follow fish and greet one at a time, **Fish Profile** to
+inspect needs and traits, **Fish Stories** to revisit its preferences and
+memories, and **Play Bubbles** for a short timing game. Feeding, cleaning,
+treatment, decoration, and play target the selected fish while still letting
+the rest of the school react. Fish remember their first meal, a favorite food,
+recovering from illness, and the decoration that feels most like home. The
+story reply also reflects current care, friendship, temperament, and past
+events, with a large rotating set of combinations.
+
+Fish grow through fry, young, juvenile, and adult forms. Their adult markings
+branch according to health, mood, bond, and tank care at the time they mature.
+Daily care and a full tank can also lead to a fry joining the family. Neglect
+can make fish unwell, but health never falls below one. The aquarium continues
+using its separate dual-slot save; the 92-byte record size and following
+EEPROM addresses stay fixed so existing fish migrate without resetting the
+main pet save.
+
+## Conversation and memory
+
+Talk, Parent Dialogue, Growing Together, and the Parent Bond Journal now use a
+shared view of the pet's existing saved history. A conversation chooses a
+relevant detail for its subject: care moments include their day and time;
+favorite questions use learned food preferences; play and work questions use
+actual game or career records; and garden, companion, family, aquarium, and
+mood conversations use matching current state. Direct Talk replies no longer
+stack a second unrelated memory and several generic relationship lines onto
+the answer.
+
+Open **Talk → Parent Bond Journal → page 7** to review care, food, play, trip,
+shared-place, and current-feeling memories. Page 8 changes how often the pet
+initiates check-ins. The conversation layer reads existing save fields and
+does not add or move any EEPROM data.

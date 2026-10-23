@@ -10,6 +10,25 @@ constexpr uint8_t AQUARIUM_SPECIES_COUNT = 12;
 constexpr uint32_t AQUARIUM_SAVE_MAGIC = 0x41515531UL; // AQU1
 constexpr uint8_t AQUARIUM_SAVE_VERSION = 1;
 
+enum AquariumMemory : uint8_t {
+  AQUA_MEMORY_NONE = 0,
+  AQUA_MEMORY_FIRST_GREET = 1,
+  AQUA_MEMORY_FIRST_MEAL = 2,
+  AQUA_MEMORY_FAVORITE_MEAL = 3,
+  AQUA_MEMORY_BUBBLE_PLAY = 4,
+  AQUA_MEMORY_GENTLE_TOUCH = 5,
+  AQUA_MEMORY_RECOVERY = 6,
+  AQUA_MEMORY_CLEAN_WATER = 7,
+  AQUA_MEMORY_FAVORITE_DECOR = 8,
+  AQUA_MEMORY_GROWTH_YOUNG = 9,
+  AQUA_MEMORY_GROWTH_JUVENILE = 10,
+  AQUA_MEMORY_GROWTH_ADULT = 11,
+  AQUA_MEMORY_RETURN_VISIT = 12,
+  AQUA_MEMORY_TREASURE = 13,
+  AQUA_MEMORY_COMFORT = 14,
+  AQUA_MEMORY_WATCH_TANK = 15
+};
+
 struct AquariumSave {
   uint32_t magic;
   uint8_t version;
@@ -37,6 +56,9 @@ struct AquariumSave {
   uint32_t checksum;
 };
 
+static_assert(sizeof(AquariumSave) == 92,
+              "Aquarium save must keep its existing EEPROM footprint");
+
 class AquariumSystem {
 public:
   AquariumSystem(size_t storageBase, GameDisplay &display,
@@ -56,6 +78,10 @@ public:
   uint8_t fishCount() const;
   uint8_t capacity() const;
   const char *selectedFishName() const;
+  uint8_t selectedFishPersonality() const;
+  uint8_t selectedFishQuirk() const;
+  uint8_t selectedFishFavoriteFood() const;
+  void composeSelectedFishComment(char *out, size_t outSize);
   uint8_t tankClean() const { return tankClean_; }
   uint8_t waterQuality() const { return waterQuality_; }
 
@@ -80,6 +106,16 @@ private:
   uint8_t health_[AQUARIUM_FISH_SLOTS];
   uint8_t friendship_[AQUARIUM_FISH_SLOTS];
   uint16_t ageTicks_[AQUARIUM_FISH_SLOTS];
+  // Traits, story tags, and care-grown adult forms use unused high bits in the
+  // existing save fields. The AquariumSave size and all later EEPROM offsets
+  // stay unchanged, so existing tanks upgrade in place.
+  uint8_t personalitySeed_[AQUARIUM_FISH_SLOTS];
+  uint8_t lastMemory_[AQUARIUM_FISH_SLOTS];
+  uint8_t favoriteMemory_[AQUARIUM_FISH_SLOTS];
+  uint8_t growthBranch_[AQUARIUM_FISH_SLOTS];
+  uint8_t firstFedMask_;
+  uint8_t actionPose_[AQUARIUM_FISH_SLOTS];
+  uint8_t actionFrames_[AQUARIUM_FISH_SLOTS];
   uint8_t tankClean_;
   uint8_t waterQuality_;
   uint8_t tankDecor_;
@@ -108,6 +144,11 @@ private:
   const char *defaultFishName(uint8_t species) const;
   const __FlashStringHelper *decorName(uint8_t decor) const;
   uint8_t fishLifeStage(uint8_t slot) const;
+  uint8_t fishFavoriteFood(uint8_t slot) const;
+  uint8_t fishFavoriteDecor(uint8_t slot) const;
+  void setMemory(uint8_t slot, uint8_t memory);
+  void setActionPose(uint8_t slot, uint8_t pose, uint8_t frames = 30);
+  void initializeFishProfile(uint8_t slot, uint8_t seed);
   bool allFishComfortable() const;
   void clampState();
 
@@ -118,7 +159,6 @@ private:
   void drawFishSprite(uint8_t species, int x, int y, bool facingRight,
                       uint8_t lifeStage, bool selected);
   void drawTankScene(uint8_t selected, uint16_t frame, bool includePet);
-  void drawTankMeters();
   void watchTank();
   void fishStatusPage();
   void feedFish();
@@ -131,6 +171,8 @@ private:
   void suppliesShop();
   void treatFish();
   void interactWithFish(uint8_t slot);
+  void playBubbles();
+  void fishMemoryPage();
   void maybeCreateFry(bool catchUpMode);
   void applyDailyTankEffects(bool catchUpMode);
 };

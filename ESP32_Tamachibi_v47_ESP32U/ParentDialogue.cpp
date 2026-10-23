@@ -52,9 +52,9 @@ const char *const STAGE_LEADS[5][8] = {
   {"Sit with me a moment.", "I remembered something.", "May I share some wisdom?", "I still need your thoughts.", "Family has changed so much.", "I wonder about my legacy.", "An old feeling returned.", "Let us talk slowly."}
 };
 
-// Four phrasing variants per topic. Combined with eight stage openings and
-// multiple question endings, these produce tens of thousands of full lines
-// without wasting ESP32 flash on 1,000 nearly duplicated complete sentences.
+// Four phrasing variants per topic combine with eight stage openings and three
+// question endings. Topic-relevant saved memories and the pet's response add
+// personal details at runtime without storing thousands of repeated sentences.
 const char *const TOPIC_LINES[4][PARENT_DIALOGUE_TOPIC_COUNT] = {
 {
   "I made a new sound and wanted you to hear it.", "I reached for you when the room felt big.", "You went away and I wondered if you return.", "My eyes feel heavy but I do not want to miss you.", "My tummy is asking for something.", "I made a mess and watched your face.", "I copied the way you smiled at me.", "The little companion came near me.",
@@ -387,8 +387,8 @@ void ParentDialogueSystem::buildPrompt(const ParentDialogueContext &ctx, char *p
   const char *lead = STAGE_LEADS[stageIndex][(pendingSeed_ + pendingVariant_) % 8U];
   const char *line = topicLine(pendingTopic_, pendingVariant_);
   char memory[150];
-  buildTamachibiPersonalMemory(ctx.memory, static_cast<uint8_t>((pendingSeed_ + pendingVariant_) % 8U),
-                               pendingSeed_, memory, sizeof(memory));
+  buildTamachibiPersonalMemory(ctx.memory, tamachibiMemoryForParentTopic(pendingTopic_),
+                               pendingSeed_ + pendingVariant_, memory, sizeof(memory));
   // The dialogue runner splits this full sentence across as many OLED pages
   // as needed, so no context sentence is silently clipped.
   snprintf(page1, page1Size, "%s %s %s", lead, line, memory);
@@ -595,13 +595,10 @@ ParentDialogueOutcome ParentDialogueSystem::runPending(const ParentDialogueConte
   applyChoice(pendingTopic_, style, o);
   o.resolved = true;
   const bool positive = style != STYLE_DISMISS && style != STYLE_MISCHIEF;
-  char rememberedDetail[150];
-  buildTamachibiPersonalMemory(ctx.memory,
-      static_cast<uint8_t>((pendingSeed_ + pendingVariant_ + selected + 3U) % 8U),
-      lifetimeConversations_, rememberedDetail, sizeof(rememberedDetail));
-  char reply[360];
-  snprintf(reply, sizeof(reply), "%s\n%s", resultReply(ctx.stage, set, selected), rememberedDetail);
-  showScrollableText(ctx, "RESPONSE REMEMBERED", reply, "D1 close");
+  // The opening already carries one topic-relevant remembered fact. Let this
+  // page respond to the player's choice instead of appending another unrelated
+  // memory that would make the exchange feel assembled from separate menus.
+  showScrollableText(ctx, "YOUR TAMA REPLIES", resultReply(ctx.stage, set, selected), "D1 close");
   positive ? goodSound() : badSound();
 
   ++generationConversations_; ++lifetimeConversations_;
@@ -657,7 +654,7 @@ void ParentDialogueSystem::eventAdjustDevelopment(int openness, int confidence,
 }
 
 void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
-  uint8_t page = 0; const uint8_t pages = 7; bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
+  uint8_t page = 0; const uint8_t pages = 8; bool oldL = HIGH, oldS = HIGH, oldR = HIGH;
   waitButtonRelease();
   while (true) {
     bool l = digitalRead(btnL_), s = digitalRead(btnS_), r = digitalRead(btnR_);
@@ -665,7 +662,27 @@ void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
     if (oldR == HIGH && r == LOW) { page = (page + 1) % pages; clickSound(); delay(100); }
     if (oldS == HIGH && s == LOW) {
       waitButtonRelease();
-      if (page == 6) { promptMode_ = (promptMode_ + 1) % 3; goodSound(); scheduleNext(ctx); }
+      if (page == 6) {
+        char memories[900] = "These details come from things we have actually done together.\n\n";
+        char memory[160];
+        auto appendMemory = [&](const char *label, uint8_t kind, uint32_t turn) {
+          buildTamachibiPersonalMemory(ctx.memory, kind, turn, memory, sizeof(memory));
+          const size_t used = strlen(memories);
+          if (used + 1 < sizeof(memories))
+            snprintf(memories + used, sizeof(memories) - used, "%s: %s\n\n", label, memory);
+        };
+        appendMemory("Care", TAMA_MEMORY_CARE, 0);
+        appendMemory("Food", TAMA_MEMORY_FOOD, lifetimeConversations_ + 1U);
+        appendMemory("Play", TAMA_MEMORY_GAME, lifetimeConversations_ + 2U);
+        appendMemory("Our last trip", TAMA_MEMORY_TRIP, lifetimeConversations_ + 3U);
+        const uint8_t sharedKind = ctx.memory.fishCount ? TAMA_MEMORY_AQUARIUM :
+            (ctx.memory.companionType < 8 ? TAMA_MEMORY_COMPANION :
+             (ctx.memory.gardenCount ? TAMA_MEMORY_GARDEN : TAMA_MEMORY_FAMILY));
+        appendMemory("Our shared place", sharedKind, lifetimeConversations_ + 4U);
+        appendMemory("How I feel today", TAMA_MEMORY_EMOTION, lifetimeConversations_ + 5U);
+        showScrollableText(ctx, "OUR SHARED MEMORIES", memories, "D1 close");
+      }
+      else if (page == 7) { promptMode_ = (promptMode_ + 1) % 3; goodSound(); scheduleNext(ctx); }
       else return;
     }
     oldL = l; oldS = s; oldR = r;
@@ -676,7 +693,7 @@ void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
       display_.setCursor(2, 25); display_.print(F("Lifetime talks ")); display_.print(lifetimeConversations_);
       display_.setCursor(2, 36); display_.print(F("Bond ")); display_.print(ctx.ownerBond); display_.print(F(" Trust ")); display_.print(ctx.ownerTrust);
       display_.setCursor(2, 47); display_.print(F("Attachment ")); display_.print(attachmentSecurity_);
-      display_.setCursor(2, 58); display_.print(F("Talk variants ")); display_.print(estimatedLinePool());
+      display_.setCursor(2, 58); display_.print(F("Prompt combos ")); display_.print(estimatedLinePool());
     } else if (page == 1) {
       display_.setCursor(2, 14); display_.print(F("Open ")); display_.print(openness_); display_.setCursor(68,14); display_.print(F("Conf ")); display_.print(confidence_);
       display_.setCursor(2, 26); display_.print(F("Empathy ")); display_.print(empathy_); display_.setCursor(68,26); display_.print(F("Honest ")); display_.print(honesty_);
@@ -708,8 +725,13 @@ void ParentDialogueSystem::runJournal(const ParentDialogueContext &ctx) {
       display_.setCursor(2, 37); display_.print(F("Encourage ")); display_.print(encouragement);
       display_.setCursor(2, 49); display_.print(F("Dismiss/prank ")); display_.print(harsh);
       display_.setCursor(2, 59); display_.print(F("Patterns shape new babies"));
+    } else if (page == 6) {
+      display_.setCursor(2, 15); display_.print(F("Care, food, games, trips"));
+      display_.setCursor(2, 28); display_.print(F("plus today's feelings"));
+      display_.setCursor(2, 43); display_.print(F("D1 reads our memories"));
+      display_.setCursor(2, 58); display_.print(F("D0/D2 pages"));
     } else {
-      display_.setCursor(2, 16); display_.print(F("Random popups:"));
+      display_.setCursor(2, 16); display_.print(F("Pet check-ins:"));
       display_.setCursor(2, 30); display_.print(promptMode_ == 0 ? F("QUIET") : (promptMode_ == 1 ? F("NORMAL") : F("CHATTY")));
       display_.setCursor(2, 44); display_.print(F("D1 changes frequency"));
       display_.setCursor(2, 57); display_.print(F("D0/D2 pages"));

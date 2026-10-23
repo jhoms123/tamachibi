@@ -1,4 +1,6 @@
 #include "NativeUI.h"
+#include "AquariumArt.h"
+#include "ConversationMemory.h"
 #include "GrowthSprites.h"
 #include "RosterSprites.h"
 #include <cassert>
@@ -6,6 +8,22 @@
 #include <cstring>
 uint32_t fixtureMillis = 100;
 int main() {
+  TamachibiMemoryContext memories{};
+  char remembered[200];
+  memories.careCount = 1; memories.careHead = 1;
+  memories.careTypes[0] = 6; memories.careDays[0] = 4; memories.careHours[0] = 19;
+  memories.ownerNickname = "Quiet Star";
+  buildTamachibiCareMemory(memories, 0, remembered, sizeof(remembered));
+  assert(strstr(remembered, "day 4") && strstr(remembered, "in the evening"));
+  assert(strstr(remembered, "Quiet Star"));
+  memories.learnedFavoriteFood = 1; memories.learnedDislikedFood = 3;
+  buildTamachibiPersonalMemory(memories, TAMA_MEMORY_FOOD, 2,
+                               remembered, sizeof(remembered));
+  assert(strstr(remembered, "rice") && strstr(remembered, "snack"));
+  assert(tamachibiMemoryForParentTopic(54) == TAMA_MEMORY_FOOD);
+  assert(tamachibiMemoryForParentTopic(18) == TAMA_MEMORY_GARDEN);
+  assert(tamachibiMemoryForGrowingFeature(16) == TAMA_MEMORY_GAME);
+
   Adafruit_SH1107 panel;
   GameDisplay d(panel);
   d.useGameCanvas(true);
@@ -57,6 +75,63 @@ int main() {
   d.clearDisplay();
   d.drawPixel(20, 20, 1);
   assert(panel.pixels[20 * 128 + 20] == 0);
+
+  uint64_t fishPrints[12]{};
+  for (uint8_t species = 0; species < 12; ++species) {
+    d.clearDisplay();
+    AquariumArt::fish(d, species, 64, 64, 3, true, 6,
+                      0, true, 0, 1);
+    d.display();
+    uint64_t hash = 1469598103934665603ULL;
+    for (uint8_t pixel : panel.pixels) {
+      hash ^= pixel;
+      hash *= 1099511628211ULL;
+    }
+    for (uint8_t prior = 0; prior < species; ++prior)
+      assert(fishPrints[prior] != hash);
+    fishPrints[species] = hash;
+  }
+  d.clearDisplay();
+  AquariumArt::fish(d, 0, 64, 64, 3, true, 0, 0, true, 0);
+  d.display();
+  uint8_t stillFish[sizeof(panel.pixels)];
+  memcpy(stillFish, panel.pixels, sizeof(stillFish));
+  d.clearDisplay();
+  AquariumArt::fish(d, 0, 64, 64, 3, true, 4, 0, true, 0);
+  d.display();
+  assert(memcmp(stillFish, panel.pixels, sizeof(stillFish)) != 0);
+  d.clearDisplay();
+  AquariumArt::fish(d, 0, 64, 64, 0, true, 4, 0, true, 0);
+  d.display();
+  assert(memcmp(stillFish, panel.pixels, sizeof(stillFish)) != 0);
+  uint64_t careBranches[4]{};
+  for (uint8_t branch = 0; branch < 4; ++branch) {
+    d.clearDisplay();
+    AquariumArt::fish(d, 0, 64, 64, 3, true, 6, 0, true, 0, branch);
+    d.display();
+    uint64_t hash = 1469598103934665603ULL;
+    for (uint8_t pixel : panel.pixels) { hash ^= pixel; hash *= 1099511628211ULL; }
+    for (uint8_t prior = 0; prior < branch; ++prior) assert(careBranches[prior] != hash);
+    careBranches[branch] = hash;
+  }
+  uint64_t personalityPaths[4]{};
+  for (uint8_t personality = 0; personality < 4; ++personality) {
+    const uint8_t seed = static_cast<uint8_t>(4U + personality);
+    uint64_t hash = 1469598103934665603ULL;
+    for (uint16_t frame = 0; frame < 96; frame += 6) {
+      const AquariumArt::SwimPoint p = AquariumArt::swimPoint(seed, 0, 2, frame);
+      hash ^= static_cast<uint8_t>(p.x); hash *= 1099511628211ULL;
+      hash ^= static_cast<uint8_t>(p.y); hash *= 1099511628211ULL;
+      hash ^= static_cast<uint8_t>(p.facingRight); hash *= 1099511628211ULL;
+    }
+    for (uint8_t prior = 0; prior < personality; ++prior)
+      assert(personalityPaths[prior] != hash);
+    personalityPaths[personality] = hash;
+  }
+  for (uint8_t species = 0; species < 12; ++species) {
+    const uint8_t preferred = AquariumArt::preferredDecor(species, species + 1U);
+    assert(preferred >= 1 && preferred <= 5);
+  }
 
   // The active pet renderer must use the 50 detailed species masks, and its
   // post-hatch forms must grow while retaining those species silhouettes.
@@ -188,5 +263,7 @@ int main() {
   puts("Renderer checks passed: square geometry, framebuffer isolation, "
        "opaque body interiors and transparent exterior, 50 adult masks, 10 distinct lineages, "
        "care-split teens, animated lineage parts through elder, 50 mapped "
-       "adult outcomes, and facing animation.");
+       "adult outcomes, facing animation, 12 unique aquarium species, memory-specific dialogue, "
+       "4 care-grown fish forms, "
+       "four distinct fish swim temperaments, and animated aquarium fins.");
 }

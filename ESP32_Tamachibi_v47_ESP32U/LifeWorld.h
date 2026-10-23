@@ -107,6 +107,7 @@ public:
   uint8_t careerId() const { return careerId_; }
   uint8_t careerRank() const { return careerRank_; }
   uint8_t companionType() const { return companionType_; }
+  const char *companionName() const;
   uint8_t companionBond() const { return companionBond_; }
   uint8_t companionMood() const { return companionMood_; }
   uint8_t companionEnergy() const { return companionEnergy_; }

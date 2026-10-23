@@ -945,9 +945,8 @@ void GrowingTogetherSystem::buildPrompt(const GrowingTogetherContext &ctx,
   appendText(out, outSize, scenarioLineForContext(contentFeature, pendingScenario_, ctx));
   appendContextLine(ctx, pendingFeature_, out, outSize);
   char memory[150];
-  buildTamachibiPersonalMemory(ctx.memory,
-      static_cast<uint8_t>((pendingEnding_ + pendingLead_ + pendingScenario_) % 8U),
-      lifetimeConversations_ + ctx.ageDays, memory, sizeof(memory));
+  buildTamachibiPersonalMemory(ctx.memory, tamachibiMemoryForGrowingFeature(contentFeature),
+      lifetimeConversations_ + ctx.ageDays + pendingScenario_, memory, sizeof(memory));
   appendText(out, outSize, "\n");
   appendText(out, outSize, memory);
   appendText(out, outSize, "\n");
@@ -1331,13 +1330,9 @@ GrowingTogetherOutcome GrowingTogetherSystem::runPending(const GrowingTogetherCo
   // Applying the underlying topic changes the real school/family/privacy/etc.
   // system; this separate step advances the four-day narrative itself.
   if (followUp) advanceArc(ctx, GT_MULTI_DAY_ARC, choice);
-  char rememberedDetail[150];
-  buildTamachibiPersonalMemory(ctx.memory,
-      static_cast<uint8_t>((pendingEnding_ + choice + contentFeature + 3U) % 8U),
-      lifetimeConversations_ + ctx.ageDays, rememberedDetail, sizeof(rememberedDetail));
   char reply[360];
-  snprintf(reply, sizeof(reply), "%s\n%s %s", resultLine(contentFeature, choice),
-           rememberedDetail, PERSONAL_RESPONSE_ACK[pendingEnding_ % GT_ENDINGS_PER_FEATURE][choice % 3U]);
+  snprintf(reply, sizeof(reply), "%s\n%s", resultLine(contentFeature, choice),
+           PERSONAL_RESPONSE_ACK[pendingEnding_ % GT_ENDINGS_PER_FEATURE][choice % 3U]);
   showScrollableText("YOUR TAMA REPLIES", reply, "D1 close");
   choice < 2 ? goodSound() : badSound();
 

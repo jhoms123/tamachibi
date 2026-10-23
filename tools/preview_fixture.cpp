@@ -1,4 +1,5 @@
 #include "NativeUI.h"
+#include "AquariumArt.h"
 #include <cstdio>
 #define WHITE SSD1306_WHITE
 #define BLACK SSD1306_BLACK
@@ -73,10 +74,17 @@ public:
   char names_[4][12] = {"BUBBLE", "LUNA", "FINN", "NORI"};
   byte species_[4] = {0, 1, 2, 3}, tankDecor_ = 3, waterQuality_ = 8,
        tankClean_ = 9;
+  byte personalitySeed_[4] = {1, 5, 10, 15}, actionPose_[4] = {0, 0, 0, 0},
+       actionFrames_[4] = {0, 0, 0, 0}, growthBranch_[4] = {0, 1, 2, 3};
+  uint16_t ageTicks_[4] = {288, 700, 1600, 2600};
   bool slotOccupied(byte) const { return true; }
   byte fishCount() const { return 4; }
   byte capacity() const { return 4; }
   bool needsCare() const { return false; }
+  byte fishLifeStage(byte slot) const {
+    return ageTicks_[slot] < 288 ? 0 : ageTicks_[slot] < 864 ? 1 :
+           ageTicks_[slot] < 2016 ? 2 : 3;
+  }
   void drawTankScene(uint8_t, uint16_t, bool);
 };
 constexpr byte EMPTY_PLANT = 255;

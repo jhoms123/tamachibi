@@ -394,7 +394,6 @@ unsigned long lastLifeClockEpoch = 0;
 unsigned long lifeSecondRemainder = 0;
 unsigned long lastAnimTick = 0;
 unsigned long lastButtonTick = 0;
-unsigned long lastNarrativeInteractionAtMs = 0;
 bool rightButtonRawLast = HIGH;
 bool rightButtonStable = HIGH;
 unsigned long rightButtonRawChangedAt = 0;
@@ -418,8 +417,8 @@ const unsigned long LIFE_TICK_MS = TAMACHIBI_TEST_MODE ? 1000UL : 300000UL;
 const unsigned long GAME_TICK_MS = LIFE_TICK_MS;
 const unsigned long RTC_SECONDS_PER_TICK = TAMACHIBI_TEST_MODE ? 1UL : SIM_SECONDS_PER_TICK;
 const unsigned long ANIM_TICK_MS = 350UL;
-const unsigned long NARRATIVE_COOLDOWN_MS = 15UL * 60UL * 1000UL;
 const unsigned long ACTIVE_ANIMATION_WINDOW_MS = 12000UL;
+const unsigned long NARRATIVE_COOLDOWN_MS = 15UL * 60UL * 1000UL;
 const unsigned long TICKS_PER_HOUR = 12UL;
 const unsigned long TICKS_PER_DAY = 288UL;
 
@@ -688,6 +687,7 @@ bool rightMenuHoldUsed = false;
 bool screenSleeping = false;
 bool oledIsOff = false;
 unsigned long lastInputAt = 0;
+unsigned long lastNarrativeInteractionAtMs = 0;
 unsigned long zeroFoodTicks = 0;
 unsigned long zeroCleanTicks = 0;
 unsigned long zeroHappyTicks = 0;
@@ -8931,66 +8931,29 @@ const __FlashStringHelper* petAdviceReply() {
 }
 
 namespace {
-const char *const PERSONAL_TALK_OPENERS[12] = {
-  "I am glad you asked me.", "I have been holding a thought for you.",
-  "A little thing from our days came back to me.", "I thought about us earlier today.",
-  "This is one of those small things I wanted to share.", "You know what I remember right now?",
-  "I want to tell you something from our story.", "I saved this thought for when you came by.",
-  "Something about our routine feels special to me.", "I feel like talking about us for a moment.",
-  "I have a memory I want to keep warm.", "I notice the little ways we know each other."
-};
-
 const char *const PERSONAL_TALK_BABY_OPENERS[12] = {
   "Ba!", "Da-da!", "Mmm!", "Look!", "I know you!", "You came!",
   "Baba!", "Hee!", "My friend!", "There you are!", "I remember!", "Listen!"
 };
 
-const char *const PERSONAL_TALK_TAILS[12] = {
-  "That is a part of my life I share with you.", "I do not want that small moment to disappear.",
-  "It makes me feel like you know the real me.", "Our tiny history makes this home feel like ours.",
-  "I hope we keep adding stories to this one.", "I carry that feeling into whatever happens next.",
-  "Even an ordinary day can become one of our memories.", "I remember the way you made room for me.",
-  "I like that we have our own ways of caring.", "That is why I keep telling you what is on my mind.",
-  "I am glad I get to grow up with you nearby.", "I notice the care you give me, even in small things."
-};
-
-const char *const PERSONAL_TALK_BABY_TAILS[12] = {
-  "I like when you are near.", "I know that sound.", "We are making a little story.",
-  "I feel safe with you.", "Come back and see me again.", "You are part of my home.",
-  "I remember your gentle hands.", "I like our time together.", "My little heart knows you.",
-  "We can do it again soon.", "You make my world feel familiar.", "I am happy you are here."
-};
-
 const char *const PERSONAL_TALK_RELATIONSHIPS[3][8] = {
   {
-    "I am still learning how safe it is to open up.",
-    "I need time, but I notice when you come back.",
-    "I am figuring out which parts of me you understand.",
-    "Small, steady moments help me feel less unsure.",
-    "I want to trust the care I see from you.",
-    "I am not ready for everything, but I am here with you.",
-    "I remember how it feels when you listen patiently.",
-    "I hope we keep learning each other's rhythms."
+    "I open up a little at a time.", "I am still learning what feels safe to share.",
+    "I notice when you come back.", "I am getting to know you, too.",
+    "Small, steady moments help me feel sure.", "I am not ready to tell you everything yet.",
+    "I like when you give me time to find my words.", "I am learning our little rhythms."
   },
   {
-    "I notice how you show up for me, even on ordinary days.",
-    "I am learning which parts of myself I can trust you with.",
-    "Our routines are becoming a language between us.",
-    "I like that you give me room to be my own kind of Tama.",
-    "I can feel our history building one small moment at a time.",
-    "I think we are getting better at understanding each other.",
-    "I know you have learned some of my little tells.",
-    "I like that we can keep growing without being the same."
+    "I notice how you show up on ordinary days.", "I am learning what I can trust you with.",
+    "Our routines are becoming a language between us.", "You give me room to be myself.",
+    "I can feel our history in the little things.", "We are getting better at understanding each other.",
+    "You have learned some of my little tells.", "I like that we can grow and still be ourselves."
   },
   {
-    "I feel safe enough with you to be completely myself.",
-    "I trust the care we have built together.",
-    "You have learned the quiet details that make me feel known.",
-    "I can bring you a hard feeling and still feel loved.",
-    "Our little history feels like a place I can come home to.",
-    "You know my rhythms, and I know you will keep showing up.",
-    "I can be brave because I know you are nearby.",
-    "I feel like your Tamachibi, not just another little face."
+    "I feel safe enough to be completely myself with you.", "I trust the care we have built.",
+    "You know the little details that make me feel understood.", "I can bring you a hard feeling and still feel loved.",
+    "Our history feels like a place I can come home to.", "You know my rhythms, and I know you will show up.",
+    "I feel braver with you nearby.", "I feel like your Tamachibi, not just another little face."
   }
 };
 
@@ -9001,71 +8964,54 @@ const char *const PERSONAL_TALK_EGG_LINES[8] = {
   "I am keeping this first hello.", "I wonder what our home will be like."
 };
 
-const char *const PERSONAL_TALK_EGG_VOICES[8] = {
-  "I hear you from in here.", "The world is still muffled, but your voice is clear.",
-  "I am listening while I get ready.", "I can feel the shell rock when you visit.",
-  "I wonder what your hands will feel like.", "I am keeping this hello for later.",
-  "It is nice knowing someone is waiting.", "I will meet you when I am ready."
-};
-
-const char *const PERSONAL_TALK_BABY_MEMORY[8] = {
-  "I know your voice.", "You came when I called.", "You notice my tiny needs.",
-  "Our visits feel familiar.", "Your gentle care feels safe.", "I like our little routine.",
-  "I remember you came back.", "We are making our first memories."
-};
 }
 
 void dialoguePopupText(const char *youLine, const char *petLine, byte talkTopic) {
   const uint32_t sequence = parentDialogue.lifetimeConversations();
-  // This is a permutation through 9,216 opening / memory / relationship /
-  // closing combinations. The saved conversation count advances it after each
-  // direct Talk reply, so the same pet does not roll a tiny random phrase list.
-  const uint32_t variantCount = 12UL * 8UL * 8UL * 12UL;
-  uint32_t variant = (sequence * 1009UL + birthCode +
-                      static_cast<uint32_t>(talkTopic) * 131UL +
-                      static_cast<uint32_t>(generation) * 17UL) % variantCount;
-  const uint8_t tail = variant % 12U; variant /= 12U;
-  const uint8_t relationship = variant % 8U; variant /= 8U;
-  const uint8_t memoryKind = variant % 8U; variant /= 8U;
-  const uint8_t opener = variant % 12U;
+  // Mix the pet's birth, generation, topic and saved conversation count. The
+  // topic decides which kind of real memory to recall; the mix only varies how
+  // that memory is phrased and which related event is selected.
+  const uint32_t variant = sequence * 1009UL + birthCode +
+      static_cast<uint32_t>(talkTopic) * 131UL +
+      static_cast<uint32_t>(generation) * 17UL;
+  const uint8_t relationship = static_cast<uint8_t>(variant % 8U);
+  const uint8_t opener = static_cast<uint8_t>((variant / 8U) % 12U);
 
   char memory[170];
   TamachibiMemoryContext memoryContext = makeTamachibiMemoryContext();
-  if (stage == STAGE_BABY) {
-    buildTamachibiBabyMemory(memoryContext, sequence + memoryKind, memory, sizeof(memory));
-  } else {
-    buildTamachibiPersonalMemory(memoryContext, memoryKind, sequence, memory, sizeof(memory));
+  if (stage == STAGE_BABY)
+    buildTamachibiBabyMemory(memoryContext, sequence + variant / 17U, memory, sizeof(memory));
+  else if (stage >= STAGE_CHILD) {
+    uint8_t memoryKind = tamachibiMemoryForDirectTalk(talkTopic);
+    if (talkTopic == 12 && memoryContext.fishCount == 0) memoryKind = TAMA_MEMORY_CARE;
+    buildTamachibiPersonalMemory(memoryContext, memoryKind,
+                                 sequence + variant / 13U, memory, sizeof(memory));
   }
+  else memory[0] = '\0';
 
   const uint8_t relationshipTier = ownerTrust < 40 || ownerBond < 35 ? 0 :
-                                   (ownerTrust >= 70 && ownerBond >= 70 ? 2 : 1);
-  const char *voice = PERSONAL_TALK_RELATIONSHIPS[relationshipTier][relationship];
-  const char *opening = PERSONAL_TALK_OPENERS[opener];
-  const char *ending = PERSONAL_TALK_TAILS[tail];
+                                  (ownerTrust >= 70 && ownerBond >= 70 ? 2 : 1);
   const char *baseReply = petLine ? petLine : "I like that you asked me.";
   if (stage == STAGE_EGG) {
-    baseReply = PERSONAL_TALK_EGG_LINES[memoryKind];
-    opening = PERSONAL_TALK_BABY_OPENERS[opener];
-    memory[0] = '\0';
-    voice = PERSONAL_TALK_EGG_VOICES[relationship];
-    ending = PERSONAL_TALK_BABY_TAILS[tail];
-  } else if (stage == STAGE_BABY) {
-    opening = PERSONAL_TALK_BABY_OPENERS[opener];
-    voice = PERSONAL_TALK_BABY_MEMORY[(relationship + temperament) % 8U];
-    ending = PERSONAL_TALK_BABY_TAILS[tail];
+    baseReply = PERSONAL_TALK_EGG_LINES[relationship];
   }
 
   char openingLine[112];
   const char *nickname = reinterpret_cast<const char *>(ownerNickname());
   if (stage >= STAGE_CHILD && (opener % 4U) == 0 && nickname && nickname[0])
-    snprintf(openingLine, sizeof(openingLine), "%s, %s.",
-             opener == 0 ? "I was thinking about us" :
-             (opener == 4 ? "I saved a thought for you" : "I notice how we know each other"), nickname);
-  else snprintf(openingLine, sizeof(openingLine), "%s", opening);
+    snprintf(openingLine, sizeof(openingLine), "Hey, %s. %s",
+             nickname, PERSONAL_TALK_RELATIONSHIPS[relationshipTier][relationship]);
+  else if (stage >= STAGE_CHILD)
+    snprintf(openingLine, sizeof(openingLine), "%s",
+             PERSONAL_TALK_RELATIONSHIPS[relationshipTier][relationship]);
+  else if (stage == STAGE_BABY)
+    snprintf(openingLine, sizeof(openingLine), "%s", PERSONAL_TALK_BABY_OPENERS[opener]);
+  else openingLine[0] = '\0';
 
   char reply[540];
-  snprintf(reply, sizeof(reply), "%s %s %s %s %s", openingLine, memory,
-           voice, baseReply, ending);
+  if (stage == STAGE_EGG) snprintf(reply, sizeof(reply), "%s", baseReply);
+  else if (memory[0]) snprintf(reply, sizeof(reply), "%s %s\n%s", openingLine, baseReply, memory);
+  else snprintf(reply, sizeof(reply), "%s %s", openingLine, baseReply);
   char text[640];
   snprintf(text, sizeof(text), "%s\n%s", youLine ? youLine : "You listen.", reply);
   char title[24];
@@ -9089,8 +9035,10 @@ TamachibiMemoryContext makeTamachibiMemoryContext() {
   m.lastTripName = lastTripEvent < 9
       ? reinterpret_cast<const char *>(lifeWorld.locationName(lastTripEvent)) : nullptr;
   m.favoriteGameName = reinterpret_cast<const char *>(gameName(favoriteGameId % 13));
+  m.companionName = lifeWorld.companionName();
   memcpy(m.careTypes, careHistoryType, sizeof(m.careTypes));
   memcpy(m.careDays, careHistoryDay, sizeof(m.careDays));
+  memcpy(m.careHours, careHistoryHour, sizeof(m.careHours));
   m.careHead = careHistoryHead;
   m.careCount = careHistoryCount;
   m.caredDayStreak = caredDayStreak;
@@ -9105,9 +9053,22 @@ TamachibiMemoryContext makeTamachibiMemoryContext() {
   m.favoriteGamePlays = gameCounts[favoriteGameId % 13];
   m.lastTripEvent = lastTripEvent;
   m.gardenCount = botany.gardenCount();
+  m.gardenHealth = botany.gardenAverageHealth();
   m.companionType = lifeWorld.companionType();
   m.companionBond = lifeWorld.companionBond();
+  m.companionMood = lifeWorld.companionMood();
+  m.careerId = lifeWorld.careerId();
+  m.careerRank = lifeWorld.careerRank();
+  m.careerName = reinterpret_cast<const char *>(lifeWorld.careerName(m.careerId));
   m.fishCount = aquarium.fishCount();
+  m.temperament = temperament;
+  m.emotion = deepLife.emotionId();
+  m.emotionIntensity = deepLife.emotionIntensity();
+  m.emotionName = reinterpret_cast<const char *>(deepLife.emotionName());
+  m.familyMood = deepLife.familyMood();
+  m.childCount = deepLife.childCount();
+  m.siblingBond = deepLife.averageSiblingBond();
+  m.familyPresent = (partnerId < PARTNER_COUNT || m.childCount > 0 || m.siblingBond > 0) ? 1 : 0;
   return m;
 }
 
@@ -9366,14 +9327,8 @@ void talkActivity() {
         stage == STAGE_EGG ? F("I can hear the water move outside my shell.") : F("Bub-bub! Fish!"), q);
     else if (!aquarium.hasFish()) dialoguePopup(F("You ask about the aquarium"), F("Maybe we will meet a fish together one day."), q);
     else {
-      char reply[180];
-      const char *fish = aquarium.selectedFishName();
-      if (aquarium.needsCare())
-        snprintf(reply, sizeof(reply), "I have been watching %s. We have %u fish together, and the aquarium could use some care.", fish, aquarium.fishCount());
-      else if (aquarium.tankClean() >= 7)
-        snprintf(reply, sizeof(reply), "I like watching %s swim. We have %u fish, and the clean water makes our tank feel peaceful.", fish, aquarium.fishCount());
-      else
-        snprintf(reply, sizeof(reply), "%s was moving around when I checked. There are %u fish in our little aquarium.", fish, aquarium.fishCount());
+      char reply[250];
+      aquarium.composeSelectedFishComment(reply, sizeof(reply));
       dialoguePopupText("You ask about the aquarium", reply, q);
       markRoutineAction(ROUTINE_TALK_AQ);
       changeBond(1);
@@ -9996,7 +9951,7 @@ void diaryPage() {
 
 void careHistoryPage() {
   byte page=0; waitButtonRelease();
-  while(true){if(rightHoldExitCheck())return;bool l=digitalRead(BTN_L),r=digitalRead(BTN_R);if(l==LOW&&careHistoryCount>0){page=(page==0)?careHistoryCount-1:page-1;clickSound();waitButtonRelease();}if(r==LOW){if(page+1<careHistoryCount)page++;clickSound();waitButtonRelease();}display.clearDisplay();display.setTextSize(1);display.setTextColor(WHITE);display.setCursor(30,0);display.print(F("Care History"));if(careHistoryCount==0){display.setCursor(20,28);display.print(F("No calls logged"));}else{byte oldest=(careHistoryHead+CARE_HISTORY_COUNT-careHistoryCount)%CARE_HISTORY_COUNT;byte idx=(oldest+page)%CARE_HISTORY_COUNT;display.setCursor(8,18);display.print(careEventName(careHistoryType[idx]));display.setCursor(8,31);display.print(F("Day "));display.print(careHistoryDay[idx]);display.print(F("  Hour "));display.print(careHistoryHour[idx]);display.setCursor(8,44);display.print(page+1);display.print(F("/"));display.print(careHistoryCount);}display.setCursor(0,56);display.print(F("D0/D2 browse Hold exit"));display.display();delay(20);}
+  while(true){if(rightHoldExitCheck())return;bool l=digitalRead(BTN_L),r=digitalRead(BTN_R);if(l==LOW&&careHistoryCount>0){page=(page==0)?careHistoryCount-1:page-1;clickSound();waitButtonRelease();}if(r==LOW){if(page+1<careHistoryCount)page++;clickSound();waitButtonRelease();}display.clearDisplay();display.setTextSize(1);display.setTextColor(WHITE);display.setCursor(30,0);display.print(F("Care History"));if(careHistoryCount==0){display.setCursor(14,28);display.print(F("No care events yet"));}else{byte oldest=(careHistoryHead+CARE_HISTORY_COUNT-careHistoryCount)%CARE_HISTORY_COUNT;byte idx=(oldest+page)%CARE_HISTORY_COUNT;display.setCursor(8,18);display.print(careEventName(careHistoryType[idx]));display.setCursor(8,31);display.print(F("Day "));display.print(careHistoryDay[idx]);display.print(F("  Hour "));display.print(careHistoryHour[idx]);display.setCursor(8,44);display.print(page+1);display.print(F("/"));display.print(careHistoryCount);}display.setCursor(0,56);display.print(F("D0/D2 browse Hold exit"));display.display();delay(20);}
 }
 
 void inspectPage() {
