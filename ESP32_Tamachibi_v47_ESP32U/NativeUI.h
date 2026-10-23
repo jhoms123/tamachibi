@@ -50,8 +50,9 @@ void meter(GameDisplay &d, int x, int y, int width, int value,
            int maximum = 10);
 void icon(GameDisplay &d, uint8_t id, int x, int y, uint16_t ink = 1);
 void pet(GameDisplay &d, int x, int y, uint8_t species, uint8_t stage,
-         uint8_t frame, bool asleep = false, int scale = 1);
-void accessory(GameDisplay &d, int x, int y, uint8_t outfit);
+         uint8_t frame, bool asleep = false, int scale = 1,
+         uint8_t evolutionPath = 0, bool facingLeft = false);
+void accessory(GameDisplay &d, int x, int y, uint8_t outfit, int scale = 1);
 void plant(GameDisplay &d, int x, int y, uint8_t species, uint8_t growth,
            bool bad = false);
 void fish(GameDisplay &d, int x, int y, uint8_t species, bool right = true,

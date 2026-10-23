@@ -6,18 +6,24 @@ uint32_t fixtureMillis = 100;
 Adafruit_SH1107 panel;
 GameDisplay display(panel);
 using NativeUI::text;
-byte stage = 4, speciesType = 0, roomStyle = 0, anim = 0, full = 8, happy = 9,
+byte stage = 4, speciesType = 0, eggType = 0, idleStyle = 0,
+     roomStyle = 0, anim = 0, full = 8, happy = 9,
      energy = 7, clean = 9, poop = 0, partnerId = 2, partnerBond = 90,
      mainCategory = 0, outfit = 0;
+unsigned int careMistakes = 0;
+byte discipline = 5;
 bool dead = false, sick = false, petAway = false, sleeping = false,
      lightOff = false, menuVisible = true;
 char petName[] = "MOCHI";
-constexpr byte STAGE_CHILD = 2;
+constexpr byte STAGE_EGG = 0, STAGE_BABY = 1, STAGE_CHILD = 2,
+               STAGE_TEEN = 3, STAGE_ADULT = 4;
 constexpr byte CATEGORY_COUNT = 6, HOUSE_ROOM_COUNT = 5, CITY_PLACE_COUNT = 6;
 bool needsCare() { return false; }
 bool isScheduledAwayTime() { return false; }
 byte visualHour() { return 14; }
 byte clockMinute() { return 28; }
+byte petLineage() { return stage < STAGE_ADULT ? speciesType % 10 : eggType % 10; }
+byte currentEvolutionPath() { return (idleStyle & 0x80U) ? 1 : 0; }
 struct World {
   byte room = 0, place = 0;
   byte houseRoom() { return room; }

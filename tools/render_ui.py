@@ -22,6 +22,7 @@ def main():
  ap=argparse.ArgumentParser();ap.add_argument('--gfx',type=Path,default=SRC/'.pio/libdeps/esp32u/Adafruit GFX Library');args=ap.parse_args();gfx=args.gfx
  if not (gfx/'Adafruit_GFX.cpp').exists():raise SystemExit('Adafruit GFX missing; run PlatformIO or pass --gfx PATH')
  program=(ROOT/'tools/preview_fixture.cpp').read_text()
+ program+='\n'+extract('GameMain.cpp','petWalkPose')+'\n'
  for f,names in {
   'GameMain.cpp':['drawSquarePet','drawMenu','drawHouseWorldView','drawCityWorldView'],
   'ParentDialogue.cpp':['ParentDialogueSystem::drawDialoguePage','ParentDialogueSystem::drawChoicePage','ParentDialogueSystem::drawResultPage'],
@@ -67,7 +68,7 @@ int main(){
  out=ROOT/'docs/native-ui';out.mkdir(parents=True,exist_ok=True)
  with tempfile.TemporaryDirectory() as td:
   td=Path(td);(td/'preview.cpp').write_text(program)
-  cmd=['g++','-std=c++17','-DARDUINO=100','-I'+str(ROOT/'tools/host'),'-I'+str(gfx),'-I'+str(SRC),str(gfx/'Adafruit_GFX.cpp'),str(SRC/'GameDisplay.cpp'),str(SRC/'NativeUI.cpp'),str(td/'preview.cpp'),'-o',str(td/'preview')]
+  cmd=['g++','-std=c++17','-DARDUINO=100','-I'+str(ROOT/'tools/host'),'-I'+str(gfx),'-I'+str(SRC),str(gfx/'Adafruit_GFX.cpp'),str(SRC/'GameDisplay.cpp'),str(SRC/'NativeUI.cpp'),str(SRC/'RosterSprites.cpp'),str(SRC/'GrowthSprites.cpp'),str(td/'preview.cpp'),'-o',str(td/'preview')]
   subprocess.run(cmd,check=True);subprocess.run([str(td/'preview')],cwd=td,check=True)
   checks=cmd[:-3]+[str(ROOT/'tools/renderer_checks.cpp'),'-o',str(td/'checks')]
   subprocess.run(checks,check=True);subprocess.run([str(td/'checks')],check=True)

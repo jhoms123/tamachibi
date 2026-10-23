@@ -14,6 +14,8 @@
 #include <Adafruit_GFX.h>
 #include "GameDisplay.h"
 #include "NativeUI.h"
+#include "GrowthSprites.h"
+#include "RosterSprites.h"
 #include <EEPROM.h>
 #include <stddef.h>
 #include "Esp32Platform.h"
@@ -74,7 +76,8 @@ const byte AQUARIUM_MENU_COUNT = 10;
 #define NEEDS_OLED_SCL 17
 #define BTN_L 32
 #define BTN_S 33
-#define BTN_R 25
+#define ENCODER_SW_PIN 25
+#define BTN_R ENCODER_SW_PIN
 #define BUZZER_PIN 26
 #define VOLUME_ENCODER_CLK_PIN 35
 #define VOLUME_ENCODER_DT_PIN 39
@@ -391,6 +394,10 @@ unsigned long lastLifeClockEpoch = 0;
 unsigned long lifeSecondRemainder = 0;
 unsigned long lastAnimTick = 0;
 unsigned long lastButtonTick = 0;
+bool rightButtonRawLast = HIGH;
+bool rightButtonStable = HIGH;
+unsigned long rightButtonRawChangedAt = 0;
+bool rightButtonDebounceReady = false;
 
 // Developer speed is intentionally not saved. Every reboot returns to normal.
 // 0 normal, 1 10x, 2 60x, 3 300x, 4 paused.
@@ -409,7 +416,7 @@ const unsigned long SIM_SECONDS_PER_TICK = 300UL;
 const unsigned long LIFE_TICK_MS = TAMACHIBI_TEST_MODE ? 1000UL : 300000UL;
 const unsigned long GAME_TICK_MS = LIFE_TICK_MS;
 const unsigned long RTC_SECONDS_PER_TICK = TAMACHIBI_TEST_MODE ? 1UL : SIM_SECONDS_PER_TICK;
-const unsigned long ANIM_TICK_MS = 1000UL;
+const unsigned long ANIM_TICK_MS = 350UL;
 const unsigned long ACTIVE_ANIMATION_WINDOW_MS = 12000UL;
 const unsigned long TICKS_PER_HOUR = 12UL;
 const unsigned long TICKS_PER_DAY = 288UL;
@@ -489,7 +496,7 @@ const unsigned long DIRTY_SICK_TICKS = 144UL;         // 12 hours dirty = illnes
 // Do not save every loop because flash has limited write cycles.
 const unsigned long AUTO_SAVE_MS = 600000UL;
 const unsigned long SAVE_MAGIC = 0x544D4139UL; // TMA9
-const byte SAVE_VERSION = 19; // v20 keeps the v19 save layout for compatibility
+const byte SAVE_VERSION = 20; // v20 changes evolution tags; the byte layout is unchanged.
 unsigned long saveSequence = 0;
 bool saveDirty = false;
 unsigned long lastSaveAt = 0;
@@ -819,6 +826,9 @@ bool batteryLow();
 bool batteryCritical();
 void applyBrightness();
 const __FlashStringHelper* speciesName();
+byte petLineage();
+byte currentEvolutionPath();
+void lockTeenEvolutionPath();
 bool needsCare();
 void waitButtonRelease();
 bool pressed(byte pin);
@@ -1740,7 +1750,8 @@ unsigned long calculateSaveChecksum(const SaveData &d) {
 }
 
 bool saveIsValid(const SaveData &d) {
-  if (d.magic != SAVE_MAGIC || d.version != SAVE_VERSION) return false;
+  if (d.magic != SAVE_MAGIC ||
+      (d.version != SAVE_VERSION && d.version != SAVE_VERSION - 1)) return false;
   return d.checksum == calculateSaveChecksum(d);
 }
 
@@ -1817,6 +1828,15 @@ void applySaveData(const SaveData &d) {
   conditionType = d.conditionType; conditionSeverity = d.conditionSeverity; conditionTicks = d.conditionTicks;
   medCold = d.medCold; medTummy = d.medTummy; medSkin = d.medSkin; medEnergy = d.medEnergy; medMood = d.medMood; medAll = d.medAll;
   poop = d.poop; ageTicks = d.ageTicks; stage = d.stage; careMistakes = d.careMistakes; stageCareMistakes = d.stageCareMistakes;
+  if (d.version < SAVE_VERSION) {
+    // v19 stored an adult species id in both fields before hatch. Convert the
+    // old choice to its new family while preserving an already-grown adult.
+    const byte family = growthFamilyForAdult(speciesType);
+    eggType = family;
+    if (stage < STAGE_ADULT) speciesType = family;
+    markSaveDirty();
+  }
+  if (stage == STAGE_TEEN) lockTeenEvolutionPath();
   lastFood = d.lastFood; varietyStreak = d.varietyStreak; walkWins = d.walkWins; crossyBest = d.crossyBest;
   studyStars = d.studyStars; gardenLevel = d.gardenLevel; musicStars = d.musicStars; trainStars = d.trainStars; gardenHarvests = d.gardenHarvests;
   coins = d.coins;
@@ -1932,6 +1952,22 @@ const __FlashStringHelper* stageName() {
   if (stage == STAGE_TEEN) return F("Teen");
   if (stage == STAGE_ADULT) return F("Adult");
   return F("Elder");
+}
+
+byte petLineage() {
+  // V19 saves are migrated on load. Live saves keep the family key in eggType.
+  if (stage < STAGE_ADULT) return speciesType % TAMACHIBI_FAMILY_COUNT;
+  return eggType % TAMACHIBI_FAMILY_COUNT;
+}
+
+byte currentEvolutionPath() {
+  return (idleStyle & 0x80U) ? 1 : 0;
+}
+
+void lockTeenEvolutionPath() {
+  if (idleStyle & 0x40U) return;
+  const bool careChallenged = careMistakes >= 3 || discipline <= 3;
+  idleStyle = (idleStyle & 0x3FU) | 0x40U | (careChallenged ? 0x80U : 0U);
 }
 
 const __FlashStringHelper* temperamentName() {
@@ -2257,6 +2293,7 @@ byte chooseAdultEvolution() {
   quality += (skillSmart + skillFit + skillKind + skillStyle) / 20;
   quality -= (int)stageCareMistakes * 6;
   quality -= (int)careMistakes * 2 + (int)sicknessHistory + (int)overfeedCount * 2;
+  if (currentEvolutionPath() != 0) quality -= 8;
 
   byte tier;
   if (quality >= 65) tier = 0;
@@ -2266,9 +2303,10 @@ byte chooseAdultEvolution() {
   else tier = 4;
 
   hobbyType = dominantHobby();
-  byte lifestyle = (byte)((nutritionScore / 20 + cleanlinessScore / 20 + exerciseScore / 10 + weight) % 10);
-  byte branch = (byte)((birthCode + temperament * 3 + hobbyType * 2 + discipline + lifestyle + habitat * 2 + (inheritedTrait < 4 ? inheritedTrait : 0)) % 10);
-  return (byte)(tier * 10 + branch);
+  // One chosen hatch family has five adult silhouettes. Care tier chooses the
+  // outcome, so both teen branches can reach several adults from that same
+  // earlier form.
+  return growthAdultSpecies(petLineage(), tier);
 }
 
 void showEvolutionMessage() {
@@ -2287,13 +2325,14 @@ void updateGrowthStage() {
 
   if (wanted == stage) return;
   stage = wanted;
-  stageCareMistakes = 0;
+  if (stage == STAGE_TEEN) lockTeenEvolutionPath();
   if (stage == STAGE_ADULT) {
     speciesType = deepLife.applySecretEvolution(chooseAdultEvolution());
     favoriteGameId = (byte)((speciesType + temperament * 3) % 13);
     dislikedGameId = (byte)((favoriteGameId + 6) % 13);
     discoverSpecies(speciesType);
   }
+  stageCareMistakes = 0;
   showEvolutionMessage();
   lifeWorld.recordMemory(1, petAgeDays(), stage);
   markSaveDirty();
@@ -2742,6 +2781,20 @@ void applyBrightness() {
 }
 
 const __FlashStringHelper* speciesName() {
+  if (stage < STAGE_ADULT) {
+    switch (petLineage()) {
+      case 0: return F("Skyling");
+      case 1: return F("Tidekin");
+      case 2: return F("Pouncer");
+      case 3: return F("Shadelet");
+      case 4: return F("Crumbkin");
+      case 5: return F("Hornling");
+      case 6: return F("Pupkin");
+      case 7: return F("Sproutling");
+      case 8: return F("Tinker");
+      default: return F("Gearling");
+    }
+  }
   switch (speciesType % SPECIES_COUNT) {
     case 0: return F("Bird");
     case 1: return F("Slug");
@@ -3167,159 +3220,7 @@ void drawMenuName() {
 // ---------- egg and pet drawing ----------
 // v14: retro-inspired sprite roster and normal eggs.
 
-// v14 sprite roster: original retro-inspired pet set.
-const uint32_t ROSTER_SPRITES[50][32] PROGMEM = {
-{
-    0x00000000UL, 0x00000000UL, 0x00070000UL, 0x00010000UL, 0x00010000UL, 0x0007E000UL, 0x00081000UL, 0x00081000UL, 0x00100C00UL, 0x00170C00UL, 0x00F10C00UL, 0x00F10C00UL, 0x00180C00UL, 0x00F00C00UL, 0x00F00C00UL, 0x04600200UL, 0x04600FC0UL, 0x04600FC0UL, 0x07E00240UL, 0x00600200UL, 0x00100C00UL, 0x00100C00UL, 0x000FF000UL, 0x00062000UL, 0x00062000UL, 0x000E3000UL, 0x00000000UL, 0x00100C00UL, 0x00100C00UL, 0x00681200UL, 0x00662200UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x01C00000UL, 0x01C00000UL, 0x00400000UL, 0x01F80000UL, 0x01F80000UL, 0x02060000UL, 0x0C010000UL, 0x0C010000UL, 0x0DC10000UL, 0x7C01F800UL, 0x7C01F800UL, 0x0E010400UL, 0x7C000300UL, 0x7C000300UL, 0x0C000300UL, 0x6D800300UL, 0x6D800300UL, 0x7E00031CUL, 0x03FFFFF0UL, 0x03FFFFF0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00204000UL, 0x00D9B000UL, 0x00D9B000UL, 0x01DFB000UL, 0x06000C00UL, 0x06000C00UL, 0x06000FE0UL, 0x06C20C18UL, 0x06C20C18UL, 0x06000E24UL, 0x06380246UL, 0x06380246UL, 0x0600025AUL, 0x0801825AUL, 0x0801825AUL, 0x0801825AUL, 0x30018242UL, 0x30018242UL, 0x30060226UL, 0x30000E04UL, 0x30000E04UL, 0x3FFFFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00007000UL, 0x00007000UL, 0x00007C00UL, 0x00007C00UL, 0x0007FF00UL, 0x0007FF00UL, 0x001FFFF0UL, 0x001FFFF0UL, 0x003FFFFCUL, 0x003FFFFCUL, 0x0039F3FCUL, 0x003E3FFCUL, 0x003E3FFCUL, 0x403FFFFCUL, 0x403FFFFCUL, 0x403FFFFCUL, 0x403FFFFCUL, 0x403FFFFCUL, 0x401FFFF0UL, 0x401FFFF0UL, 0x4007FFC0UL, 0x4007FFC0UL, 0x400783C0UL, 0x400783C0UL, 0x001E00F0UL, 0x001E00F0UL, 0x003E00FCUL, 0x003E00FCUL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x0001FE00UL, 0x0001FE00UL, 0x00020100UL, 0x007E00C0UL, 0x007E00C0UL, 0x008000C0UL, 0x008000C0UL, 0x008000C0UL, 0x03E007C0UL, 0x03000100UL, 0x03000100UL, 0x03000100UL, 0x03000100UL, 0x03FFFF00UL, 0x04EE7EC0UL, 0x04EE7EC0UL, 0x04FFFEC0UL, 0x040000C0UL, 0x040000C0UL, 0x03FFFF00UL, 0x008C0100UL, 0x008C0100UL, 0x00800100UL, 0x007FFE00UL, 0x007FFE00UL, 0x008C4100UL, 0x00FC7F00UL, 0x00FC7F00UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x01118800UL, 0x06204600UL, 0x01204800UL, 0x01204800UL, 0x013FC800UL, 0x01C03800UL, 0x01C03800UL, 0x06000604UL, 0x18E07104UL, 0x18E07104UL, 0x18000104UL, 0x181F8104UL, 0x18204104UL, 0x18204104UL, 0x201F80C0UL, 0x201F80C0UL, 0x200000C0UL, 0x210008C0UL, 0x210008C0UL, 0x210008C0UL, 0x27FFFEC0UL, 0x1FFFFF00UL, 0x1FFFFF00UL, 0x01FFF800UL, 0x00F1F000UL, 0x00F1F000UL, 0x00D1B000UL, 0x00D1B000UL, 0x00204000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0007F800UL, 0x00040F00UL, 0x00040F00UL, 0x1FFC0100UL, 0x6000F100UL, 0x6000F100UL, 0x0C007100UL, 0x00006100UL, 0x00006100UL, 0x00000100UL, 0x1EE40100UL, 0x73FC0138UL, 0x73FC0138UL, 0x10000124UL, 0x10000124UL, 0x10000124UL, 0x0FF86126UL, 0x00206122UL, 0x00206122UL, 0x002061E2UL, 0x00C06002UL, 0x00C06002UL, 0x10C00002UL, 0x10C00002UL, 0x1FFFFFFEUL, 0x1FFFFFFEUL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x001FE000UL, 0x001FE000UL, 0x00601800UL, 0x00600400UL, 0x00600400UL, 0x038D0400UL, 0x078D2300UL, 0x078D2300UL, 0x04012080UL, 0x0301E080UL, 0x0301E080UL, 0x04000070UL, 0x0400000CUL, 0x4380000CUL, 0x4380000CUL, 0x40600010UL, 0x40600010UL, 0x40600010UL, 0x40600010UL, 0x401FFFE0UL, 0x401FFFE0UL, 0x400D0360UL, 0x400D0360UL, 0x400D0360UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x000FF000UL, 0x000FF000UL, 0x01F83F80UL, 0x07F00FC0UL, 0x07F00FC0UL, 0x09F00FB0UL, 0x09F00FB0UL, 0x31F83F8CUL, 0x31FFFF8CUL, 0x31FFFF8CUL, 0x37F83FCCUL, 0x37F83FCCUL, 0x0FF00FF0UL, 0x07FFFFC0UL, 0x07FFFFC0UL, 0x00300C00UL, 0x01F64F80UL, 0x01F64F80UL, 0x01B00D80UL, 0x01B00D80UL, 0x01B18D80UL, 0x00300C00UL, 0x00300C00UL, 0x000FF000UL, 0x000FF000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x003BC000UL, 0x003BC000UL, 0x00DB2000UL, 0x00DB2000UL, 0x031B1800UL, 0x031B1800UL, 0x031B1800UL, 0x03041800UL, 0x03001C00UL, 0x03001C00UL, 0x03000400UL, 0x03002700UL, 0x03002700UL, 0x032424C0UL, 0x032424C0UL, 0x032404C0UL, 0x032404C0UL, 0x032404C0UL, 0x03180700UL, 0x03180700UL, 0x03000400UL, 0x00C01800UL, 0x00C01800UL, 0x00FFF800UL, 0x0318C400UL, 0x0318C400UL, 0x03F8FC00UL, 0x03F8FC00UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00FFE000UL, 0x00FFE000UL, 0x01001800UL, 0x01001800UL, 0x01C1E400UL, 0x01C1E400UL, 0x06321C00UL, 0x063E1C00UL, 0x063E1C00UL, 0x01C1E400UL, 0x01C1E400UL, 0x06300400UL, 0x06300400UL, 0x06C00400UL, 0x063C0700UL, 0x063C0700UL, 0x060004C0UL, 0x060004C0UL, 0x060000C0UL, 0x060000C0UL, 0x060004C0UL, 0x01001F00UL, 0x01001F00UL, 0x00FFE000UL, 0x00FFE000UL, 0x00318000UL, 0x00318000UL, 0x00318000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x01860000UL, 0x01860000UL, 0x02498000UL, 0x02498000UL, 0x0279FFF0UL, 0x0C00000CUL, 0x0C00000CUL, 0x30000070UL, 0x30000070UL, 0x30000040UL, 0x30000040UL, 0x30000040UL, 0x32400040UL, 0x31800040UL, 0x31800040UL, 0x0C000180UL, 0x0C000180UL, 0x03FFFE00UL, 0x01B03200UL, 0x01B03200UL, 0x01B03200UL, 0x01B03200UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x007FFF80UL, 0x007FFF80UL, 0x01FFFFC0UL, 0x01FFFFC0UL, 0x0799E7F8UL, 0x0799E7F8UL, 0x060001F8UL, 0x060001F8UL, 0x06618038UL, 0x06618038UL, 0x06000038UL, 0x06000038UL, 0x06180038UL, 0x06180038UL, 0x06001838UL, 0x06001838UL, 0x1E01F838UL, 0x1E01F838UL, 0x06000038UL, 0x06000038UL, 0x06000038UL, 0x01999840UL, 0x01999840UL, 0x01999840UL, 0x01999840UL, 0x00666780UL, 0x00666780UL, 0x00666780UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00044000UL, 0x00044000UL, 0x001FF000UL, 0x001FF000UL, 0x00600C00UL, 0x00600C00UL, 0x01800300UL, 0x01800300UL, 0x019B8300UL, 0x01800300UL, 0x01800300UL, 0x00600C00UL, 0x00600C00UL, 0x001FF000UL, 0x001FF000UL, 0x00607C00UL, 0x00607C00UL, 0x01843300UL, 0x01843300UL, 0x01803300UL, 0x01843300UL, 0x01843300UL, 0x01800300UL, 0x01800300UL, 0x00600C00UL, 0x00600C00UL, 0x001FF000UL, 0x001FF000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x007FE000UL, 0x007FE000UL, 0x01801E00UL, 0x01801E00UL, 0x06000100UL, 0x06000100UL, 0x07FFFFC0UL, 0x060018C0UL, 0x060018C0UL, 0x064318C0UL, 0x064318C0UL, 0x084318F0UL, 0x084318F0UL, 0x30001E0CUL, 0x31FF003CUL, 0x31FF003CUL, 0x3000000CUL, 0x3000000CUL, 0x3000000CUL, 0x3000000CUL, 0x080000F0UL, 0x07FFFF00UL, 0x07FFFF00UL, 0x0E30C1C0UL, 0x0E30C1C0UL, 0x0FFFFFC0UL, 0x0FFFFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x000FFF80UL, 0x000FFF80UL, 0x00700060UL, 0x00700060UL, 0x00700060UL, 0x00700060UL, 0x07FCFE18UL, 0x07FCFE18UL, 0x18001818UL, 0x18001818UL, 0x18001818UL, 0x18000018UL, 0x18000018UL, 0x07FC0018UL, 0x07FC0018UL, 0x01800018UL, 0x01800018UL, 0x01800018UL, 0x01800060UL, 0x01800060UL, 0x007FFF80UL, 0x007FFF80UL, 0x000C0600UL, 0x000C0600UL, 0x007C0780UL, 0x007C0780UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x0F001C00UL, 0x0F001C00UL, 0x3FC07F00UL, 0x3FC07F00UL, 0x3FFFFF00UL, 0x0F001C00UL, 0x0F001C00UL, 0x0F001C00UL, 0x03219800UL, 0x031E1800UL, 0x031E1800UL, 0x0C0004FCUL, 0x0C0004FCUL, 0x0C3F87CCUL, 0x0C3F87CCUL, 0x0C1E04FCUL, 0x0C000430UL, 0x0C000430UL, 0x0C000430UL, 0x0C000430UL, 0x0C000430UL, 0x0C000430UL, 0x33E1FB30UL, 0x33E1FB30UL, 0x301E03F0UL, 0x301E03F0UL, 0x0FE1FF00UL, 0x0FE1FF00UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00460000UL, 0x01FF0000UL, 0x01FF0000UL, 0x0200C000UL, 0x04002000UL, 0x04002000UL, 0x04783FFCUL, 0x04480232UL, 0x38480232UL, 0x38480232UL, 0x20000002UL, 0x3E000232UL, 0x3E000232UL, 0x18000002UL, 0x1F812232UL, 0x1F812232UL, 0x01FFFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0001C000UL, 0x0001C000UL, 0x00018000UL, 0x000FF000UL, 0x000FF000UL, 0x00300C00UL, 0x00300C00UL, 0x0031CC00UL, 0x00303E00UL, 0x00303E00UL, 0x00307000UL, 0x40303E00UL, 0x40303E00UL, 0x40320C00UL, 0x40320C00UL, 0x40324380UL, 0x40324060UL, 0x40324060UL, 0x4031806CUL, 0x4030006CUL, 0x4030006CUL, 0x000FFFFCUL, 0x000FFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00FFFF00UL, 0x00FFFF00UL, 0x030000F0UL, 0x030000F0UL, 0x0C00000CUL, 0x0C00000CUL, 0x0C06000CUL, 0x0C06000CUL, 0x03E0000CUL, 0x0C1800F0UL, 0x0C1800F0UL, 0x0FD80F00UL, 0x0FD80F00UL, 0x0C181000UL, 0x0C181000UL, 0x0FE010C0UL, 0x0FE010C0UL, 0x33198F30UL, 0x33198F30UL, 0x30266030UL, 0x3FFFFFF0UL, 0x3FFFFFF0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x03000300UL, 0x03000300UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x3FF00FFCUL, 0x3FF00FFCUL, 0x0FFFFFF0UL, 0x0FFFFFF0UL, 0x0FFFFFF0UL, 0x00FFFF00UL, 0x00C00300UL, 0x00C00300UL, 0x00CC0300UL, 0x00CC0300UL, 0x00CC0300UL, 0x030030CCUL, 0x030000FCUL, 0x030000FCUL, 0x030FC0FCUL, 0x030FC0FCUL, 0x030FC0FCUL, 0x030000F0UL, 0x03CFCFC0UL, 0x03CFCFC0UL, 0x00303000UL, 0x00303000UL, 0x00303000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x001FF800UL, 0x001FF800UL, 0x0067E600UL, 0x0381E180UL, 0x0381E180UL, 0x0381E180UL, 0x03800180UL, 0x03800180UL, 0x03986180UL, 0x03986180UL, 0x03800180UL, 0x03800180UL, 0x07FFFFE0UL, 0x07FFFFE0UL, 0x1FF9FFF8UL, 0x1FF9FFF8UL, 0x1FFFFFF8UL, 0x1FFFFFF8UL, 0x07FFFFE0UL, 0x07FFFFE0UL, 0x007E7E00UL, 0x007E7E00UL, 0x00666600UL, 0x00666600UL, 0x00181800UL, 0x00181800UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000C00UL, 0x00000C00UL, 0x00003F00UL, 0x00003F00UL, 0x00000C00UL, 0x00000C00UL, 0x0003FFC0UL, 0x03FC0030UL, 0x03FC0030UL, 0x03FC0030UL, 0x0C00C00CUL, 0x3000FC0CUL, 0x3000FC0CUL, 0x3000C00CUL, 0x3000C00CUL, 0x3000000CUL, 0x3000000CUL, 0x3000000CUL, 0x3000000CUL, 0x0C00000CUL, 0x0C00000CUL, 0x03FC0030UL, 0x03FC0030UL, 0x0003FFC0UL, 0x0003FFC0UL, 0x00030300UL, 0x00030300UL, 0x000F0F00UL, 0x000F0F00UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0FF80000UL, 0x0FF80000UL, 0x30060000UL, 0x30060000UL, 0x31E60000UL, 0x31E60000UL, 0x3007FE00UL, 0x0F86C980UL, 0x0F86C980UL, 0x0186C840UL, 0x0186C840UL, 0x0186C840UL, 0x0186C840UL, 0x01FEC840UL, 0x0180C870UL, 0x0180C870UL, 0x0180C84CUL, 0x0180C84CUL, 0x01FFFFF0UL, 0x01993640UL, 0x01993640UL, 0x01993640UL, 0x01993640UL, 0x00660980UL, 0x00660980UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x1E000380UL, 0x1E000380UL, 0x07800E00UL, 0x07800E00UL, 0x063FC200UL, 0x07FFFE00UL, 0x07FFFE00UL, 0x07FFFE00UL, 0x07FFFE00UL, 0x01C03F80UL, 0x01C03F80UL, 0x07B30F80UL, 0x07B30F80UL, 0x07800FF8UL, 0x07800FF8UL, 0x07FFFF98UL, 0x07FFFF98UL, 0x07FFFF98UL, 0x01FFFE60UL, 0x01FFFE60UL, 0x007FFF80UL, 0x007FFF80UL, 0x00303000UL, 0x00303000UL, 0x07F03F80UL, 0x07F03F80UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x07C001F8UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x01FFF800UL, 0x01FFF800UL, 0x06000600UL, 0x06000600UL, 0x0660C100UL, 0x08000100UL, 0x08000100UL, 0x08000100UL, 0x08000100UL, 0x08631900UL, 0x08631900UL, 0x079CE0C0UL, 0x08000030UL, 0x08000030UL, 0x3660D830UL, 0x3660D830UL, 0x3660D808UL, 0x3660D808UL, 0x37E0F806UL, 0x08000006UL, 0x08000006UL, 0x07FFFFFEUL, 0x07FFFFFEUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000700UL, 0x0000F8C0UL, 0x0000F8C0UL, 0x000308C0UL, 0x000408C0UL, 0x000408C0UL, 0x00380038UL, 0x01C08024UL, 0x01C08024UL, 0x03C08024UL, 0x03C00024UL, 0x03C00024UL, 0x00380024UL, 0x000400C4UL, 0x000400C4UL, 0x001F01F8UL, 0x0020FEC0UL, 0x0020FEC0UL, 0x00FFFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0007FFC0UL, 0x000FFFE0UL, 0x000FFFE0UL, 0x07FFFFFEUL, 0x07FFFFFEUL, 0x00C00018UL, 0x00C00004UL, 0x00C00004UL, 0x00C80804UL, 0x00300404UL, 0x00300404UL, 0x00CFF804UL, 0x00CFF804UL, 0x00C80804UL, 0x08C7F804UL, 0x08C7F804UL, 0x36C00004UL, 0x36C00004UL, 0x37F7C004UL, 0x3006FC04UL, 0x3006FC04UL, 0x3FFE0018UL, 0x0007FFE0UL, 0x0007FFE0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x000FFF00UL, 0x001000C0UL, 0x001000C0UL, 0x00E00038UL, 0x030D8904UL, 0x030D8904UL, 0x03020604UL, 0x00E07038UL, 0x00E07038UL, 0x001188C0UL, 0x001070C0UL, 0x001070C0UL, 0x001000C0UL, 0x001000C0UL, 0x00FFFFF8UL, 0x00FFFFF8UL, 0x00800018UL, 0x00F000F8UL, 0x00F000F8UL, 0x00600020UL, 0x00600020UL, 0x001FFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x07C003E0UL, 0x06300C20UL, 0x06300C20UL, 0x060FF020UL, 0x06000020UL, 0x06000020UL, 0x06381C20UL, 0x06381C20UL, 0x06000020UL, 0x18318C18UL, 0x18318C18UL, 0x180E7018UL, 0x180E7018UL, 0x18000018UL, 0x18000018UL, 0x18000018UL, 0x18000018UL, 0x18000018UL, 0x06000020UL, 0x06000020UL, 0x06000020UL, 0x0707E0E0UL, 0x0707E0E0UL, 0x18081018UL, 0x18081018UL, 0x1FF00FF8UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00020000UL, 0x00020000UL, 0x000D8000UL, 0x000D8000UL, 0x000C6000UL, 0x000C6000UL, 0x00318000UL, 0x000D8000UL, 0x000D8000UL, 0x007FF800UL, 0x007FF800UL, 0x01800600UL, 0x01800600UL, 0x01800600UL, 0x063C07C0UL, 0x063C07C0UL, 0x078006C0UL, 0x078006C0UL, 0x018006C0UL, 0x018006C0UL, 0x018066C0UL, 0x01FFFFC0UL, 0x01FFFFC0UL, 0x007FF800UL, 0x007FF800UL, 0x000D8000UL, 0x003F8000UL, 0x003F8000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00FFFF00UL, 0x00FFFF00UL, 0x030000C0UL, 0x030000C0UL, 0x03200CC0UL, 0x03200CC0UL, 0x0C000030UL, 0x0C000030UL, 0x301FE00CUL, 0x301FE00CUL, 0x3020000CUL, 0x303F800CUL, 0x303F800CUL, 0x3020000CUL, 0x3020000CUL, 0x0C1FE030UL, 0x0C1FE030UL, 0x0C000030UL, 0x0C000030UL, 0x03FFFFC0UL, 0x03FFFFC0UL, 0x00266C00UL, 0x00266C00UL, 0x00C66300UL, 0x00FE7F00UL, 0x00FE7F00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x0007E000UL, 0x0007E000UL, 0x00181000UL, 0x00181000UL, 0x00200C00UL, 0x00200C00UL, 0x03E00FC0UL, 0x0C200C30UL, 0x0C200C30UL, 0x3000000CUL, 0x3000000CUL, 0x303FFC0CUL, 0x303FFC0CUL, 0x30C0030CUL, 0x30C0030CUL, 0x33381CCCUL, 0x33381CCCUL, 0x330180CCUL, 0x0F0000F0UL, 0x0F0000F0UL, 0x0CFFFF30UL, 0x0CFFFF30UL, 0x0C266C30UL, 0x0C266C30UL, 0x0C266C30UL, 0x03FFFFC0UL, 0x03FFFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x0FFE0000UL, 0x0FFE0000UL, 0x3FFFF000UL, 0x3FFFF000UL, 0x3DFFF800UL, 0x3DFFF800UL, 0x307FFE00UL, 0x01FFFE30UL, 0x01FFFE30UL, 0x0F9EFFCCUL, 0x0F9EFFCCUL, 0x0FFFFFCCUL, 0x0FFFFFCCUL, 0x0E003FB0UL, 0x0E7F3FB0UL, 0x0E7F3FB0UL, 0x0F80FE30UL, 0x0F80FE30UL, 0x03FFFFF0UL, 0x03FFFFF0UL, 0x01FFFFF0UL, 0x03FFFE30UL, 0x03FFFE30UL, 0x33FFFE30UL, 0x33FFFE30UL, 0x3FFFF830UL, 0x3FFFF800UL, 0x3FFFF800UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x000F0000UL, 0x00030000UL, 0x00030000UL, 0x01FFFF00UL, 0x01FFFF00UL, 0x060000C0UL, 0x060000C0UL, 0x06000030UL, 0x06406030UL, 0x06406030UL, 0x06000030UL, 0x06000030UL, 0x1FFF0030UL, 0x1FFF0030UL, 0x003F8030UL, 0x1FFC0030UL, 0x1FFC0030UL, 0x06001B30UL, 0x06001B30UL, 0x06001B30UL, 0x06001B30UL, 0x06000430UL, 0x06000030UL, 0x06000030UL, 0x01FFFFC0UL, 0x01FFFFC0UL, 0x060C1830UL, 0x07FC1FF0UL, 0x07FC1FF0UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x07E00FC0UL, 0x07E00FC0UL, 0x1E783CF0UL, 0x1E783CF0UL, 0x181FF030UL, 0x181FF030UL, 0x1E7FFCF0UL, 0x1E7FFCF0UL, 0x07E7CFC0UL, 0x07E7CFC0UL, 0x01FFFF00UL, 0x01FFFF00UL, 0x01E00F00UL, 0x01E00F00UL, 0x01FFFF00UL, 0x01FFFF00UL, 0x01FFFF00UL, 0x007FFC00UL, 0x007FFC00UL, 0x019FF300UL, 0x019FF300UL, 0x01E7CF00UL, 0x01E7CF00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0007C000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x0000FFC0UL, 0x0000FFC0UL, 0x03FF0030UL, 0x0C00000CUL, 0x0C00000CUL, 0x30001F0CUL, 0x30001F0CUL, 0x30001F0CUL, 0x30001F0CUL, 0x3000060CUL, 0x0C00000CUL, 0x0C00000CUL, 0x03FF000CUL, 0x03FF000CUL, 0x018FE00CUL, 0x018FE00CUL, 0x01800030UL, 0x007FFFC0UL, 0x007FFFC0UL, 0x001326C0UL, 0x001326C0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x003FFF00UL, 0x003FFF00UL, 0x00C000C0UL, 0x00C000C0UL, 0x03003F20UL, 0x03003F20UL, 0x0FFFF320UL, 0x0FFFF320UL, 0x0C00F320UL, 0x0C00F320UL, 0x33CF3320UL, 0x33CF3320UL, 0x0C00C320UL, 0x0C00C320UL, 0x0FFFFF20UL, 0x0FFFFF20UL, 0x03000020UL, 0x03000020UL, 0x0CFFFFDCUL, 0x0CFFFFDCUL, 0x0FFC0FFCUL, 0x0FFC0FFCUL, 0x00000000UL, 0x00003C00UL, 0x00003C00UL, 0x0000C300UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00FFFF00UL, 0x00FFFF00UL, 0x030000C0UL, 0x030000C0UL, 0x033004C0UL, 0x033004C0UL, 0x030000C0UL, 0x3F3004FCUL, 0x3F3004FCUL, 0x330FF8CCUL, 0x330FF8CCUL, 0x330000CCUL, 0x330000CCUL, 0x00F00700UL, 0x00F00700UL, 0x000E7800UL, 0x000E7800UL, 0x00F18700UL, 0x030180C0UL, 0x030180C0UL, 0x03FFFFC0UL, 0x03FFFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00F00000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x003FFFC0UL, 0x003FFFC0UL, 0x00C00030UL, 0x00C00030UL, 0x0300000CUL, 0x0300000CUL, 0x0308000CUL, 0x3F0F800CUL, 0x3F0F800CUL, 0x0F0E000CUL, 0x0F0E000CUL, 0x0300000CUL, 0x0300000CUL, 0x0300000CUL, 0x0300000CUL, 0x00F000F0UL, 0x00F000F0UL, 0x003664C0UL, 0x003664C0UL, 0x003664C0UL, 0x00099B00UL, 0x00099B00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00066000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00078000UL, 0x00078000UL, 0x00018000UL, 0x00018000UL, 0x007FFF80UL, 0x007FFF80UL, 0x07800060UL, 0x07800060UL, 0x1807E018UL, 0x1807E018UL, 0x07981818UL, 0x07981818UL, 0x18181818UL, 0x18181818UL, 0x06000018UL, 0x06000018UL, 0x01800060UL, 0x01800060UL, 0x007FFF80UL, 0x007FFF80UL, 0x00019800UL, 0x00019800UL, 0x00019800UL, 0x00019800UL, 0x00019800UL, 0x00019800UL, 0x00079E00UL, 0x00079E00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x001C3800UL, 0x001C3800UL, 0x0063C600UL, 0x0063C600UL, 0x01800180UL, 0x01800180UL, 0x021C3840UL, 0x02042040UL, 0x02042040UL, 0x02042040UL, 0x02042040UL, 0x0E03C070UL, 0x3200004CUL, 0x3200004CUL, 0x33FFFFCCUL, 0x33FFFFCCUL, 0x3200004CUL, 0x3200004CUL, 0x3E00007CUL, 0x02000040UL, 0x02000040UL, 0x0187E180UL, 0x0187E180UL, 0x00781E00UL, 0x00781E00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00018C00UL, 0x00018C00UL, 0x00018C00UL, 0x003FEF00UL, 0x003FEF00UL, 0x00C07CC0UL, 0x00C07CC0UL, 0x03060330UL, 0x03007C30UL, 0x03007C30UL, 0x03018330UL, 0x03018330UL, 0x03007C30UL, 0x03007C30UL, 0x030010C0UL, 0x030010C0UL, 0x00C01300UL, 0x00C01300UL, 0x3FC00300UL, 0x303E033CUL, 0x303E033CUL, 0x0C2603CCUL, 0x0C2603CCUL, 0x03E6030CUL, 0x03E6030CUL, 0x003FFFFCUL, 0x003FFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x01E00000UL, 0x00600000UL, 0x00600000UL, 0x01FC0000UL, 0x01FC0000UL, 0x02030000UL, 0x3E130000UL, 0x3E130000UL, 0x03830000UL, 0x03830000UL, 0x3E03C000UL, 0x02003F80UL, 0x02003F80UL, 0x02000070UL, 0x02000070UL, 0x021FF00CUL, 0x0C00080CUL, 0x0C00080CUL, 0x0C003830UL, 0x0C003830UL, 0x0C1FC030UL, 0x02000040UL, 0x02000040UL, 0x01FFFF80UL, 0x01FFFF80UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x000CC000UL, 0x00333F00UL, 0x00333F00UL, 0x07C000C0UL, 0x07C000C0UL, 0x3C30C030UL, 0x3C30C030UL, 0x3C000030UL, 0x3C000030UL, 0x03000030UL, 0x03000030UL, 0x03000C30UL, 0x03000C30UL, 0x03000C30UL, 0x03000C30UL, 0x03000FF0UL, 0x03000FF0UL, 0x03000330UL, 0x03000330UL, 0x030003F0UL, 0x030003F0UL, 0x00C00030UL, 0x00C00030UL, 0x03FFFFF0UL, 0x03FFFFF0UL, 0x04C0F0CCUL, 0x07FFFFFCUL, 0x07FFFFFCUL, 0x07FFFFFCUL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x02000040UL, 0x02000040UL, 0x02000040UL, 0x1D8001B8UL, 0x1DFFF9B8UL, 0x1DFFF9B8UL, 0x1DFFF9B8UL, 0x1D800638UL, 0x1FE067C0UL, 0x1FE067C0UL, 0x019E0038UL, 0x019E0038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x01800038UL, 0x00600040UL, 0x00600040UL, 0x001FFF80UL, 0x001FFF80UL, 0x00199980UL, 0x00199980UL, 0x00199980UL, 0x00199980UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x03F83F80UL, 0x03F83F80UL, 0x0C07C040UL, 0x0C07C040UL, 0x0C000040UL, 0x03802780UL, 0x03802780UL, 0x01800600UL, 0x01800600UL, 0x019B2180UL, 0x019B2180UL, 0x0200C040UL, 0x02000040UL, 0x02000040UL, 0x0E000070UL, 0x0E000070UL, 0x0C000030UL, 0x0C000030UL, 0x3C00003CUL, 0x3000000CUL, 0x3000000CUL, 0x3FFFFFFCUL, 0x3FFFFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x007FFE00UL, 0x007FFE00UL, 0x038001C0UL, 0x038001C0UL, 0x0C000030UL, 0x0C000030UL, 0x30000030UL, 0x3207000CUL, 0x3207000CUL, 0x31F8000CUL, 0x31F8000CUL, 0x3204000CUL, 0x3204000CUL, 0x31F80030UL, 0x0C000040UL, 0x0C000040UL, 0x03E0FF80UL, 0x03E0FF80UL, 0x01FC2600UL, 0x038427C0UL, 0x038427C0UL, 0x02181840UL, 0x02181840UL, 0x03FFFFC0UL, 0x03FFFFC0UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x000FF000UL, 0x000FF000UL, 0x08300C30UL, 0x08300C30UL, 0x08400230UL, 0x0FC833F0UL, 0x0FC833F0UL, 0x0047C200UL, 0x00400200UL, 0x00400200UL, 0x0F87C1F0UL, 0x0F87C1F0UL, 0x3000000CUL, 0x3000000CUL, 0x3000000CUL, 0x0F8001F0UL, 0x00400200UL, 0x00400200UL, 0x00400200UL, 0x00400200UL, 0x0047C200UL, 0x00383C00UL, 0x00383C00UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  },
-{
-    0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x01FFFF80UL, 0x01FFFF80UL, 0x02000040UL, 0x02000040UL, 0x0C700E30UL, 0x0C700E30UL, 0x0C03C030UL, 0x0C0C3030UL, 0x0C0C3030UL, 0x0C0C3030UL, 0x0C0C3030UL, 0x0C0C3030UL, 0x0C03C030UL, 0x0C03C030UL, 0x02000040UL, 0x02000040UL, 0x01800180UL, 0x0DEC37B0UL, 0x0DEC37B0UL, 0x3393C9CCUL, 0x3393C9CCUL, 0x3000000CUL, 0x3FFFFFFCUL, 0x3FFFFFFCUL, 0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
-  }
-};
+// The 50-species sprite masks are shared with NativeUI via RosterSprites.h.
 
 void drawMaskSprite(int x, int y, const uint32_t rows[32], byte scale) {
   // Compatibility wrapper. In v16.5, sprites are 32x32.
@@ -3588,9 +3489,9 @@ void applySpeciesBirthBonus() {
   }
 
   if (favoriteFoodType() == 1) cookedMeals++;
-  if ((speciesType % 10) == 0) berryInv++;
-  if ((speciesType % 10) == 3) spiceInv++;
-  if ((speciesType % 10) == 7) herbInv++;
+  if (petLineage() == 0) berryInv++;
+  if (petLineage() == 3) spiceInv++;
+  if (petLineage() == 7) herbInv++;
 }
 
 
@@ -3709,62 +3610,15 @@ const __FlashStringHelper* dislikedThing() {
 
 
 void drawGrowthSprite(int x, int y, byte sc, bool sleepEyes=false) {
-  // Original monochrome pixel-style growth art. The shapes intentionally use
-  // large readable silhouettes, two-pixel features and a little asymmetry,
-  // like classic three-button virtual pets without copying a licensed sprite.
-  int bob = (anim & 1) ? sc : 0;
-
-  if (stage == STAGE_EGG) {
-    display.fillRoundRect(x + 4 * sc, y + 1 * sc + bob, 8 * sc, 14 * sc, 4 * sc, WHITE);
-    display.fillRect(x + 5 * sc, y + 4 * sc + bob, 2 * sc, 2 * sc, BLACK);
-    display.fillRect(x + 10 * sc, y + 8 * sc + bob, 2 * sc, 2 * sc, BLACK);
-    display.fillRect(x + 6 * sc, y + 12 * sc + bob, 3 * sc, sc, BLACK);
-    return;
-  }
-
-  if (stage == STAGE_BABY) {
-    display.fillRoundRect(x + 3 * sc, y + 5 * sc + bob, 10 * sc, 8 * sc, 4 * sc, WHITE);
-    display.fillRect(x + 5 * sc, y + 3 * sc + bob, 2 * sc, 3 * sc, WHITE);
-    display.fillRect(x + 9 * sc, y + 2 * sc + bob, 2 * sc, 4 * sc, WHITE);
-    display.fillRect(x + 4 * sc, y + 12 * sc + bob, 3 * sc, 2 * sc, WHITE);
-    display.fillRect(x + 9 * sc, y + 12 * sc + bob, 3 * sc, 2 * sc, WHITE);
-  } else if (stage == STAGE_CHILD) {
-    display.fillRoundRect(x + 2 * sc, y + 4 * sc + bob, 12 * sc, 10 * sc, 4 * sc, WHITE);
-    if ((temperament & 1) == 0) {
-      display.fillTriangle(x + 3 * sc, y + 5 * sc + bob, x + 4 * sc, y, x + 7 * sc, y + 5 * sc + bob, WHITE);
-      display.fillTriangle(x + 9 * sc, y + 5 * sc + bob, x + 12 * sc, y, x + 13 * sc, y + 5 * sc + bob, WHITE);
-    } else {
-      display.fillRect(x + 3 * sc, y + 1 * sc + bob, 3 * sc, 4 * sc, WHITE);
-      display.fillRect(x + 10 * sc, y + 1 * sc + bob, 3 * sc, 4 * sc, WHITE);
-    }
-    display.fillRect(x + 3 * sc, y + 13 * sc + bob, 3 * sc, 2 * sc, WHITE);
-    display.fillRect(x + 10 * sc, y + 13 * sc + bob, 3 * sc, 2 * sc, WHITE);
-  } else { // teen
-    display.fillRoundRect(x + 1 * sc, y + 3 * sc + bob, 14 * sc, 11 * sc, 4 * sc, WHITE);
-    display.fillTriangle(x + 2 * sc, y + 5 * sc + bob, x + 4 * sc, y, x + 7 * sc, y + 4 * sc + bob, WHITE);
-    display.fillTriangle(x + 9 * sc, y + 4 * sc + bob, x + 12 * sc, y, x + 14 * sc, y + 5 * sc + bob, WHITE);
-    display.fillRect(x, y + 8 * sc + bob, 3 * sc, 2 * sc, WHITE);
-    display.fillRect(x + 13 * sc, y + 8 * sc + bob, 3 * sc, 2 * sc, WHITE);
-    display.fillRect(x + 3 * sc, y + 13 * sc + bob, 3 * sc, 3 * sc, WHITE);
-    display.fillRect(x + 10 * sc, y + 13 * sc + bob, 3 * sc, 3 * sc, WHITE);
-    if (hobbyType == 0) display.drawRect(x + 6 * sc, y + 4 * sc + bob, 4 * sc, 2 * sc, BLACK);
-    if (hobbyType == 1) display.fillTriangle(x + 7 * sc, y + 2 * sc + bob, x + 9 * sc, y - sc + bob, x + 10 * sc, y + 3 * sc + bob, WHITE);
-  }
-
-  int eyeY = y + 8 * sc + bob;
-  if (sleepEyes) {
-    display.drawLine(x + 5 * sc, eyeY, x + 7 * sc, eyeY, BLACK);
-    display.drawLine(x + 9 * sc, eyeY, x + 11 * sc, eyeY, BLACK);
-  } else {
-    display.fillRect(x + 5 * sc, eyeY - sc, sc, 2 * sc, BLACK);
-    display.fillRect(x + 10 * sc, eyeY - sc, sc, 2 * sc, BLACK);
-  }
-  display.drawLine(x + 7 * sc, eyeY + 3 * sc, x + 9 * sc, eyeY + 3 * sc, BLACK);
+  const byte appearance = stage < STAGE_ADULT ? petLineage() : speciesType;
+  NativeUI::pet(display, x, y, appearance, stage, anim, sleepEyes, sc,
+                currentEvolutionPath());
 }
 
 void drawCurrentPetMini(int x, int y, byte scale) {
   if (stage < STAGE_ADULT) {
-    drawGrowthSprite(x, y, scale <= 1 ? 1 : 2, false);
+    NativeUI::pet(display, x, y, petLineage(), stage, anim, false,
+                  scale <= 1 ? 1 : 2, currentEvolutionPath());
     return;
   }
   // Adult and elder forms use the 50-creature evolution roster.
@@ -3804,12 +3658,17 @@ void drawCurrentPetMini(int x, int y, byte scale) {
 }
 
 
-void drawCurrentPetTiny(int x,int y){NativeUI::pet(display,x,y,speciesType,stage,anim,sleeping||lightOff);}
+void drawCurrentPetTiny(int x,int y){
+  const byte appearance = stage < STAGE_ADULT ? petLineage() : speciesType;
+  NativeUI::pet(display,x,y,appearance,stage,anim,sleeping||lightOff,1,
+                currentEvolutionPath());
+}
 
 
 void drawCurrentPetSleepMini(int x, int y, byte scale) {
   if (stage < STAGE_ADULT) {
-    drawGrowthSprite(x, y, scale <= 1 ? 1 : 2, true);
+    NativeUI::pet(display, x, y, petLineage(), stage, anim, true,
+                  scale <= 1 ? 1 : 2, currentEvolutionPath());
     return;
   }
   if (scale <= 1) {
@@ -4188,14 +4047,14 @@ byte statBirthRoll(byte low, byte high) {
 }
 
 void rollEggMenu() {
-  // v16: four random normal eggs, each linked to one of 50 possible pets.
+  // Four unique lineage eggs each hatch into one of ten original young forms.
   byte used[4] = {255, 255, 255, 255};
 
   for (byte i = 0; i < 4; i++) {
     byte e;
     bool unique;
     do {
-      e = random(0, SPECIES_COUNT);
+      e = random(0, TAMACHIBI_FAMILY_COUNT);
       unique = true;
       for (byte j = 0; j < i; j++) {
         if (used[j] == e) unique = false;
@@ -4209,14 +4068,18 @@ void rollEggMenu() {
 
 
 void rollPetGenes(byte chosenEgg) {
-  eggType = chosenEgg;
+  eggType = chosenEgg % TAMACHIBI_FAMILY_COUNT;
   birthCode = ((unsigned int)random(0, 256) << 8) | (unsigned int)random(0, 256);
 
-  // v16: the chosen egg maps to one of 50 possible drawn creatures.
-  speciesType = chosenEgg % SPECIES_COUNT;
+  // The hatch keeps its family silhouette until care selects one of its adult
+  // branches. Each family still has five distinct mature roster outcomes.
+  speciesType = eggType;
 
   // Rare surprise hatch.
-  if (random(0, 50) == 0) speciesType = random(0, SPECIES_COUNT);
+  if (random(0, 50) == 0) {
+    speciesType = random(0, TAMACHIBI_FAMILY_COUNT);
+    eggType = speciesType;
+  }
 
   // Kept as compact compatibility values for save data and small movement flavor.
   bodyType = speciesType % 12;
@@ -4358,14 +4221,16 @@ void chooseEgg() {
 
     display.setCursor(6, 55);
     byte shown = eggChoice[e];
-    if (shown == 0) display.print(F("Soft stripe egg"));
-    else if (shown == 1) display.print(F("Spotted wild egg"));
-    else if (shown == 2) display.print(F("Smart cross egg"));
-    else if (shown == 3) display.print(F("Mystery cute egg"));
-    else if (shown == 4) display.print(F("Tall stripe egg"));
-    else if (shown == 5) display.print(F("Pointy rare egg"));
-    else if (shown == 6) display.print(F("Plus sign egg"));
-    else display.print(F("Tri mark egg"));
+    if (shown == 0) display.print(F("Skyline egg"));
+    else if (shown == 1) display.print(F("Tidepool egg"));
+    else if (shown == 2) display.print(F("Pouncer egg"));
+    else if (shown == 3) display.print(F("Shade egg"));
+    else if (shown == 4) display.print(F("Crumb egg"));
+    else if (shown == 5) display.print(F("Horn egg"));
+    else if (shown == 6) display.print(F("Pup egg"));
+    else if (shown == 7) display.print(F("Sprout egg"));
+    else if (shown == 8) display.print(F("Tinker egg"));
+    else display.print(F("Gearling egg"));
 
     display.display();
     delay(25);
@@ -5125,7 +4990,8 @@ void drawPet() {
 
   if (stage < STAGE_ADULT) {
     if (stage >= STAGE_CHILD) drawOutfitBackdrop(outfit, 50, 24, (anim & 1), 28, 28);
-    drawGrowthSprite(48, 20, 2, false);
+    NativeUI::pet(display, 48, 20, petLineage(), stage, anim, false, 2,
+                  currentEvolutionPath());
     if (stage >= STAGE_CHILD) drawOutfitOnPet(50, 24, (anim & 1), 28, 28);
     if (stage != STAGE_EGG) drawPoops();
     drawNeedBubble();
@@ -5209,6 +5075,22 @@ void drawPet() {
 
 
 
+void petWalkPose(byte &step, bool &facingLeft) {
+  const byte phase = (byte)((anim + 11U) & 63U);
+  step = 0;
+  facingLeft = false;
+  if (phase < 22) {
+    step = phase;
+  } else if (phase < 31) {
+    step = 22;
+  } else if (phase < 54) {
+    step = 53 - phase;
+    facingLeft = true;
+  } else {
+    facingLeft = true;
+  }
+}
+
 void drawSquarePet() {
   char clock[8];snprintf(clock,sizeof(clock),"%02u:%02u",visualHour(),clockMinute());
   NativeUI::header(display,petName,clock,needsCare()||sick);
@@ -5219,8 +5101,22 @@ void drawSquarePet() {
   }else if(petAway||isScheduledAwayTime()){
     NativeUI::icon(display,4,56,63);
   }else {
-    NativeUI::pet(display,sleeping||lightOff?15:57,sleeping||lightOff?36:63,speciesType,stage,anim,sleeping||lightOff);
-    if(stage>=STAGE_CHILD&&!sleeping&&!lightOff)NativeUI::accessory(display,57,63,outfit);
+    if (sleeping || lightOff) {
+      const byte appearance = stage < STAGE_ADULT ? petLineage() : speciesType;
+      NativeUI::pet(display, 15, 36, appearance, stage, anim, true, 1,
+                    currentEvolutionPath());
+    } else {
+      const byte appearance = stage < STAGE_ADULT ? petLineage() : speciesType;
+      byte walkStep = 0;
+      bool facingLeft = false;
+      petWalkPose(walkStep, facingLeft);
+      const int petX = stage == STAGE_EGG ? 48 + ((anim & 1U) ? 1 : -1)
+                                          : 16 + walkStep * 3;
+      NativeUI::pet(display, petX, 47, appearance, stage, anim, false, 2,
+                    currentEvolutionPath(), facingLeft);
+      if (stage >= STAGE_CHILD)
+        NativeUI::accessory(display, petX, 47, outfit, 2);
+    }
     if(poop>0){display.drawCircle(85,88,2,WHITE);display.drawLine(82,90,89,90,WHITE);}
   }
   if(!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
@@ -9594,7 +9490,7 @@ void startReplacementEgg() {
 
 
 const __FlashStringHelper* evolutionHint(byte id) {
-  byte tier=(id%SPECIES_COUNT)/10;
+  byte tier = growthCareTierForAdult(id);
   if(tier==0) return F("Excellent care + hobby");
   if(tier==1) return F("Good care + chosen field");
   if(tier==2) return F("Balanced daily routine");
@@ -9604,9 +9500,12 @@ const __FlashStringHelper* evolutionHint(byte id) {
 
 const __FlashStringHelper* speciesNameById(byte id) {
   byte oldSpecies = speciesType;
+  byte oldStage = stage;
   speciesType = id % SPECIES_COUNT;
+  stage = STAGE_ADULT;
   const __FlashStringHelper* result = speciesName();
   speciesType = oldSpecies;
+  stage = oldStage;
   return result;
 }
 
@@ -10866,6 +10765,7 @@ void developerApplyStage(byte newStage) {
   else if (stage == STAGE_TEEN) ageTicks = growthThreshold(TEEN_START_TICKS);
   else if (stage == STAGE_ADULT) ageTicks = growthThreshold(ADULT_START_TICKS);
   else ageTicks = growthThreshold(ELDER_START_TICKS);
+  if (stage == STAGE_TEEN) lockTeenEvolutionPath();
   stageCareMistakes = 0;
   petAway = false; awayTicks = 0;
   if (stage >= STAGE_ADULT) discoverSpecies(speciesType);
@@ -10902,7 +10802,7 @@ void developerSelectSpecies() {
     if (oldL==HIGH && l==LOW) { pick = pick==0 ? SPECIES_COUNT-1 : pick-1; clickSound(); delay(90); }
     if (oldR==HIGH && r==LOW) { pick=(pick+1)%SPECIES_COUNT; clickSound(); delay(90); }
     if (oldS==HIGH && s==LOW) {
-      speciesType=pick; bodyType=pick%12; idleStyle=pick%6;
+      speciesType=pick; eggType=growthFamilyForAdult(pick); bodyType=pick%12; idleStyle=pick%6;
       geneA=pick%8; geneB=(pick/2)%8; geneC=(pick/3)%8;
       personality=pick%8; statBias=pick%8;
       if (stage < STAGE_ADULT) developerApplyStage(STAGE_ADULT);
@@ -12348,6 +12248,33 @@ void enterScreenSleep() {
 
 
 
+bool readRightButtonDebounced() {
+  const bool raw = digitalRead(BTN_R);
+  const unsigned long now = millis();
+  if (!rightButtonDebounceReady) {
+    rightButtonRawLast = raw;
+    rightButtonStable = raw;
+    rightButtonRawChangedAt = now;
+    rightButtonDebounceReady = true;
+    return rightButtonStable;
+  }
+  if (raw != rightButtonRawLast) {
+    rightButtonRawLast = raw;
+    rightButtonRawChangedAt = now;
+  }
+  if (now - rightButtonRawChangedAt >= 25UL) {
+    rightButtonStable = rightButtonRawLast;
+  }
+  return rightButtonStable;
+}
+
+void syncRightButtonDebouncer() {
+  rightButtonRawLast = digitalRead(BTN_R);
+  rightButtonStable = rightButtonRawLast;
+  rightButtonRawChangedAt = millis();
+  rightButtonDebounceReady = true;
+}
+
 void wakeScreen() {
   // Wake must work even if the OLED is off but screenSleeping got out of sync.
   if (!screenSleeping && !oledIsOff) return;
@@ -12366,6 +12293,8 @@ void wakeScreen() {
   oldR = HIGH;
 
   waitButtonRelease();
+  syncRightButtonDebouncer();
+  oldR = HIGH;
   drawScreen(true);
 }
 
@@ -12445,7 +12374,22 @@ void drawHouseWorldView() {
   byte room=cityWorld.houseRoom();char count[8];snprintf(count,sizeof(count),"%u/%u",room+1,HOUSE_ROOM_COUNT);
   NativeUI::header(display,cityWorld.houseRoomName(room),count,botany.needsCare()||aquarium.needsCare());
   NativeUI::room(display,room,roomStyle,visualHour(),anim);
-  if(!dead&&room!=1&&room!=2&&room!=3)NativeUI::pet(display,56,62,speciesType,stage,anim,sleeping);
+  if(!dead&&room!=1&&room!=2&&room!=3) {
+    const byte appearance = stage < STAGE_ADULT ? petLineage() : speciesType;
+    byte walkStep = 0;
+    bool facingLeft = false;
+    int petX = 56;
+    if (sleeping || lightOff) {
+      facingLeft = false;
+    } else if (stage == STAGE_EGG) {
+      petX = 56 + ((anim & 1U) ? 1 : -1);
+    } else {
+      petWalkPose(walkStep, facingLeft);
+      petX = 12 + walkStep * 4;
+    }
+    NativeUI::pet(display,petX,62,appearance,stage,anim,sleeping,1,
+                  currentEvolutionPath(),facingLeft);
+  }
   if(room==0&&!dead)NativeUI::family(display,deepLife.childCount(),cityWorld.partnerLivesAtHome(partnerId,partnerBond),partnerId,lifeWorld.hasCompanion(),anim);
   NativeUI::text(display,"TURN DIAL: WORLD",16,104,102);
   NativeUI::footer(display,"ROOM","ENTER","ROOM");
@@ -12497,7 +12441,7 @@ void enterCitySelection() {
 void updateButtons() {
   bool l = digitalRead(BTN_L);
   bool s = digitalRead(BTN_S);
-  bool r = digitalRead(BTN_R);
+  bool r = readRightButtonDebounced();
   unsigned long now = millis();
 
   // If the OLED is off, the first button press only wakes the screen.
@@ -12530,7 +12474,7 @@ void updateButtons() {
       else enterCitySelection();
       drawScreen(true);
     }
-    if (now - lastButtonTick > 130 && oldR == HIGH && r == LOW) {
+    if (now - lastButtonTick > 60 && oldR == HIGH && r == LOW) {
       if (dialWorldView == VIEW_HOUSE) cityWorld.nextHouseRoom();
       else cityWorld.nextCityPlace();
       clickSound(); lastButtonTick = now; drawScreen(true);
@@ -12581,7 +12525,7 @@ void updateButtons() {
     drawScreen(true);
   }
 
-  if (now - lastButtonTick > 130 && oldR == LOW && r == HIGH) {
+  if (now - lastButtonTick > 60 && oldR == LOW && r == HIGH) {
     if (!rightMenuHoldUsed) {
       if (!menuVisible) {
         menuVisible = true;
@@ -12655,11 +12599,14 @@ void setup() {
   pinMode(BTN_L, INPUT_PULLUP);
   pinMode(BTN_S, INPUT_PULLUP);
   pinMode(BTN_R, INPUT_PULLUP);
+  syncRightButtonDebouncer();
   pinMode(BUZZER_PIN, OUTPUT);
   esp32BuzzerBegin(BUZZER_PIN);
   esp32BuzzerStop(BUZZER_PIN);
-  // The encoder module is powered at 3V3. GPIO35/39 are input-only and have
-  // no internal pull-ups, so use the module's pull-ups or add 10k resistors.
+  // The encoder module is powered at 3V3. Its push switch is the right/D2
+  // button on GPIO25; the existing standalone button remains select on GPIO33.
+  // GPIO35/39 are input-only and have no internal pull-ups, so use the
+  // module's pull-ups or add 10k resistors for CLK and DT.
   pinMode(VOLUME_ENCODER_CLK_PIN, INPUT);
   pinMode(VOLUME_ENCODER_DT_PIN, INPUT);
   resetWorldViewEncoder();
@@ -12668,7 +12615,9 @@ void setup() {
   // address 0x3C because they use separate I2C controllers. The main panel
   // probes both common SH1107 addresses so either 0x3C or 0x3D modules work.
   Wire.begin(MAIN_OLED_SDA, MAIN_OLED_SCL);
-  Wire.setClock(100000UL);
+  // The 128x128 SH1107 frame takes about 90 ms at 100 kHz. Run the main bus
+  // at 400 kHz so encoder and button polling are not held up by each redraw.
+  Wire.setClock(400000UL);
   Wire1.begin(NEEDS_OLED_SDA, NEEDS_OLED_SCL);
   Wire1.setClock(100000UL);
 
@@ -12822,7 +12771,13 @@ void loop() {
     }
   }
 
-  if (!screenSleeping && !oledIsOff && now - lastInputAt < ACTIVE_ANIMATION_WINDOW_MS && now - lastAnimTick >= ANIM_TICK_MS) {
+  const bool petIsWalking = !menuVisible &&
+      (dialWorldView == VIEW_PET || dialWorldView == VIEW_HOUSE) &&
+      !dead && !sleeping && !lightOff && !petAway &&
+      !isScheduledAwayTime() && !rtcCatchUpMode;
+  const bool recentUiActivity = now - lastInputAt < ACTIVE_ANIMATION_WINDOW_MS;
+  if (!screenSleeping && !oledIsOff && (petIsWalking || recentUiActivity) &&
+      now - lastAnimTick >= ANIM_TICK_MS) {
     lastAnimTick = now;
     anim++;
     drawScreen(true);

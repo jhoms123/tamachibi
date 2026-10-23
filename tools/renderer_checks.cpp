@@ -1,6 +1,9 @@
 #include "NativeUI.h"
+#include "GrowthSprites.h"
+#include "RosterSprites.h"
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 uint32_t fixtureMillis = 100;
 int main() {
   Adafruit_SH1107 panel;
@@ -54,6 +57,165 @@ int main() {
   d.clearDisplay();
   d.drawPixel(20, 20, 1);
   assert(panel.pixels[20 * 128 + 20] == 0);
-  puts("Renderer checks passed: square geometry, bottom edge, text/art "
-       "isolation, scoped frame lifetime.");
+
+  // The active pet renderer must use the 50 detailed species masks, and its
+  // post-hatch forms must grow while retaining those species silhouettes.
+  d.useNativeLayout(true);
+  uint8_t firstAdult[128 * 128];
+  uint64_t fingerprints[50]{};
+  for (int species = 0; species < 50; ++species) {
+    d.clearDisplay();
+    NativeUI::pet(d, 48, 48, species, 4, 0, false, 2);
+    d.display();
+    uint64_t hash = 1469598103934665603ULL;
+    for (int i = 0; i < 128 * 128; ++i) {
+      hash ^= panel.pixels[i];
+      hash *= 1099511628211ULL;
+    }
+    for (int prior = 0; prior < species; ++prior)
+      assert(fingerprints[prior] != hash);
+    fingerprints[species] = hash;
+    if (species == 0)
+      memcpy(firstAdult, panel.pixels, sizeof(firstAdult));
+  }
+
+  auto speciesZeroStage = [&](uint8_t age) {
+    d.clearDisplay();
+    NativeUI::pet(d, 48, 48, 0, age, 0, false, 2);
+    d.display();
+    int pixels = 0;
+    for (uint8_t pixel : panel.pixels)
+      pixels += pixel != 0;
+    return pixels;
+  };
+  const int babyPixels = speciesZeroStage(1);
+  const int childPixels = speciesZeroStage(2);
+  const int teenPixels = speciesZeroStage(3);
+  const int adultPixels = speciesZeroStage(4);
+  // Juvenile growth increases the family sprite; adult art switches to the
+  // selected full-size roster silhouette and therefore need not use more ink.
+  assert(babyPixels < childPixels && childPixels < teenPixels);
+  assert(adultPixels != teenPixels);
+  d.clearDisplay();
+  NativeUI::pet(d, 48, 48, 0, 3, 0, false, 2);
+  d.display();
+  assert(memcmp(firstAdult, panel.pixels, sizeof(firstAdult)) != 0);
+
+  // A pre-painted background pixel in an empty adult mask pixel must remain
+  // visible after drawing the pet. The renderer paints set bits only.
+  const int holeX = 11, holeY = 15;
+  const uint32_t adultRow = pgm_read_dword(&ROSTER_SPRITES[0][holeY]);
+  assert(!(adultRow & (0x80000000UL >> holeX)));
+  d.clearDisplay();
+  d.drawPixel(48 + holeX, 48 + holeY, 1);
+  NativeUI::pet(d, 48, 48, 0, 4, 0, false, 2);
+  d.display();
+  assert(panel.pixels[(48 + holeY) * 128 + 48 + holeX]);
+
+  uint32_t teenRows[32];
+  buildGrowthRows(0, 3, 0, teenRows);
+  int teenHoleX = -1, teenHoleY = -1, bestHoleDistance = 1000;
+  for (int y = 2; y < 30; ++y) {
+    for (int x = 2; x < 30; ++x) {
+      if (teenRows[y] & (0x80000000UL >> x))
+        continue;
+      int neighbors = 0;
+      for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+          if ((dx || dy) &&
+              (teenRows[y + dy] & (0x80000000UL >> (x + dx))))
+            ++neighbors;
+      const int distance = abs(x - 16) + abs(y - 16);
+      if (neighbors >= 3 && distance < bestHoleDistance) {
+        teenHoleX = x;
+        teenHoleY = y;
+        bestHoleDistance = distance;
+      }
+    }
+  }
+  assert(teenHoleX >= 0 && teenHoleY >= 0);
+  d.clearDisplay();
+  d.drawPixel(48 + teenHoleX, 48 + teenHoleY, 1);
+  NativeUI::pet(d, 48, 48, 0, 3, 0, false, 2);
+  d.display();
+  assert(panel.pixels[(48 + teenHoleY) * 128 + 48 + teenHoleX]);
+
+  uint64_t familyPrints[4][10]{};
+  for (uint8_t stage = 0; stage <= 3; ++stage) {
+    for (uint8_t family = 0; family < TAMACHIBI_FAMILY_COUNT; ++family) {
+      const uint8_t pathCount = stage == 3 ? 2 : 1;
+      for (uint8_t path = 0; path < pathCount; ++path) {
+        d.clearDisplay();
+        NativeUI::pet(d, 48, 48, family, stage, 0, false, 2, path);
+        d.display();
+        uint64_t hash = 1469598103934665603ULL;
+        for (int i = 0; i < 128 * 128; ++i) {
+          hash ^= panel.pixels[i];
+          hash *= 1099511628211ULL;
+        }
+        if (path == 0) {
+          for (uint8_t prior = 0; prior < family; ++prior) {
+            if (familyPrints[stage][prior] == hash)
+              fprintf(stderr, "duplicate family sprite: stage=%u families=%u,%u\n", stage, prior, family);
+            assert(familyPrints[stage][prior] != hash);
+          }
+          familyPrints[stage][family] = hash;
+        } else {
+          assert(familyPrints[stage][family] != hash);
+        }
+      }
+    }
+  }
+
+  // Each lineage has an idle pose that moves its own appendage/feature. Frame
+  // 0 and 2 keep the body bob identical, so this catches part animation rather
+  // than translation or bouncing the whole sprite.
+  auto petFingerprint = [&](uint8_t species, uint8_t stage, uint8_t frame) {
+    d.clearDisplay();
+    NativeUI::pet(d, 48, 48, species, stage, frame, false, 2);
+    d.display();
+    uint64_t hash = 1469598103934665603ULL;
+    for (int i = 0; i < 128 * 128; ++i) {
+      hash ^= panel.pixels[i];
+      hash *= 1099511628211ULL;
+    }
+    return hash;
+  };
+  for (uint8_t family = 0; family < TAMACHIBI_FAMILY_COUNT; ++family) {
+    for (uint8_t stage = 0; stage <= 5; ++stage) {
+      const uint8_t species = stage < 4 ? family : growthAdultSpecies(family, 2);
+      const uint64_t still = petFingerprint(species, stage, 0);
+      const uint64_t articulated = petFingerprint(species, stage, 2);
+      if (still == articulated)
+        fprintf(stderr, "idle part did not move: family=%u stage=%u\n", family, stage);
+      assert(still != articulated);
+    }
+  }
+
+  bool adultSeen[50]{};
+  for (uint8_t family = 0; family < TAMACHIBI_FAMILY_COUNT; ++family) {
+    for (uint8_t tier = 0; tier < TAMACHIBI_CARE_TIER_COUNT; ++tier) {
+      const uint8_t adult = growthAdultSpecies(family, tier);
+      assert(adult < 50 && !adultSeen[adult]);
+      adultSeen[adult] = true;
+      assert(growthFamilyForAdult(adult) == family);
+      assert(growthCareTierForAdult(adult) == tier);
+    }
+  }
+  for (bool seen : adultSeen) assert(seen);
+
+  d.clearDisplay();
+  NativeUI::pet(d, 48, 48, 0, 3, 0, false, 2, 0, false);
+  d.display();
+  uint8_t facingRight[128 * 128];
+  memcpy(facingRight, panel.pixels, sizeof(facingRight));
+  d.clearDisplay();
+  NativeUI::pet(d, 48, 48, 0, 3, 0, false, 2, 0, true);
+  d.display();
+  assert(memcmp(facingRight, panel.pixels, sizeof(facingRight)) != 0);
+
+  puts("Renderer checks passed: square geometry, framebuffer isolation, "
+       "transparent sprite holes, 50 adult masks, 10 distinct lineages, "
+       "care-split teens, animated lineage parts through elder, 50 mapped "
+       "adult outcomes, and facing animation.");
 }

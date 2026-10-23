@@ -1,8 +1,336 @@
 #include "NativeUI.h"
+#include "GrowthSprites.h"
+#include "RosterSprites.h"
 #include <algorithm>
 #include <cstring>
 
 namespace NativeUI {
+namespace {
+void cutEggPixel(uint32_t rows[32], int x, int y) {
+  if (x >= 0 && x < 32 && y >= 0 && y < 32)
+    rows[y] &= ~(0x80000000UL >> x);
+}
+
+void addEggEmblem(uint32_t rows[32], uint8_t family) {
+  // The shell carries a distinct cutout emblem for its hatch lineage.
+  switch (family % TAMACHIBI_FAMILY_COUNT) {
+  case 0: cutEggPixel(rows,14,11); cutEggPixel(rows,15,12); cutEggPixel(rows,13,12); cutEggPixel(rows,16,13); cutEggPixel(rows,12,13); cutEggPixel(rows,17,12); break;
+  case 1: cutEggPixel(rows,12,11); cutEggPixel(rows,19,11); cutEggPixel(rows,14,14); cutEggPixel(rows,17,14); cutEggPixel(rows,15,17); cutEggPixel(rows,16,17); break;
+  case 2: cutEggPixel(rows,12,12); cutEggPixel(rows,13,13); cutEggPixel(rows,14,14); cutEggPixel(rows,19,14); cutEggPixel(rows,20,13); cutEggPixel(rows,21,12); break;
+  case 3: cutEggPixel(rows,15,10); cutEggPixel(rows,16,10); cutEggPixel(rows,13,13); cutEggPixel(rows,18,13); cutEggPixel(rows,14,16); cutEggPixel(rows,17,16); break;
+  case 4: for (int x=12;x<=19;++x) cutEggPixel(rows,x,12); for (int x=14;x<=17;++x) cutEggPixel(rows,x,15); break;
+  case 5: cutEggPixel(rows,12,15); cutEggPixel(rows,13,13); cutEggPixel(rows,14,11); cutEggPixel(rows,19,15); cutEggPixel(rows,18,13); cutEggPixel(rows,17,11); break;
+  case 6: cutEggPixel(rows,13,12); cutEggPixel(rows,14,12); cutEggPixel(rows,18,12); cutEggPixel(rows,19,12); cutEggPixel(rows,14,15); cutEggPixel(rows,18,15); cutEggPixel(rows,16,18); break;
+  case 7: cutEggPixel(rows,13,16); cutEggPixel(rows,14,14); cutEggPixel(rows,15,12); cutEggPixel(rows,16,10); cutEggPixel(rows,17,12); cutEggPixel(rows,18,14); cutEggPixel(rows,19,16); break;
+  case 8: for (int x=14;x<=17;++x) cutEggPixel(rows,x,10); cutEggPixel(rows,12,15); cutEggPixel(rows,19,15); cutEggPixel(rows,14,18); cutEggPixel(rows,17,18); break;
+  default: cutEggPixel(rows,13,12); cutEggPixel(rows,14,12); cutEggPixel(rows,18,12); cutEggPixel(rows,19,12); cutEggPixel(rows,14,14); cutEggPixel(rows,18,14); cutEggPixel(rows,16,17); cutEggPixel(rows,17,17); break;
+  }
+}
+
+void buildEggRows(uint8_t family, uint32_t rows[32]) {
+  static const uint8_t halfWidth[32] = {
+      0, 0, 0, 1, 2, 4, 5, 6, 7, 8, 8, 9, 9, 9, 9, 9,
+      9, 9, 9, 9, 8, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0};
+  memset(rows, 0, sizeof(uint32_t) * 32);
+  for (int y = 3; y <= 28; ++y) {
+    for (int x = 16 - halfWidth[y]; x <= 16 + halfWidth[y]; ++x)
+      rows[y] |= 0x80000000UL >> x;
+  }
+  // A short zig-zag crack makes the egg readable at both native sizes.
+  rows[14] &= ~(0x80000000UL >> 14);
+  rows[15] &= ~(0x80000000UL >> 15);
+  rows[15] &= ~(0x80000000UL >> 16);
+  rows[16] &= ~(0x80000000UL >> 17);
+  rows[17] &= ~(0x80000000UL >> 16);
+  addEggEmblem(rows, family);
+}
+
+void clear32(uint32_t rows[32], int x, int y) {
+  if (x >= 0 && x < 32 && y >= 0 && y < 32)
+    rows[y] &= ~(0x80000000UL >> x);
+}
+
+bool rowBounds(const uint32_t rows[32], int y, int &left, int &right) {
+  const uint32_t row = rows[y];
+  if (!row)
+    return false;
+  left = 0;
+  while (left < 32 && !(row & (0x80000000UL >> left)))
+    ++left;
+  right = 31;
+  while (right >= 0 && !(row & (0x80000000UL >> right)))
+    --right;
+  return true;
+}
+
+bool maskBounds(const uint32_t rows[32], int &left, int &right, int &top,
+                int &bottom) {
+  left = 32;
+  right = -1;
+  top = 32;
+  bottom = -1;
+  for (int y = 0; y < 32; ++y) {
+    int rowLeft, rowRight;
+    if (!rowBounds(rows, y, rowLeft, rowRight))
+      continue;
+    left = std::min(left, rowLeft);
+    right = std::max(right, rowRight);
+    top = std::min(top, y);
+    bottom = std::max(bottom, y);
+  }
+  return right >= left;
+}
+
+void findSideAnchor(const uint32_t rows[32], bool useRight, int preferredY,
+                    int &anchorX, int &anchorY) {
+  int bestDistance = 33;
+  anchorX = useRight ? 31 : 0;
+  anchorY = preferredY;
+  for (int y = 0; y < 32; ++y) {
+    int left, right;
+    if (!rowBounds(rows, y, left, right))
+      continue;
+    const int distance = abs(y - preferredY);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      anchorX = useRight ? right : left;
+      anchorY = y;
+    }
+  }
+}
+
+void animateEggRows(uint32_t rows[32], uint8_t family, uint8_t frame) {
+  int left, right, top, bottom;
+  if (!maskBounds(rows, left, right, top, bottom))
+    return;
+  // A tiny hatchling eye peeks through a different shell pixel each pose.
+  // It is cleared from the shell mask so the room underneath stays visible.
+  static const int peekX[4] = {-2, -1, 1, 2};
+  const uint8_t phase = (frame >> 1) & 3U;
+  clear32(rows, (left + right) / 2 + peekX[(phase + family) & 3U], top + 6);
+}
+
+void buildAgeRows(uint8_t species, uint8_t stage, uint8_t evolutionPath,
+                  uint8_t frame, uint32_t rows[32]) {
+  memset(rows, 0, sizeof(uint32_t) * 32);
+  if (stage == 0) {
+    buildEggRows(species, rows);
+    animateEggRows(rows, species, frame);
+    return;
+  }
+  if (stage < 4) {
+    buildGrowthRows(species % TAMACHIBI_FAMILY_COUNT, stage, evolutionPath,
+                    rows);
+    return;
+  }
+  const uint8_t id = species % 50;
+  for (int y = 0; y < 32; ++y)
+    rows[y] = pgm_read_dword(&ROSTER_SPRITES[id][y]);
+}
+
+int floorScale(int source, int outputSize) {
+  const int value = source * outputSize;
+  return value >= 0 ? value / 32 : -((-value + 31) / 32);
+}
+
+void drawPartPixel(GameDisplay &d, int x, int y, int outputSize, int bob,
+                   int sourceX, int sourceY, bool facingLeft) {
+  const int mirroredX = facingLeft ? 31 - sourceX : sourceX;
+  const int x0 = floorScale(mirroredX, outputSize);
+  const int x1 = -floorScale(-mirroredX - 1, outputSize);
+  const int y0 = floorScale(sourceY, outputSize);
+  const int y1 = -floorScale(-sourceY - 1, outputSize);
+  d.fillRect(x + x0, y + y0 - bob, std::max(1, x1 - x0),
+             std::max(1, y1 - y0), 1);
+}
+
+void drawPartLine(GameDisplay &d, int x, int y, int outputSize, int bob,
+                  int x0, int y0, int x1, int y1, bool facingLeft) {
+  const int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+  const int dy = -abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+  int error = dx + dy;
+  while (true) {
+    drawPartPixel(d, x, y, outputSize, bob, x0, y0, facingLeft);
+    if (x0 == x1 && y0 == y1)
+      break;
+    const int twice = 2 * error;
+    if (twice >= dy) { error += dy; x0 += sx; }
+    if (twice <= dx) { error += dx; y0 += sy; }
+  }
+}
+
+void drawPartSquare(GameDisplay &d, int x, int y, int outputSize, int bob,
+                    int sourceX, int sourceY, int size, bool facingLeft) {
+  for (int py = 0; py < size; ++py)
+    for (int px = 0; px < size; ++px)
+      drawPartPixel(d, x, y, outputSize, bob, sourceX + px, sourceY + py,
+                    facingLeft);
+}
+
+void findTopAnchor(const uint32_t rows[32], int top, int centerX, int &x) {
+  int left, right;
+  rowBounds(rows, top, left, right);
+  x = std::max(left, std::min(right, centerX));
+  while (x <= right && !(rows[top] & (0x80000000UL >> x)))
+    ++x;
+  if (x > right) {
+    x = std::max(left, std::min(right, centerX));
+    while (x >= left && !(rows[top] & (0x80000000UL >> x)))
+      --x;
+  }
+}
+
+void findBottomAnchor(const uint32_t rows[32], int bottom, int centerX, int &x) {
+  int left, right;
+  rowBounds(rows, bottom, left, right);
+  x = std::max(left, std::min(right, centerX));
+  while (x <= right && !(rows[bottom] & (0x80000000UL >> x)))
+    ++x;
+  if (x > right) {
+    x = std::max(left, std::min(right, centerX));
+    while (x >= left && !(rows[bottom] & (0x80000000UL >> x)))
+      --x;
+  }
+}
+
+void drawAnimatedPart(GameDisplay &d, int x, int y, int outputSize, int bob,
+                      const uint32_t rows[32], uint8_t species,
+                      uint8_t stage, uint8_t frame, bool facingLeft) {
+  if (stage == 0)
+    return;
+  const uint8_t family = stage < 4
+                             ? species % TAMACHIBI_FAMILY_COUNT
+                             : growthFamilyForAdult(species % 50);
+  const uint8_t phase = (frame >> 1) & 3U;
+  int left, right, top, bottom;
+  if (!maskBounds(rows, left, right, top, bottom))
+    return;
+  const int centerX = (left + right) / 2;
+  const int preferredY = top + (bottom - top) * 2 / 3;
+  int anchorX, anchorY;
+  static const int swing[4] = {-3, -1, 3, 1};
+
+  switch (family) {
+  case 0: { // Skyling wing: a broad fan flaps through four angles.
+    findSideAnchor(rows, false, preferredY, anchorX, anchorY);
+    const int tipY = anchorY + swing[phase];
+    drawPartLine(d, x, y, outputSize, bob, anchorX, anchorY,
+                 anchorX - 6, tipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX - 1, anchorY - 1,
+                 anchorX - 4, tipY - 2, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX - 1, anchorY + 1,
+                 anchorX - 4, tipY + 2, facingLeft);
+    break;
+  }
+  case 1: { // Tidekin fin: two rays sweep behind the swimmer.
+    findSideAnchor(rows, true, preferredY, anchorX, anchorY);
+    const int tipY = anchorY + swing[phase] / 2;
+    drawPartLine(d, x, y, outputSize, bob, anchorX, anchorY,
+                 anchorX + 6, tipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + 2, anchorY - 1,
+                 anchorX + 6, tipY - 3, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + 2, anchorY + 1,
+                 anchorX + 6, tipY + 3, facingLeft);
+    break;
+  }
+  case 2: case 5: { // Pouncer/Hornling tail: a long curl whips up and down.
+    findSideAnchor(rows, family == 2, preferredY, anchorX, anchorY);
+    const int direction = family == 2 ? 1 : -1;
+    const int tipY = anchorY + swing[phase];
+    drawPartLine(d, x, y, outputSize, bob, anchorX, anchorY,
+                 anchorX + direction * 3, anchorY + 1, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + direction * 3,
+                 anchorY + 1, anchorX + direction * 5, tipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + direction * 5, tipY,
+                 anchorX + direction * 7, tipY - 2, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + direction * 6,
+                 tipY - 2, anchorX + direction * 7, tipY - 2, facingLeft);
+    break;
+  }
+  case 3: { // Shadelet wisp: the lower hem trails in a loose S curve.
+    findBottomAnchor(rows, bottom, centerX, anchorX);
+    const int sway = swing[phase];
+    drawPartLine(d, x, y, outputSize, bob, anchorX, bottom,
+                 anchorX + sway / 2, bottom + 2, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + sway / 2,
+                 bottom + 2, anchorX + sway, bottom + 5, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, anchorX + sway,
+                 bottom + 5, anchorX + sway + 2, bottom + 6, facingLeft);
+    break;
+  }
+  case 4: { // Crumbkin bun: sesame seeds bounce independently above it.
+    int topAnchor;
+    findTopAnchor(rows, top, centerX, topAnchor);
+    const int hop = (phase == 0 || phase == 3) ? 1 : 3;
+    drawPartSquare(d, x, y, outputSize, bob, topAnchor - 5, top - hop, 2,
+                   facingLeft);
+    drawPartSquare(d, x, y, outputSize, bob, topAnchor - 1, top - (4 - hop), 2,
+                   facingLeft);
+    drawPartSquare(d, x, y, outputSize, bob, topAnchor + 3, top - hop, 2,
+                   facingLeft);
+    break;
+  }
+  case 6: { // Pupkin ears: floppy tips move separately on both sides.
+    int topAnchor;
+    findTopAnchor(rows, top, centerX, topAnchor);
+    const int leftTipY = top - (phase == 0 ? 6 : phase == 1 ? 3 : phase == 2 ? 2 : 4);
+    const int rightTipY = top - (phase == 2 ? 6 : phase == 3 ? 3 : phase == 0 ? 2 : 4);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor - 2, top,
+                 topAnchor - 6, leftTipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor - 6, leftTipY,
+                 topAnchor - 8, leftTipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor + 2, top,
+                 topAnchor + 6, rightTipY, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor + 6, rightTipY,
+                 topAnchor + 8, rightTipY, facingLeft);
+    break;
+  }
+  case 7: { // Sproutling leaf: a stem bends and the leaf swaps sides.
+    int topAnchor;
+    findTopAnchor(rows, top, centerX, topAnchor);
+    const int direction = (phase == 0 || phase == 3) ? -1 : 1;
+    drawPartLine(d, x, y, outputSize, bob, topAnchor, top,
+                 topAnchor, top - 5, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor, top - 4,
+                 topAnchor + direction * 4, top - 6, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor + direction * 4,
+                 top - 6, topAnchor + direction * 5, top - 4, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor + direction * 5,
+                 top - 4, topAnchor, top - 4, facingLeft);
+    break;
+  }
+  case 8: { // Tinker clapper: the bell's hanging striker swings.
+    findBottomAnchor(rows, bottom, centerX, anchorX);
+    static const int strikerOffset[4] = {-3, -5, 3, 5};
+    const int tipX = anchorX + strikerOffset[phase];
+    const int tipY = bottom + ((phase & 1U) ? 5 : 3);
+    drawPartLine(d, x, y, outputSize, bob, anchorX, bottom,
+                 anchorX + strikerOffset[phase] / 2, bottom + 2, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob,
+                 anchorX + strikerOffset[phase] / 2, bottom + 2,
+                 tipX, tipY, facingLeft);
+    drawPartSquare(d, x, y, outputSize, bob, tipX - 1, tipY, 2, facingLeft);
+    break;
+  }
+  default: { // Gearling antenna: the mast stays still as its signal pulses.
+    int topAnchor;
+    findTopAnchor(rows, top, centerX, topAnchor);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor, top,
+                 topAnchor, top - 5, facingLeft);
+    const int direction = (phase & 1U) ? 1 : -1;
+    drawPartLine(d, x, y, outputSize, bob, topAnchor, top - 5,
+                 topAnchor + direction * 3, top - 5, facingLeft);
+    drawPartLine(d, x, y, outputSize, bob, topAnchor + direction * 3,
+                 top - 5, topAnchor + direction * 4, top - 4, facingLeft);
+    if (phase & 1U)
+      drawPartSquare(d, x, y, outputSize, bob, topAnchor + direction * 4,
+                     top - 6, 2, facingLeft);
+    break;
+  }
+  }
+}
+} // namespace
+
 void flashCopy(char *out, const __FlashStringHelper *s, size_t size) {
   if (!size)
     return;
@@ -188,117 +516,78 @@ void icon(GameDisplay &d, uint8_t id, int x, int y, uint16_t ink) {
   }
 }
 void pet(GameDisplay &d, int x, int y, uint8_t species, uint8_t stage,
-         uint8_t frame, bool asleep, int scale) {
-  // Original 16x16 mascot, with six silhouettes and live stage/eye changes.
-  // Draw each pixel uniformly: scale 2 always means 2x2, never 1x2.
-  uint16_t rows[16] = {0,      0,      0x0ff0, 0x1ff8, 0x3ffc, 0x3ffc,
-                       0x7ffe, 0x7ffe, 0x7ffe, 0x7ffe, 0x3ffc, 0x3ffc,
-                       0x1ff8, 0x0ff0, 0x0c30, 0};
-  if (stage == 0) {
-    const uint16_t egg[16] = {0,      0,      0x0180, 0x03c0, 0x07e0, 0x0ff0,
-                              0x0ff0, 0x1ff8, 0x1ff8, 0x1ff8, 0x1ff8, 0x0ff0,
-                              0x07e0, 0,      0,      0};
-    memcpy(rows, egg, sizeof(rows));
-    rows[7] &= ~0x0240;
-    rows[9] &= ~0x0100;
-  } else {
-    switch (species % 6) {
-    case 0:
-      rows[0] = 0x300c;
-      rows[1] = 0x3c3c;
-      rows[2] |= 0x3c3c;
-      break;
-    case 1:
-      rows[0] = 0x0c30;
-      rows[1] = 0x0c30;
-      rows[2] |= 0x0c30;
-      break;
-    case 2:
-      rows[1] = 0x0660;
-      rows[2] |= 0x0660;
-      rows[6] |= 0xc003;
-      rows[7] |= 0xc003;
-      break;
-    case 3:
-      rows[0] = 0x0180;
-      rows[1] = 0x03c0;
-      break;
-    case 4:
-      rows[2] = 0x1ff8;
-      rows[3] = 0x3ffc;
-      rows[4] |= 0x6006;
-      break;
-    default:
-      rows[0] = 0x03c0;
-      rows[1] = 0x07e0;
-      rows[2] |= 0x07e0;
-      break;
-    }
-    rows[7] &= ~(asleep || ((frame % 32) == 31) ? 0x0c30 : 0x0420);
-    rows[8] &= ~(asleep ? 0 : 0x0420);
-    rows[10] &= ~0x0180;
-    switch (species / 6) {
-    case 1:
-      rows[9] &= ~0x0810;
-      break;
-    case 2:
-      rows[11] &= ~0x03c0;
-      break;
-    case 3:
-      rows[4] &= ~0x0180;
-      break;
-    case 4:
-      rows[8] &= ~0x300c;
-      break;
-    case 5:
-      rows[12] &= ~0x0180;
-      break;
-    case 6:
-      rows[5] &= ~0x07e0;
-      break;
-    case 7:
-      rows[5] &= ~0x0240;
-      rows[11] &= ~0x0420;
-      break;
-    case 8:
-      rows[4] &= ~0x0180;
-      rows[5] &= ~0x0240;
-      rows[6] &= ~0x0180;
-      break;
-    }
-    if (stage == 1) {
-      rows[0] = rows[1] = 0;
-    }
-    if (stage == 5) {
-      rows[10] &= ~0x0810;
+         uint8_t frame, bool asleep, int scale, uint8_t evolutionPath,
+         bool facingLeft) {
+  uint32_t rows[32];
+  buildAgeRows(species, stage, evolutionPath, frame, rows);
+  const int outputSize = 16 * std::max(1, scale);
+  const int bob = ((frame & 1U) != 0) ? std::max(1, outputSize / 32) : 0;
+
+  // The old callers use scale 1 for a 16px icon and scale 2 for a 32px
+  // character. Larger preview scales keep the same pixel-art proportions.
+  for (int yy = 0; yy < 32; ++yy) {
+    const uint32_t row = rows[yy];
+    if (!row)
+      continue;
+    const int y0 = (yy * outputSize) / 32 - bob;
+    const int y1 = ((yy + 1) * outputSize + 31) / 32 - bob;
+    for (int xx = 0; xx < 32; ++xx) {
+      const int sourceX = facingLeft ? 31 - xx : xx;
+      if (!(row & (0x80000000UL >> sourceX)))
+        continue;
+      const int x0 = (xx * outputSize) / 32;
+      const int x1 = ((xx + 1) * outputSize + 31) / 32;
+      d.fillRect(x + x0, y + y0, std::max(1, x1 - x0),
+                 std::max(1, y1 - y0), 1);
     }
   }
-  int bob = (frame / 8) % 2;
-  for (int yy = 0; yy < 16; ++yy)
-    for (int xx = 0; xx < 16; ++xx)
-      if (rows[yy] & (0x8000 >> xx))
-        d.fillRect(x + xx * scale, y + (yy - bob) * scale, scale, scale, 1);
+
+  // Appendages are layered as separate transparent pixels so they can flap,
+  // wag, sway, or swing without translating the creature's whole body.
+  if (!asleep && stage > 0)
+    drawAnimatedPart(d, x, y, outputSize, bob, rows, species, stage, frame,
+                     facingLeft);
+
+  if (asleep && stage > 0) {
+    const int eyeY = y + outputSize / 2 - bob;
+    const int eyeW = std::max(1, outputSize / 12);
+    d.drawFastHLine(x + outputSize * 3 / 10, eyeY, eyeW, 0);
+    d.drawFastHLine(x + outputSize * 6 / 10, eyeY, eyeW, 0);
+  }
+
+  if (stage == 5 && outputSize >= 32) {
+    const int unit = outputSize / 32;
+    // Leave the cane just outside the creature silhouette so it remains
+    // readable at the device's 32px render size as well as in larger previews.
+    const int caneX = facingLeft ? x - unit : x + outputSize + unit;
+    d.drawLine(caneX, y + 20 * unit, caneX, y + 31 * unit - bob, 1);
+    d.drawCircle(caneX, y + 19 * unit, 2 * unit, 1);
+    d.drawFastHLine(caneX - 2 * unit, y + 31 * unit - bob, 5 * unit, 1);
+  }
 }
-void accessory(GameDisplay &d, int x, int y, uint8_t outfit) {
+void accessory(GameDisplay &d, int x, int y, uint8_t outfit, int scale) {
   if (!outfit)
     return;
+  const int u = std::max(1, scale);
   switch ((outfit - 1) % 4) {
   case 0:
-    d.drawFastHLine(x + 3, y + 1, 11, 1);
-    d.fillRect(x + 5, y - 1, 7, 3, 1);
+    d.drawFastHLine(x + 3 * u, y + u, 11 * u, 1);
+    d.fillRect(x + 5 * u, y - u, 7 * u, 3 * u, 1);
     break;
   case 1:
-    d.fillTriangle(x + 9, y + 2, x + 13, y + 5, x + 13, y - 1, 1);
-    d.fillTriangle(x + 9, y + 2, x + 6, y + 5, x + 6, y - 1, 1);
+    d.fillTriangle(x + 9 * u, y + 2 * u, x + 13 * u, y + 5 * u,
+                   x + 13 * u, y - u, 1);
+    d.fillTriangle(x + 9 * u, y + 2 * u, x + 6 * u, y + 5 * u,
+                   x + 6 * u, y - u, 1);
     break;
   case 2:
-    d.drawFastHLine(x + 4, y + 11, 8, 0);
-    d.drawFastVLine(x + 11, y + 11, 4, 0);
+    d.drawFastHLine(x + 4 * u, y + 11 * u, 8 * u, 0);
+    d.drawFastVLine(x + 11 * u, y + 11 * u, 4 * u, 0);
     break;
   case 3:
-    d.drawRect(x + 3, y + 6, 4, 4, 0);
-    d.drawRect(x + 9, y + 6, 4, 4, 0);
-    d.drawFastHLine(x + 7, y + 7, 2, 0);
+    d.drawRect(x + 3 * u, y + 6 * u, 4 * u, 4 * u, 0);
+    d.drawRect(x + 9 * u, y + 6 * u, 4 * u, 4 * u, 0);
+    d.drawFastHLine(x + 7 * u, y + 7 * u, 2 * u, 0);
     break;
   }
 }

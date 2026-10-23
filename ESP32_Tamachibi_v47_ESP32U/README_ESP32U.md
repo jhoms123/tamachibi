@@ -44,7 +44,8 @@ See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the 128×128 OL
 ## Native square visual system
 
 The main UI uses the physical 128×128 grid. Install/copy the whole sketch folder,
-including **GameDisplay.cpp**, **GameDisplay.h**, **NativeUI.cpp** and **NativeUI.h**.
+including **GameDisplay.cpp**, **GameDisplay.h**, **NativeUI.cpp**, **NativeUI.h**,
+**GrowthSprites.cpp**, **GrowthSprites.h**, **RosterSprites.cpp** and **RosterSprites.h**.
 No SD image pack, font download, or new Arduino library is needed beyond the existing
 Adafruit SH110X / GFX / BusIO and audio libraries.
 
@@ -66,3 +67,37 @@ Adafruit SH110X / GFX / BusIO and audio libraries.
 Firmware-rendered screenshots and the design/validation notes are in
 [`../docs/NATIVE_UI.md`](../docs/NATIVE_UI.md). Run the screenshot harness from the
 repository root with `python3 tools/render_ui.py` after PlatformIO installs GFX.
+
+## Character growth and movement
+
+The original roster now has ten lineage families with their own egg emblems,
+baby, child, and two teen forms. A care challenged teen has a smaller, squatter
+silhouette and a broken mark; a thriving teen gets a family crest. When the pet
+reaches adulthood, its lineage can branch into any of five distinct roster
+creatures. The adult tier uses the care record and the pet's health, stats, and
+bond. Every adult can continue to Elder, keeping its chosen silhouette and
+adding a cane.
+
+Teen form is set when the pet reaches that stage: three or more care mistakes,
+or discipline at three or lower, selects the care challenged route. The adult
+choice uses five care quality bands. The save structure stays the same; v19
+saves are accepted and their old species choices are migrated to the new
+lineages on load.
+
+Pet sprites are transparent masks: the renderer paints only the creature's
+lit pixels, so room details remain visible through open spaces inside a design.
+Awake idle cycles animate a lineage-specific part independently of the body's
+position: wings flap, fins and tails swish, ears flop, leaves sway, wisps trail,
+and bells or antennae swing. These poses change every 700 ms; the home pet also
+walks, turns, flips, and bobs every 350 ms. Walking pauses while the display is
+asleep, the pet is away, or a menu is open. The branch chart plus live rendered
+walking and part-animation previews can be regenerated from the repository root
+with:
+
+```sh
+python3 tools/render_evolution.py
+```
+
+The evolution approach follows the care based branching pattern in the
+[1996 Tamagotchi character list](https://tamagotchi.fandom.com/wiki/Tamagotchi_(1996_Pet)/Character_list#Generation_1_2).
+All Tamachibi sprite designs in this project are original.
