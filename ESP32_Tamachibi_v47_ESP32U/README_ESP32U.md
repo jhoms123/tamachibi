@@ -1,8 +1,8 @@
 # Tamachibi v47 — ESP32-WROOM-32U breakout port
 
-This folder contains the v47 game port for a classic ESP32-WROOM-32U development breakout. It uses a 128×128 SH1107 main OLED and the optional 128×32 SSD1306 status OLED, along with the buttons, rotary encoder, piezo, save/profile system, life simulation, and original Music rhythm game. The visual system uses native square layouts and separates supporting-page text from undistorted artwork. It also adds a Music Player that scans MP3 files from a separate SPI microSD adapter and sends decoded audio over I²S to a separate audio board.
+This folder contains the v47 game port for a classic ESP32-WROOM-32U development breakout. It uses a 128×128 SH1107 main OLED and the optional 128×32 SSD1306 status OLED, along with the buttons, rotary encoder, piezo, save/profile system, life simulation, and original Music rhythm game. The visual system uses native square layouts and separates supporting-page text from undistorted artwork. It also adds a Music Player that scans MP3 files from a separate SPI microSD adapter and plays decoded audio through a wired I²S board or Bluetooth A2DP headphones.
 
-The pictured blue module is used only as the microSD reader. The red HW-261/VS1053 shield is not part of this build. The I²S audio board can be chosen later; its exact power and analog/speaker wiring depend on that board.
+The pictured blue module is used only as the microSD reader. The red HW-261/VS1053 shield is not part of this build. Bluetooth headphone playback uses the ESP32's built-in Classic Bluetooth radio. Wired output still needs a compatible I²S DAC/amplifier; its exact power and analog/speaker wiring depend on that board.
 
 ## Hardware assumption
 
@@ -12,16 +12,17 @@ The pin map is for a **classic ESP32-WROOM-32U on a development breakout** with 
 
 ### PlatformIO
 
-Open this folder as a PlatformIO project and build the `esp32u` environment. `platformio.ini` selects the generic `esp32dev` target used for a classic WROOM-32U breakout and installs the display and MP3/I²S libraries.
+Open this folder as a PlatformIO project and build the `esp32u` environment. `platformio.ini` selects the generic `esp32dev` target used for a classic WROOM-32U breakout and installs the display, MP3/I²S, and Bluetooth A2DP libraries.
 
 ### Arduino IDE
 
 1. Install the Espressif **esp32** board package.
 2. Install `Adafruit SH110X`, `Adafruit SSD1306`, `Adafruit GFX Library`, and `Adafruit BusIO` from Library Manager.
-3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding and I²S output.
-4. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
-5. Select the flash size printed for your board and the **Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)** partition scheme used by this build. EEPROM stores the live state; LittleFS stores save-profile snapshots, so keep the filesystem partition.
-6. Upload over USB with the battery boost output switched off. Keep all `.cpp`, `.h`, and `.ino` files together.
+3. Install `ESP8266Audio` by Earle Philhower for MP3 decoding and wired I²S output.
+4. Install `ESP32-A2DP` by Phil Schatzmann for Bluetooth headphone output.
+5. Open `ESP32_Tamachibi_v47_ESP32U.ino` in this folder and select **ESP32 Dev Module** (or the exact WROOM-32U carrier board if listed).
+6. Select the flash size printed for your board and the **Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)** partition scheme used by this build. EEPROM stores the live state; LittleFS stores save-profile snapshots, so keep the filesystem partition.
+7. Upload over USB with the battery boost output switched off. Keep all `.cpp`, `.h`, and `.ino` files together.
 
 ## Controls
 
@@ -34,11 +35,11 @@ In the Play menu, choose **Music Player**:
 - Encoder push switch: Right / D2
 - On the main pet screen, the same encoder cycles Pet → House → City
 
-The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, and Exit Player. The firmware decodes MP3 and outputs I²S on BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. There is no sound until a compatible I²S DAC or amplifier board is connected.
+The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, Exit Player, and a Bluetooth output toggle. To pair headphones the first time, put them in pairing mode, choose **BT OUTPUT ON**, then press Select to start a song. The ESP32 connects to the first nearby compatible audio device; keep other speakers/headphones out of pairing mode during setup. The saved device is used for automatic reconnection on later playback. Bluetooth works without an audio board. Wired output uses I²S BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4 and needs a compatible DAC/amplifier.
 
 ## Hardware and card setup
 
-See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the 128×128 OLED wiring, SD card formatting and file names, the future I²S audio connection, and LiPo/charger notes. The charger board model is needed to confirm its exact battery and power connections.
+See [ESP32U_WIRING_AND_MUSIC.md](ESP32U_WIRING_AND_MUSIC.md) for the 128×128 OLED wiring, SD card formatting and file names, Bluetooth headphone pairing, wired I²S audio connections, and LiPo/charger notes. The charger board model is needed to confirm its exact battery and power connections.
 
 
 ## Native square visual system
@@ -47,8 +48,8 @@ The main UI uses the physical 128×128 grid. Install/copy the whole sketch folde
 including **GameDisplay.cpp**, **GameDisplay.h**, **NativeUI.cpp**, **NativeUI.h**,
 **GrowthSprites.cpp**, **GrowthSprites.h**, **RosterSprites.cpp**, **RosterSprites.h**,
 **AquariumArt.h**, and **ConversationMemory.h**.
-No SD image pack, font download, or new Arduino library is needed beyond the existing
-Adafruit SH110X / GFX / BusIO and audio libraries.
+No SD image pack or font download is needed. This port uses the existing Adafruit
+SH110X / GFX / BusIO libraries, plus ESP8266Audio and ESP32-A2DP for audio.
 
 - Home and resident rooms use a new top-down plan with compact original pet art.
 - House, town, garden, aquarium, music, dialogue, activity grid and game selectors
@@ -221,11 +222,18 @@ the highlighted entry. Each list includes Back.
 Left/right change tracks; Select pauses/resumes without restarting the song.
 Turn the encoder for volume. Hold Select for the options menu, use Left/Right
 to select an option, then Select to activate it. Options include shuffle,
-repeat off/all/one, song and folder browsers, stop, and Exit Player. Holding Right
-also exits directly. Exit stops playback and restores the normal care display.
+repeat off/all/one, song and folder browsers, stop, Exit Player, and BT Output
+On/Off. The Bluetooth option is on the second options page. For first pairing,
+put the target headphones in pairing mode, choose BT Output On, then press Select
+to play. Tamachibi connects to the first compatible audio device it finds and
+remembers that device for later reconnection. Holding Right also exits directly.
+Exit stops the music and restores the normal care display.
 
 The care screen scrolls long filenames. The main screen shows the current pet
-wearing headphones in a room, animated notes during playback, and volume.
+wearing headphones in a room, animated notes during playback, output status, and
+volume. The ESP32 resamples MP3 audio to the 44.1 kHz stereo PCM format used by
+the Bluetooth A2DP output. Its Bluetooth link remains available while the board
+is on; switching to wired output stops the Bluetooth audio feed.
 
 Shuffle builds a queue so every song plays once per pass, and Previous retraces
 that queue. Repeat Off stops at the end of the queue; Repeat All wraps it;
@@ -240,3 +248,4 @@ Verification: `python tools/check_music.py` exercises actual library and control
 methods with deterministic SD/audio/button doubles. `python tools/render_ui.py`
 renders the listening scene, animation frame, paused screen, options and folders.
 Physical audio timing and button feel still require testing on the device.
+

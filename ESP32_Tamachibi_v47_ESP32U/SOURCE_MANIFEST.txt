@@ -30,6 +30,8 @@ LifeWorld.cpp
 LifeWorld.h
 MusicPlayer.cpp
 MusicPlayer.h
+BluetoothAudioOutput.cpp
+BluetoothAudioOutput.h
 NeedsDisplay.cpp
 NeedsDisplay.h
 ParadiseSystem.cpp
@@ -47,3 +49,4 @@ SaveProfiles.h
 ESP32_Tamachibi_v47_ESP32U.ino
 V47_ESP32U_CHANGE_NOTES.txt
 platformio.ini
+

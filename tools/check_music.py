@@ -102,14 +102,23 @@ struct AudioFileSourceBuffer{
  AudioFileSourceBuffer(AudioFileSourceSD*s,void*,size_t):src(s){++liveBuffers;}
  ~AudioFileSourceBuffer(){--liveBuffers;}void close(){src->close();}
 };
-struct AudioOutputI2S{
+struct AudioOutput{
+ virtual ~AudioOutput()=default;
+ virtual bool SetGain(float){return true;}virtual bool stop(){return true;}
+};
+struct AudioOutputI2S:AudioOutput{
  AudioOutputI2S(){++liveOutputs;}~AudioOutputI2S(){--liveOutputs;}
- void SetBuffers(int,int){}void SetPinout(int,int,int){}void SetGain(float){}void stop(){}
+ void SetBuffers(int,int){}void SetPinout(int,int,int){}bool SetGain(float)override{return true;}bool stop()override{return true;}
+};
+struct BluetoothAudioOutput:AudioOutput{
+ bool begin(){return true;}bool SetRate(int){return true;}bool SetChannels(int){return true;}
+ bool SetGain(float)override{return true;}bool ConsumeSample(int16_t[2]){return true;}
+ bool stop()override{return true;}bool isConnected()const{return true;}
 };
 struct AudioGeneratorMP3{
  bool running=false;
  AudioGeneratorMP3(){++liveDecoders;}~AudioGeneratorMP3(){--liveDecoders;}
- bool begin(AudioFileSourceBuffer*,AudioOutputI2S*){++starts;return running=!decoderFails;}
+ bool begin(AudioFileSourceBuffer*,AudioOutput*){++starts;return running=!decoderFails;}
  bool isRunning()const{return running;}void stop(){running=false;}
  bool loop(){++loops;if(finishAfter>=0&&loops>=finishAfter)running=false;return running;}
 };
@@ -187,3 +196,4 @@ with tempfile.TemporaryDirectory() as td:
     exe=Path(td)/'checks'
     subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-I'+str(SRC),str(cpp),'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)
+

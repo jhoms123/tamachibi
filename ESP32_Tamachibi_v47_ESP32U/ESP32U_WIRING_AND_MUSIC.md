@@ -47,11 +47,15 @@ Connect the module's SPI pins as follows:
 
 The photo matches the common six-pin module with an `1117` regulator and a 16-pin level-conversion IC. That board version is specified for 4.5–5.5V at VCC; its onboard regulator supplies the card at 3.3V and its MISO conversion outputs 3.3V logic. https://keszoox.com/products/micro-sd-tf-card-storage-module-with-spi-interface-and-level-conversion-chip-for-arduino The AMS1117 regulator itself may need up to 1.3V headroom, so powering its VCC from only 3.3V can underpower the card. https://www.advanced-monolithic.com/pdf/ds1117.pdf Do not connect 5V to CS, SCK, MOSI, or MISO. If your module has a different revision or its labels/chip differ from the photo, check its own specifications before powering it. Keep SPI wires short.
 
-## Future I²S audio board
+## Wired I²S audio board
 
-The code decodes MP3 from the SD card and sends I²S to BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. Connect those three signals and GND when you choose the audio board. Its VCC, any MCLK/SCK requirement, and speaker/headphone connections depend on the exact module. A PCM5102A is a line-output DAC and normally needs powered speakers or an amplifier; a board such as MAX98357A includes a mono speaker amplifier. Do not connect a speaker directly to the ESP32 GPIOs or to line-output pins.
+For wired listening, the code sends decoded MP3 audio over I²S to BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. Connect those three signals and GND when you choose the audio board. Its VCC, any MCLK/SCK requirement, and speaker/headphone connections depend on the exact module. A PCM5102A is a line-output DAC and normally needs powered speakers or an amplifier; a board such as MAX98357A includes a mono speaker amplifier. Do not connect a speaker directly to the ESP32 GPIOs or to line-output pins.
 
-There will be no sound until a compatible I²S DAC/amplifier is connected. The red HW-261/VS1053 shield from the earlier photo is not used by this wiring or firmware.
+Wired playback needs a compatible I²S DAC/amplifier. Bluetooth headphone playback uses the ESP32 radio and does not need this audio board. The red HW-261/VS1053 shield from the earlier photo is not used by this wiring or firmware.
+
+## Bluetooth headphones
+
+Bluetooth audio uses the ESP32-WROOM-32U's built-in Bluetooth Classic radio, so no additional Bluetooth transmitter or audio wires are needed. In **Play → Music Player**, hold Select to open options, move to the second options page, and choose **BT OUTPUT ON**. Put the target headphones in pairing mode, then press Select to play a song. The ESP32 scans for a compatible Bluetooth audio device and connects to the first one found; keep other Bluetooth speakers/headphones out of pairing mode during initial pairing. The player remembers the last connection and attempts to reconnect on later playback. The encoder changes the playback volume for Bluetooth and wired audio.
 
 ## LiPo battery and separate charger
 
@@ -78,7 +82,7 @@ Measure the power board's output voltage and polarity before connecting it to th
 
 5. Insert the card and choose **Play → Music Player**. The screen reports an SD error if the card cannot mount or asks for `/music` if the folder is missing. D0/D1/D2 select and play tracks; turning the encoder changes volume.
 
-Use ordinary, non-DRM MP3 files. For predictable testing, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 128 tracks. Hold Select for song/folder browsing, shuffle, repeat, stop and Exit Player. Hold Right to exit directly. The code does not include music files.
+Use ordinary, non-DRM MP3 files. The Bluetooth output resamples MP3 audio to 44.1 kHz stereo PCM; for predictable playback, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 128 tracks. Hold Select for song/folder browsing, shuffle, repeat, stop, wired/Bluetooth output selection and Exit Player. Hold Right to exit directly. The code does not include music files.
 
 ## First power-up sequence
 
@@ -87,3 +91,4 @@ Use ordinary, non-DRM MP3 files. For predictable testing, start with 44.1 kHz mo
 3. Add the microSD adapter and test that the card mounts and `/music` is found.
 4. When you pick an audio board, connect its I²S signals and test it with powered speakers or the board's specified load.
 5. Test the charger's regulated output with a multimeter while it is disconnected from the ESP32; only then connect the battery supply.
+

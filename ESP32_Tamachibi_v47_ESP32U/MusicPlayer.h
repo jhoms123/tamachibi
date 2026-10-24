@@ -3,10 +3,12 @@
 #include <Arduino.h>
 #include "GameDisplay.h"
 #include "MusicQueue.h"
+#include <AudioOutput.h>
+#include <AudioOutputI2S.h>
 #include <AudioFileSourceBuffer.h>
 #include <AudioFileSourceSD.h>
 #include <AudioGeneratorMP3.h>
-#include <AudioOutputI2S.h>
+#include "BluetoothAudioOutput.h"
 
 class Esp32MusicPlayer {
 public:
@@ -47,10 +49,13 @@ private:
   AudioFileSourceSD *source_;
   AudioGeneratorMP3 *decoder_;
   AudioOutputI2S *output_;
+  AudioOutput *activeOutput_;
+  BluetoothAudioOutput bluetoothOutput_;
 
   void (*scene_)(bool) = nullptr;
   void (*info_)(const String &, const String &) = nullptr;
   bool paused_ = false, shuffle_ = false, options_ = false;
+  bool bluetoothEnabled_ = false;
   uint8_t repeat_ = 0, option_ = 0;
   String folder_;
   uint8_t folderTracks_[MAX_TRACKS];
@@ -69,3 +74,4 @@ private:
   static bool isMp3Path(const String &path);
   String trackName(uint8_t index) const;
 };
+

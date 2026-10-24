@@ -34,7 +34,8 @@ Esp32MusicPlayer::Esp32MusicPlayer(GameDisplay &display,
       volumeEncoderDt_(volumeEncoderDt), trackCount_(0), selectedTrack_(0),
       encoderPreviousState_(0), encoderTransitionCount_(0), spiStarted_(false),
       sdReady_(false), gain_(0.55f),
-      status_("STOPPED"), source_(nullptr), decoder_(nullptr), output_(nullptr) {}
+      status_("STOPPED"), source_(nullptr), decoder_(nullptr), output_(nullptr),
+      activeOutput_(nullptr) {}
 
 bool Esp32MusicPlayer::initializeCard() {
   if (!spiStarted_) {
@@ -166,11 +167,15 @@ void Esp32MusicPlayer::stopPlayback(const char *status) {
     delete source_;
     source_ = nullptr;
   }
+  if (activeOutput_) {
+    activeOutput_->stop();
+    activeOutput_ = nullptr;
+  }
   if (output_) {
-    output_->stop();
     delete output_;
     output_ = nullptr;
   }
+  bluetoothOutput_.stop();
   paused_ = false;
   status_ = status;
 }
@@ -188,21 +193,26 @@ void Esp32MusicPlayer::startPlayback() {
     return;
   }
 
-  output_ = new (std::nothrow) AudioOutputI2S();
-  if (!output_) {
-    stopPlayback("AUDIO OUT OF MEMORY");
-    return;
+  if (bluetoothEnabled_) {
+    activeOutput_ = &bluetoothOutput_;
+  } else {
+    output_ = new (std::nothrow) AudioOutputI2S();
+    if (!output_) {
+      stopPlayback("AUDIO OUT OF MEMORY");
+      return;
+    }
+    // Stay below the ESP32 DMA frame-size limit while covering OLED transfers.
+    output_->SetBuffers(12, 2304);
+    output_->SetPinout(AUDIO_BCLK_PIN, AUDIO_LRCLK_PIN, AUDIO_DATA_PIN);
+    activeOutput_ = output_;
   }
-  // Stay below the ESP32 DMA frame-size limit while covering OLED transfers.
-  output_->SetBuffers(12, 2304);
-  output_->SetPinout(AUDIO_BCLK_PIN, AUDIO_LRCLK_PIN, AUDIO_DATA_PIN);
-  output_->SetGain(gain_);
+  activeOutput_->SetGain(gain_);
 
   buffer_ = new (std::nothrow) AudioFileSourceBuffer(source_, audioBuffer_, sizeof(audioBuffer_));
   if (!buffer_) { stopPlayback("AUDIO OUT OF MEMORY"); return; }
   decoder_ = new (std::nothrow) AudioGeneratorMP3();
-  if (!decoder_ || !decoder_->begin(buffer_, output_)) {
-    stopPlayback("MP3 START FAILED");
+  if (!decoder_ || !decoder_->begin(buffer_, activeOutput_)) {
+    stopPlayback(bluetoothEnabled_ ? "BT START FAILED" : "MP3 START FAILED");
     return;
   }
   paused_ = false;
@@ -232,7 +242,7 @@ void Esp32MusicPlayer::updateGain() {
   }
   if (gain_ < 0.0f) gain_ = 0.0f;
   if (gain_ > 0.90f) gain_ = 0.90f;
-  if (changed && output_) output_->SetGain(gain_);
+  if (changed && activeOutput_) activeOutput_->SetGain(gain_);
 }
 
 void Esp32MusicPlayer::drawBrowser() const {
@@ -251,17 +261,23 @@ void Esp32MusicPlayer::drawBrowser() const {
 }
 
 void Esp32MusicPlayer::drawPlayerScreen() const {
+  String playbackStatus = status_;
+  if (bluetoothEnabled_ && isPlaying() && !paused_)
+    playbackStatus = bluetoothOutput_.isConnected() ? "PLAYING BT" : "PAIR HEADSET";
+  else if (bluetoothEnabled_ && status_ == "STOPPED")
+    playbackStatus = "BT OUTPUT";
   NativeUI::Scope frame(display_); display_.clearDisplay();
   if (browser_) drawBrowser();
   else if (options_) {
     NativeUI::header(display_, "OPTIONS", "S:SET");
-    const char *labels[] = {"BACK TO PLAYER", "BROWSE SONGS", "CHOOSE FOLDER", "SHUFFLE", "REPEAT", "STOP", "EXIT PLAYER"};
-    const uint8_t first = option_ < 4 ? 0 : 3;
+    const char *labels[] = {"BACK TO PLAYER", "BROWSE SONGS", "CHOOSE FOLDER", "SHUFFLE", "REPEAT", "STOP", "EXIT PLAYER", "BT OUTPUT"};
+    const uint8_t first = option_ < 4 ? 0 : 4;
     for (uint8_t row = 0; row < 4; ++row) {
       uint8_t index = first + row;
       String label = labels[index];
       if (index == 3) label += shuffle_ ? " ON" : " OFF";
       if (index == 4) label += repeat_ == 0 ? " OFF" : repeat_ == 1 ? " ALL" : " ONE";
+      if (index == 7) label += bluetoothEnabled_ ? " ON" : " OFF";
       NativeUI::text(display_, index == option_ ? ">" : " ", 4, 30 + row * 16, 8);
       NativeUI::text(display_, label.c_str(), 14, 30 + row * 16, 110);
     }
@@ -272,7 +288,7 @@ void Esp32MusicPlayer::drawPlayerScreen() const {
     snprintf(context, sizeof(context), "%u/%u", queue_.count() ? queue_.position() + 1 : 0, queue_.count());
     NativeUI::header(display_, "MUSIC", context);
     if (scene_) scene_(isPlaying() && !paused_);
-    NativeUI::text(display_, status_.c_str(), 7, 79, isPlaying() ? 66 : 114);
+    NativeUI::text(display_, playbackStatus.c_str(), 7, 79, isPlaying() ? 66 : 114);
     if (isPlaying()) {
       String flags = shuffle_ ? "S/" : "";
       flags += repeat_ == 2 ? "R1" : repeat_ == 1 ? "RA" : "";
@@ -286,7 +302,7 @@ void Esp32MusicPlayer::drawPlayerScreen() const {
   display_.display();
   if (info_) {
     String title = trackCount_ ? trackName(selectedTrack_) : "No MP3 files";
-    String detail = status_;
+    String detail = playbackStatus;
     if (browser_) {
       const uint16_t count = folders_ ? folderCount() : trackCount_;
       title = browseIndex_ == count ? "Back to options" : folders_ ? folderAt(browseIndex_) : trackName(browseIndex_);
@@ -355,13 +371,20 @@ void Esp32MusicPlayer::run() {
             browser_ = false; options_ = false;
           }
         } else if (options_) {
-          if (i != 1) option_ = (option_ + (i == 0 ? 6 : 1)) % 7;
+          if (i != 1) option_ = (option_ + (i == 0 ? 7 : 1)) % 8;
           else if (option_ == 0) options_ = false;
           else if (option_ == 1 || option_ == 2) { browser_ = true; folders_ = option_ == 2; browseIndex_ = 0; }
           else if (option_ == 3) { shuffle_ = !shuffle_; rebuildQueue(); }
           else if (option_ == 4) repeat_ = (repeat_ + 1) % 3;
           else if (option_ == 5) stopPlayback("STOPPED");
           else if (option_ == 6) { stopPlayback("STOPPED"); return; }
+          else if (option_ == 7) {
+            const bool resumePlayback = isPlaying() && !paused_;
+            stopPlayback("STOPPED");
+            bluetoothEnabled_ = !bluetoothEnabled_;
+            options_ = false;
+            if (resumePlayback) startPlayback();
+          }
         } else if (i == 0) moveSelection(-1);
         else if (i == 2) moveSelection(1);
         else if (isPlaying()) { paused_ = !paused_; status_ = paused_ ? "PAUSED" : "PLAYING"; }
@@ -373,3 +396,4 @@ void Esp32MusicPlayer::run() {
     delay(1);
   }
 }
+
