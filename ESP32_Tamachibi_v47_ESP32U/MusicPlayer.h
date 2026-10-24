@@ -36,6 +36,9 @@ private:
   bool libraryLimited_ = false;
   bool browser_ = false;
   bool folders_ = false;
+  bool bluetoothMenu_ = false;
+  bool playbackClockRunning_ = false;
+  bool durationApproximate_ = true;
   uint16_t browseIndex_ = 0;
   MusicQueue queue_;
   AudioFileSourceBuffer *buffer_ = nullptr;
@@ -46,6 +49,9 @@ private:
   void drawBrowser() const;
   float gain_;
   String status_;
+  uint32_t durationSeconds_ = 0;
+  uint32_t playbackElapsedMs_ = 0;
+  uint32_t playbackSegmentStartMs_ = 0;
   AudioFileSourceSD *source_;
   AudioGeneratorMP3 *decoder_;
   AudioOutputI2S *output_;
@@ -56,7 +62,7 @@ private:
   void (*info_)(const String &, const String &) = nullptr;
   bool paused_ = false, shuffle_ = false, options_ = false;
   bool bluetoothEnabled_ = false;
-  uint8_t repeat_ = 0, option_ = 0;
+  uint8_t repeat_ = 0, option_ = 0, bluetoothOption_ = 0;
   String folder_;
   uint8_t folderTracks_[MAX_TRACKS];
   uint16_t folderCount_ = 0;
@@ -68,6 +74,8 @@ private:
   void stopPlayback(const char *status);
   bool isPlaying() const;
   void updateGain();
+  void updatePlaybackClock(uint32_t now);
+  uint32_t currentElapsedSeconds() const;
   void drawPlayerScreen() const;
   void waitForButtonsReleased() const;
   void moveSelection(int8_t direction);

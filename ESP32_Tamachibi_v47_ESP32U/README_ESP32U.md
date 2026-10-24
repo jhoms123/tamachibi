@@ -35,7 +35,7 @@ In the Play menu, choose **Music Player**:
 - Encoder push switch: Right / D2
 - On the main pet screen, the same encoder cycles Pet → House → City
 
-The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, Exit Player, and a Bluetooth output toggle. To pair headphones the first time, put them in pairing mode, choose **BT OUTPUT ON**, then press Select to start a song. The ESP32 connects to the first nearby compatible audio device; keep other speakers/headphones out of pairing mode during setup. The saved device is used for automatic reconnection on later playback. Bluetooth works without an audio board. Wired output uses I²S BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4 and needs a compatible DAC/amplifier.
+The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, Exit Player, and a separate Bluetooth menu. To pair headphones the first time, put them in pairing mode and open **BLUETOOTH MENU**; the screen reports STARTING, SEARCHING, CONNECTING, and CONNECTED as those states occur and shows a discovered device name. Choose **PAIR / SEARCH** to restart discovery after a scan has stopped. The saved device is used for reconnection on later playback. Bluetooth works without an audio board. Wired output uses I²S BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4 and needs a compatible DAC/amplifier.
 
 ## Hardware and card setup
 
@@ -220,23 +220,27 @@ lets you start any indexed song. Left/Right navigate these lists; Select opens
 the highlighted entry. Each list includes Back.
 
 Left/right change tracks; Select pauses/resumes without restarting the song.
+The player shows the estimated time left beside the playback state. A `~` marks
+an estimate based on the first MP3 frame; MP3 files with Xing or VBRI frame
+counts get a more accurate duration.
 Turn the encoder for volume. Hold Select for the options menu, use Left/Right
 to select an option, then Select to activate it. Options include shuffle,
-repeat off/all/one, song and folder browsers, stop, Exit Player, and BT Output
-On/Off. The Bluetooth option is on the second options page. For first pairing,
-put the target headphones in pairing mode, choose BT Output On, then press Select
-to play. Tamachibi connects to the first compatible audio device it finds and
-remembers that device for later reconnection. Changing the output stops the
-current song; press Select to start it again on the selected output. Holding
-Right also exits directly. Exit stops the music, disconnects connected
-headphones, and restores the normal care display.
+repeat off/all/one, song and folder browsers, stop, Exit Player, and Bluetooth
+Menu on the second options page. Opening Bluetooth Menu starts scanning. Choose
+**PAIR / SEARCH** to retry, **DISCONNECT** to disconnect, or **BACK TO OPTIONS**
+to return. Leave headphones in pairing mode until the status reads CONNECTED.
+Tamachibi connects to the first compatible audio device it finds and remembers
+that device for later reconnection. Changing the output stops the current song;
+press Select to start it again on the selected output. Holding Right also exits
+directly. Exit stops the music, disconnects connected headphones, and restores
+the normal care display.
 
 The care screen scrolls long filenames. The main screen shows the current pet
 wearing headphones in a room, animated notes during playback, output status, and
 volume. The ESP32 resamples MP3 audio to the 44.1 kHz stereo PCM format used by
 the Bluetooth A2DP output. The encoder controls both decoded audio gain and the
-Bluetooth headset's reported volume. Turning Bluetooth output off requests a
-nonblocking disconnect so the player can continue using wired audio.
+Bluetooth headset's reported volume. The music screen shows PAUSED explicitly
+and displays the time remaining while a track plays.
 
 Shuffle builds a queue so every song plays once per pass, and Previous retraces
 that queue. Repeat Off stops at the end of the queue; Repeat All wraps it;

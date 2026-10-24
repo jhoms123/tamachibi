@@ -66,6 +66,7 @@ public:
  bool isDirectory()const{return bool(*this)&&nodes.at(h->path).directory;}
  String name()const{return h?h->path.substring(h->path.lastIndexOf('/')+1):String();}
  File openNextFile(){if(!isDirectory())return File();auto &c=nodes.at(h->path).children;return h->cursor<c.size()?File(c[h->cursor++]):File();}
+ size_t read(uint8_t*,size_t){return 0;}bool seek(uint32_t){return true;}uint32_t size()const{return 0;}
  void close(){if(h)h->open=false;}
 };
 struct Sd{
@@ -113,7 +114,7 @@ struct AudioOutputI2S:AudioOutput{
 struct BluetoothAudioOutput:AudioOutput{
  bool begin(){return true;}bool SetRate(int){return true;}bool SetChannels(int){return true;}
  bool SetGain(float)override{return true;}bool ConsumeSample(int16_t[2]){return true;}
-  bool stop()override{return true;}void disconnect(){}void service(){}bool isConnected()const{return true;}
+  bool stop()override{return true;}bool startPairing(){return true;}void disconnect(){}void service(){}bool isConnected()const{return true;}
 };
 struct AudioGeneratorMP3{
  bool running=false;

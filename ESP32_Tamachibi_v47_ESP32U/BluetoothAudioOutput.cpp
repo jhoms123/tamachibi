@@ -21,29 +21,70 @@ BluetoothAudioOutput::~BluetoothAudioOutput() {
 bool BluetoothAudioOutput::begin() {
   if (active_ && active_ != this) return false;
   active_ = this;
+  pairingEnabled_ = true;
   clearPcm(true);
   havePrevious_ = false;
   resamplePhase_ = static_cast<uint32_t>(inputRate_);
 
   if (!bluetoothStarted_) {
     source_.set_local_name("Tamachibi Audio");
+    // Include telephony-class headsets such as some true-wireless earbuds in
+    // addition to devices advertising only the audio/rendering service.
     source_.set_valid_cod_service(ESP_BT_COD_SRVC_RENDERING |
-                                 ESP_BT_COD_SRVC_AUDIO);
+                                  ESP_BT_COD_SRVC_AUDIO |
+                                  ESP_BT_COD_SRVC_TELEPHONY);
+    source_.set_ssp_enabled(true);
     source_.set_auto_reconnect(true, 3);
     source_.set_ssid_callback(selectAudioSink);
+    source_.set_discovery_mode_callback(discoveryChanged);
     source_.set_on_connection_state_changed(connectionChanged, this);
     source_.set_data_callback(provideAudio);
+    clearDeviceName();
+    discoveryStarted_ = false;
+    scanning_ = true;
     source_.start();
     bluetoothStarted_ = true;
   } else if (!source_.is_connected() && !source_.is_discovery_active() &&
+             !(scanning_ && !discoveryStarted_) &&
              source_.get_connection_state() ==
                  ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
     // A deliberate disconnect disables the library's automatic retry. Reuse
     // the remembered headset when Bluetooth output is selected again.
-    source_.reconnect();
+    const bool reconnectStarted = source_.reconnect();
     source_.set_auto_reconnect(true, 3);
+    if (!reconnectStarted && discoveryStarted_) return restartSource();
   }
   return true;
+}
+
+bool BluetoothAudioOutput::startPairing() {
+  pairingEnabled_ = true;
+  if (!bluetoothStarted_) {
+    clearDeviceName();
+    return begin();
+  }
+
+  const esp_a2d_connection_state_t state = source_.get_connection_state();
+  if (state != ESP_A2D_CONNECTION_STATE_DISCONNECTED ||
+      source_.is_discovery_active() || (scanning_ && !discoveryStarted_))
+    return true;
+
+  return restartSource();
+}
+
+bool BluetoothAudioOutput::restartSource() {
+  // The library has no public "start discovery again" call. End the idle,
+  // disconnected profile and start it again so PAIR / SEARCH really scans
+  // instead of silently retrying only the previously remembered address.
+  source_.cancel_discovery();
+  source_.end(false);
+  bluetoothStarted_ = false;
+  connected_ = false;
+  scanning_ = false;
+  discoveryStarted_ = false;
+  connectionState_ = ESP_A2D_CONNECTION_STATE_DISCONNECTED;
+  clearDeviceName();
+  return begin();
 }
 
 bool BluetoothAudioOutput::SetRate(int hz) {
@@ -139,13 +180,41 @@ bool BluetoothAudioOutput::stop() {
 }
 
 void BluetoothAudioOutput::disconnect() {
+  pairingEnabled_ = false;
   stop();
   if (bluetoothStarted_ &&
       source_.get_connection_state() !=
           ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+    connectionState_ = ESP_A2D_CONNECTION_STATE_DISCONNECTING;
     // Do not wait for the Bluetooth stack while the game controls are running.
     source_.disconnect();
   }
+}
+
+const char *BluetoothAudioOutput::connectionStatus() const {
+  if (!bluetoothStarted_) return "NOT STARTED";
+  if (pairingEnabled_ && scanning_ && !discoveryStarted_)
+    return "STARTING";
+  switch (connectionState_) {
+    case ESP_A2D_CONNECTION_STATE_CONNECTED:
+      return "CONNECTED";
+    case ESP_A2D_CONNECTION_STATE_CONNECTING:
+      return "CONNECTING";
+    case ESP_A2D_CONNECTION_STATE_DISCONNECTING:
+      return "DISCONNECTING";
+    default:
+      if (pairingEnabled_ && scanning_) return "SEARCHING";
+      return "DISCONNECTED";
+  }
+}
+
+void BluetoothAudioOutput::copyDeviceName(char *destination,
+                                          size_t capacity) const {
+  if (!destination || capacity == 0) return;
+  portENTER_CRITICAL(&mux_);
+  strncpy(destination, deviceName_, capacity - 1);
+  destination[capacity - 1] = '\0';
+  portEXIT_CRITICAL(&mux_);
 }
 
 void BluetoothAudioOutput::service() {
@@ -172,15 +241,31 @@ bool BluetoothAudioOutput::selectAudioSink(const char *name,
   (void)rssi;
   // ESP32-A2DP already filters scan results to audio renderers. Accept the
   // first named sink found while the intended headphones are in pairing mode.
-  return name && name[0] != '\0';
+  if (!active_ || !active_->pairingEnabled_ || !name || name[0] == '\0')
+    return false;
+  portENTER_CRITICAL(&active_->mux_);
+  strncpy(active_->deviceName_, name, sizeof(active_->deviceName_) - 1);
+  active_->deviceName_[sizeof(active_->deviceName_) - 1] = '\0';
+  portEXIT_CRITICAL(&active_->mux_);
+  return true;
 }
 
 void BluetoothAudioOutput::connectionChanged(esp_a2d_connection_state_t state,
                                              void *context) {
   auto *output = static_cast<BluetoothAudioOutput *>(context);
   if (output) {
+    output->connectionState_ = state;
     output->connected_ = state == ESP_A2D_CONNECTION_STATE_CONNECTED;
     output->volumeSyncPending_ = output->connected_;
+  }
+}
+
+void BluetoothAudioOutput::discoveryChanged(
+    esp_bt_gap_discovery_state_t state) {
+  if (active_) {
+    active_->scanning_ = state == ESP_BT_GAP_DISCOVERY_STARTED;
+    if (state == ESP_BT_GAP_DISCOVERY_STARTED)
+      active_->discoveryStarted_ = true;
   }
 }
 
@@ -215,5 +300,11 @@ void BluetoothAudioOutput::clearPcm(bool enableFeed) {
   readFrame_ = 0;
   writeFrame_ = 0;
   feedEnabled_ = enableFeed;
+  portEXIT_CRITICAL(&mux_);
+}
+
+void BluetoothAudioOutput::clearDeviceName() {
+  portENTER_CRITICAL(&mux_);
+  deviceName_[0] = '\0';
   portEXIT_CRITICAL(&mux_);
 }

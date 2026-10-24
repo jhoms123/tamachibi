@@ -3,6 +3,7 @@
 #include <AudioOutput.h>
 #include <BluetoothA2DPSource.h>
 #include <freertos/FreeRTOS.h>
+#include <stddef.h>
 #include <stdint.h>
 
 // Bridges the ESP8266Audio MP3 decoder to the ESP32's Bluetooth A2DP source.
@@ -19,10 +20,13 @@ public:
   bool SetGain(float gain) override;
   bool ConsumeSample(int16_t sample[2]) override;
   bool stop() override;
+  bool startPairing();
   void disconnect();
   void service();
 
   bool isConnected() const { return connected_; }
+  const char *connectionStatus() const;
+  void copyDeviceName(char *destination, size_t capacity) const;
 
 private:
   static constexpr uint32_t kBluetoothSampleRate = 44100UL;
@@ -32,14 +36,20 @@ private:
   static BluetoothAudioOutput *active_;
 
   BluetoothA2DPSource source_;
-  portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
+  mutable portMUX_TYPE mux_ = portMUX_INITIALIZER_UNLOCKED;
   int16_t pcmRing_[kRingFrames * 2] = {};
   volatile uint32_t readFrame_ = 0;
   volatile uint32_t writeFrame_ = 0;
   volatile bool feedEnabled_ = false;
   volatile bool connected_ = false;
+  volatile bool pairingEnabled_ = false;
+  volatile bool scanning_ = false;
+  volatile bool discoveryStarted_ = false;
   volatile bool volumeSyncPending_ = false;
   volatile uint8_t bluetoothVolume_ = 0;
+  volatile esp_a2d_connection_state_t connectionState_ =
+      ESP_A2D_CONNECTION_STATE_DISCONNECTED;
+  char deviceName_[33] = {};
   bool bluetoothStarted_ = false;
   bool havePrevious_ = false;
   int inputRate_ = static_cast<int>(kBluetoothSampleRate);
@@ -52,7 +62,10 @@ private:
                               int rssi);
   static void connectionChanged(esp_a2d_connection_state_t state,
                                 void *context);
+  static void discoveryChanged(esp_bt_gap_discovery_state_t state);
 
   int32_t fillAudio(uint8_t *data, int32_t byteCount);
   void clearPcm(bool enableFeed);
+  void clearDeviceName();
+  bool restartSource();
 };

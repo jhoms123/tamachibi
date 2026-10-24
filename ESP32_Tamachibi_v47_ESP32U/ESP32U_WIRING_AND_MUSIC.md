@@ -55,7 +55,7 @@ Wired playback needs a compatible I²S DAC/amplifier. Bluetooth headphone playba
 
 ## Bluetooth headphones
 
-Bluetooth audio uses the ESP32-WROOM-32U's built-in Bluetooth Classic radio, so no additional Bluetooth transmitter or audio wires are needed. In **Play → Music Player**, hold Select to open options, move to the second options page, and choose **BT OUTPUT ON**. Put the target headphones in pairing mode, then press Select to play a song. The ESP32 scans for a compatible Bluetooth audio device and connects to the first one found; keep other Bluetooth speakers/headphones out of pairing mode during initial pairing. The player remembers the last connection and attempts to reconnect on later playback. The encoder changes decoded audio gain and sends the matching Bluetooth volume level to the headset. Changing the output stops the current song; press Select to start it on the selected output. Turning Bluetooth off and exiting request a nonblocking disconnect.
+Bluetooth audio uses the ESP32-WROOM-32U's built-in Bluetooth Classic radio, so no additional Bluetooth transmitter or audio wires are needed. In **Play → Music Player**, hold Select to open options, move to the second options page, and choose **BLUETOOTH MENU**. The menu starts or resumes pairing and shows STARTING, SEARCHING, CONNECTING, or CONNECTED, along with the discovered device name. Put the target headphones in pairing mode. If a scan has stopped and the status is DISCONNECTED, choose **PAIR / SEARCH** to restart discovery. The scanner accepts audio, rendering, and telephony headset service classes and enables Secure Simple Pairing. Keep other Bluetooth speakers/headphones out of pairing mode during initial pairing because the ESP32 connects to the first compatible audio device it finds. Select **BACK TO OPTIONS** after it connects, then press Select to start a song. The player remembers the last connection and attempts to reconnect on later playback. Choose **DISCONNECT** to stop Bluetooth output and return to wired audio. The encoder changes decoded audio gain and sends the matching Bluetooth volume level to the headset.
 
 ## LiPo battery and separate charger
 
@@ -82,7 +82,7 @@ Measure the power board's output voltage and polarity before connecting it to th
 
 5. Insert the card and choose **Play → Music Player**. The screen reports an SD error if the card cannot mount or asks for `/music` if the folder is missing. D0/D1/D2 select and play tracks; turning the encoder changes volume.
 
-Use ordinary, non-DRM MP3 files. The Bluetooth output resamples MP3 audio to 44.1 kHz stereo PCM; for predictable playback, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 128 tracks. Hold Select for song/folder browsing, shuffle, repeat, stop, wired/Bluetooth output selection and Exit Player. Hold Right to exit directly. The code does not include music files.
+Use ordinary, non-DRM MP3 files. The Bluetooth output resamples MP3 audio to 44.1 kHz stereo PCM; for predictable playback, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 128 tracks and shows time remaining beside PLAYING or PAUSED. Remaining time is exact when an MP3 contains a Xing/VBRI frame count and marked with `~` when estimated from the first audio frame. Hold Select for song/folder browsing, shuffle, repeat, stop, Bluetooth Menu and Exit Player. Hold Right to exit directly. The code does not include music files.
 
 ## First power-up sequence
 
