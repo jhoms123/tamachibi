@@ -1,5 +1,7 @@
 #include "NativeUI.h"
 #include "AquariumArt.h"
+#include "MusicScene.h"
+#include "MusicQueue.h"
 #include <cstdio>
 #define WHITE SSD1306_WHITE
 #define BLACK SSD1306_BLACK
@@ -122,6 +124,17 @@ class Esp32MusicPlayer {
 public:
   GameDisplay &display_ = display;
   byte trackCount_ = 12, selectedTrack_ = 2;
+  bool browser_ = false, options_ = false, shuffle_ = false, paused_ = false;
+  bool folders_ = false, libraryLimited_ = false;
+  uint8_t repeat_ = 0, option_ = 0;
+  uint16_t browseIndex_ = 0;
+  MusicQueue queue_;
+  Esp32MusicPlayer() { for (uint8_t i=0;i<12;++i) queue_.add(i); queue_.select(2); }
+  void (*scene_)(bool) = [](bool playing) { drawMusicRoom(display, 0, 4, 0, playing, fixtureMillis); };
+  void (*info_)(const String &, const String &) = nullptr;
+  uint16_t folderCount() const { return 4; }
+  String folderAt(uint16_t index) const { const char *names[]={"","/music/Calm","/music/Adventure","/music/Bedtime"};return names[index%4]; }
+  void drawBrowser() const;
   float gain_ = .65f;
   String status_ = "PLAYING";
   String trackName(byte) const { return "03 - Evening in the little town"; }

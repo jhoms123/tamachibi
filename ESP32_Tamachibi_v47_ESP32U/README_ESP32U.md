@@ -28,13 +28,13 @@ Open this folder as a PlatformIO project and build the `esp32u` environment. `pl
 In the Play menu, choose **Music Player**:
 
 - D0: previous track
-- D1: start or stop the selected MP3
+- D1: play or pause/resume; hold about one second for options
 - D2: next track; hold D2 for about one second to exit
 - Rotary encoder: playback volume
 - Encoder push switch: Right / D2
 - On the main pet screen, the same encoder cycles Pet → House → City
 
-The player reads up to 32 `.mp3` files from the top level of `/music` and sorts them by filename. It does not scan nested folders or playlists. The firmware decodes MP3 and outputs I²S on BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. There is no sound until a compatible I²S DAC or amplifier board is connected.
+The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, and Exit Player. The firmware decodes MP3 and outputs I²S on BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4. There is no sound until a compatible I²S DAC or amplifier board is connected.
 
 ## Hardware and card setup
 
@@ -208,3 +208,35 @@ Research projects that improve crops, ornamentals, careers and community project
 See [`../docs/GAMEPLAY_OVERHAUL.md`](../docs/GAMEPLAY_OVERHAUL.md) for the complete
 resource connections and balance rules. Run `python3 tools/check_gameplay.py` from
 the repository root for gameplay regression checks.
+
+### Music player update
+
+Put MP3 files in `/music` or its subfolders (up to eight nested levels).
+The player indexes up to 128 songs, sorted by full path. Folder names can
+represent albums or playlists. Choose Folder opens a list of folders containing songs, plus All Folders;
+a folder selection includes the songs directly in that folder. Browse Songs
+lets you start any indexed song. Left/Right navigate these lists; Select opens
+the highlighted entry. Each list includes Back.
+
+Left/right change tracks; Select pauses/resumes without restarting the song.
+Turn the encoder for volume. Hold Select for the options menu, use Left/Right
+to select an option, then Select to activate it. Options include shuffle,
+repeat off/all/one, song and folder browsers, stop, and Exit Player. Holding Right
+also exits directly. Exit stops playback and restores the normal care display.
+
+The care screen scrolls long filenames. The main screen shows the current pet
+wearing headphones in a room, animated notes during playback, and volume.
+
+Shuffle builds a queue so every song plays once per pass, and Previous retraces
+that queue. Repeat Off stops at the end of the queue; Repeat All wraps it;
+Repeat One replays the current song. Manual Previous/Next can wrap regardless
+of repeat mode. Changing tracks while paused leaves playback stopped. Changing
+folders stops playback; press Select to play the new selection. Playback options
+and volume stay in memory during this power session. Scanning ignores hidden
+files and reports when the bounded library/depth limit is reached. External
+`.m3u` playlists, seeking and ID3 metadata are not implemented; titles use filenames.
+
+Verification: `python tools/check_music.py` exercises actual library and control
+methods with deterministic SD/audio/button doubles. `python tools/render_ui.py`
+renders the listening scene, animation frame, paused screen, options and folders.
+Physical audio timing and button feel still require testing on the device.

@@ -213,3 +213,24 @@ void NeedsDisplay::update(const NeedsDisplayState &state, uint32_t nowMs, bool f
 
   oled_.display();
 }
+
+void NeedsDisplay::showMusic(const String &title, const String &status) {
+  if (!ready_) return;
+  oled_.clearDisplay();
+  oled_.setTextColor(SSD1306_WHITE);
+  oled_.setTextSize(1);
+  oled_.setTextWrap(false);
+  oled_.setCursor(0, 0);
+  oled_.print("NOW LISTENING");
+  if (title != musicTitle_) { musicTitle_ = title; musicTitleSince_ = millis(); }
+  String text = title;
+  String lower = text; lower.toLowerCase();
+  if (lower.endsWith(".mp3")) text.remove(text.length() - 4);
+  unsigned offset = text.length() > 21 ? ((millis() - musicTitleSince_) / 350) % (text.length() + 5) : 0;
+  String scroll = text + "     " + text;
+  oled_.setCursor(0, 11);
+  oled_.print(scroll.substring(offset, offset + 21));
+  oled_.setCursor(0, 23);
+  oled_.print(status.substring(0, 21));
+  oled_.display();
+}

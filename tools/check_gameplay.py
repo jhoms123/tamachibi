@@ -94,7 +94,11 @@ struct City {
  void visitResidents(){++callbacks;}
 } cityWorld;
 constexpr byte HOUSE_ROOM_COUNT=5,CITY_PLACE_COUNT=6;
-struct Music {void run(){++callbacks;}} musicPlayer;
+void drawMusicPlayerScene(bool){} void drawMusicPlayerInfo(int,int){}
+unsigned long millis(){return 0;}
+int makeNeedsDisplayState(){return 0;}
+struct Needs {void update(int,unsigned long,bool){}} needsDisplay;
+struct Music {template<class A,class B>void setViews(A,B){} void run(){++callbacks;}} musicPlayer;
 void exploreTrip(){++callbacks;if(energy<2||!activitySucceeds)return;completeGameplayAction(M_EXPLORE);}
 void jobActivity(){++callbacks;if(energy<2||!activitySucceeds)return;completeGameplayAction(M_JOB);}
 '''

@@ -67,18 +67,18 @@ Measure the power board's output voltage and polarity before connecting it to th
 
 1. Format the card as FAT32. A small 8–32 GB card is a practical starting point; avoid exFAT for this firmware.
 2. Create a folder named `music` in the card's root directory.
-3. Copy MP3 files directly into that folder. The player scans this folder's top level only, not nested folders.
+3. Copy MP3 files into that folder or subfolders up to eight levels deep. Use folders for albums or collections.
 4. Name files in the order you want, for example:
 
    ```text
    /music/01_theme.mp3
-   /music/02_walk.mp3
-   /music/03_night.mp3
+   /music/Adventure/02_walk.mp3
+   /music/Bedtime/03_night.mp3
    ```
 
 5. Insert the card and choose **Play → Music Player**. The screen reports an SD error if the card cannot mount or asks for `/music` if the folder is missing. D0/D1/D2 select and play tracks; turning the encoder changes volume.
 
-Use ordinary, non-DRM MP3 files. For predictable testing, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 32 tracks. The code does not include music files.
+Use ordinary, non-DRM MP3 files. For predictable testing, start with 44.1 kHz mono or stereo MP3s at a moderate bitrate such as 128–192 kb/s. The player indexes up to 128 tracks. Hold Select for song/folder browsing, shuffle, repeat, stop and Exit Player. Hold Right to exit directly. The code does not include music files.
 
 ## First power-up sequence
 

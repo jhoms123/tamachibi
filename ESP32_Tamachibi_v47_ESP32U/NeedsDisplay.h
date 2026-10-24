@@ -40,6 +40,7 @@ public:
 
   bool begin(uint8_t address = 0x3C);
   void showStartup();
+  void showMusic(const String &title, const String &status);
   void update(const NeedsDisplayState &state, uint32_t nowMs, bool force = false);
   bool ready() const { return ready_; }
 
@@ -47,6 +48,8 @@ private:
   Adafruit_SSD1306 oled_;
   bool ready_;
   uint32_t lastDrawMs_;
+  String musicTitle_;
+  uint32_t musicTitleSince_ = 0;
 
   static uint8_t urgencyFor(uint8_t value, bool critical = false);
   static bool blinkVisible(uint8_t urgency, uint32_t nowMs);

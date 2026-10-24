@@ -30,8 +30,11 @@ def main():
   'Aquarium.cpp':['AquariumSystem::drawTankScene'],
   'Botany.cpp':['BotanySystem::drawCropSprite','BotanySystem::drawIndoorSprite',
                 'BotanySystem::drawGardenOverview','BotanySystem::drawPlantRoomOverview'],
-  'MusicPlayer.cpp':['Esp32MusicPlayer::drawPlayerScreen']}.items():
-  for name in names:program+='\n'+extract(f,name)+'\n'
+  'MusicPlayer.cpp':['Esp32MusicPlayer::drawBrowser','Esp32MusicPlayer::drawPlayerScreen']}.items():
+  for name in names:
+   body=extract(f,name)
+   if f=='MusicPlayer.cpp':body=body.replace('label.startsWith("/music/")','label.rfind("/music/", 0) == 0').replace('label.substring(7)','label.substr(7)')
+   program+='\n'+body+'\n'
  for func,vars in [('categoryMenu','byte pick=2,count=6,category=0;'),('miniGameMenu','byte g=0,gameCount=14;'),('gameHubMenu','byte selected=1;')]:
   body=extract('GameMain.cpp',func);mark=body.index('NativeUI::Scope frame(display)');start=body.rfind('\n    {',0,mark)+1
   mask=re.sub(r'"(?:\\.|[^"\\])*"',lambda m:' '*len(m[0]),body);pos=start;depth=0
@@ -64,6 +67,11 @@ int main(){
  {NativeUI::Scope f(display);display.clearDisplay();display.setCursor(31,0);display.print("FOOD CROPS 0-11");for(uint8_t i=0;i<12;++i){int x=(i%4)*32,y=18+(i/4)*32;display.drawRoundRect(x,y,31,31,2,1);NativeUI::crop(display,x+4,y,i,4,false,0);display.setCursor(x+10,y+24);display.print(i);}save("crop-catalog.pbm");}
  {NativeUI::Scope f(display);display.clearDisplay();display.setCursor(17,0);display.print("DECOR PLANTS 0-9");for(uint8_t i=0;i<10;++i){int x=(i%4)*32,y=18+(i/4)*32;display.drawRoundRect(x,y,31,31,2,1);NativeUI::plant(display,x+4,y,i,4,false,0);display.setCursor(x+10,y+24);display.print(i);}save("decor-catalog.pbm");}
  Esp32MusicPlayer music;music.drawPlayerScreen();save("music.pbm");
+ for(int i=0;i<16;++i){fixtureMillis=100+i*180;music.drawPlayerScreen();char name[32];snprintf(name,sizeof(name),"music-anim-%02d.pbm",i);save(name);}
+ fixtureMillis=820;music.drawPlayerScreen();save("music-frame2.pbm");
+ music.paused_=true;music.status_="PAUSED";music.drawPlayerScreen();save("music-paused.pbm");
+ music.options_=true;music.option_=6;music.drawPlayerScreen();save("music-options.pbm");
+ music.browser_=true;music.folders_=true;music.browseIndex_=1;music.drawPlayerScreen();save("music-folders.pbm");
  display.useNativeLayout(false);display.clearDisplay();display.setCursor(20,0);display.print("LONG STATUS TITLE");display.setCursor(105,0);display.print("2/7");
  display.setCursor(1,14);display.print("School confidence 100");display.setCursor(1,26);display.print("Social confidence 86");display.setCursor(1,38);display.print("Attachment security 95");display.setCursor(1,50);display.print("Difficult talks 32");display.setPageFooter("D0 PREV","D1 OPEN","D2 NEXT");save("status.pbm");
  display.clearDisplay();display.setPageTitle("SAVE PROFILES","1/9");display.setCursor(12,24);display.print("Create restore point");display.setCursor(12,38);display.print("MOCHI G12 D366");display.setPageFooter("PREV","SAVE","NEXT");save("save.pbm");
@@ -81,7 +89,9 @@ int main(){
   subprocess.run(cmd,check=True);subprocess.run([str(td/'preview')],cwd=td,check=True)
   checks=cmd[:-3]+[str(ROOT/'tools/renderer_checks.cpp'),'-o',str(td/'checks')]
   subprocess.run(checks,check=True);subprocess.run([str(td/'checks')],check=True)
-  names=['home','menu','actions','arcade','game-types','house','house-plants','house-garden','town','talk','choices','reply','tank','garden','plants','garden-start','plants-start','crop-catalog','decor-catalog','music','status','save','game']
+  music_frames=[Image.open(td/f'music-anim-{i:02d}.pbm').convert('RGB').resize((384,384),Image.Resampling.NEAREST) for i in range(16)]
+  music_frames[0].save(out/'music-listening.gif',save_all=True,append_images=music_frames[1:],duration=180,loop=0)
+  names=['home','menu','actions','arcade','game-types','house','house-plants','house-garden','town','talk','choices','reply','tank','garden','plants','garden-start','plants-start','crop-catalog','decor-catalog','music','music-frame2','music-paused','music-options','music-folders','status','save','game']
   scale=3;cellw,cellh=416,438;sheet=Image.new('RGB',(cellw*4,cellh*math.ceil(len(names)/4)),'#191d22');draw=ImageDraw.Draw(sheet)
   font=ImageFont.truetype('DejaVuSans.ttf',17)
   for i,n in enumerate(names):

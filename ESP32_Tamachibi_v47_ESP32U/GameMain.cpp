@@ -33,6 +33,7 @@
 #include "GrowingTogether.h"
 #include "SaveProfiles.h"
 #include "MusicPlayer.h"
+#include "MusicScene.h"
 #include "GameplayActions.h"
 #include "GameplayProgress.h"
 
@@ -12576,6 +12577,15 @@ bool completeGameplayAction(uint8_t action) {
   return true;
 }
 
+void drawMusicPlayerScene(bool playing) {
+  drawMusicRoom(display, stage < STAGE_ADULT ? petLineage() : speciesType,
+                stage, currentEvolutionPath(), playing, millis());
+}
+
+void drawMusicPlayerInfo(const String &title, const String &status) {
+  needsDisplay.showMusic(title, status);
+}
+
 void executeAction(byte action) {
   menu = action;
   if (dead) { startReplacementEgg(); drawScreen(true); return; }
@@ -12627,7 +12637,9 @@ void executeAction(byte action) {
   else if (menu == M_NEIGHBORS) cityWorld.visitResidents();
   else if (menu == M_MUSIC) musicGame();
   else if (menu == M_PLAYER) {
+    musicPlayer.setViews(drawMusicPlayerScene, drawMusicPlayerInfo);
     musicPlayer.run();
+    needsDisplay.update(makeNeedsDisplayState(), millis(), true);
     updateWorldViewFromEncoder(true);  // Re-sync after the player used the encoder.
     drawScreen(true);
     return;
