@@ -14,8 +14,6 @@ BluetoothAudioOutput::~BluetoothAudioOutput() {
   stop();
   if (bluetoothStarted_) {
     if (source_.is_discovery_active()) source_.cancel_discovery();
-    source_.end(true);
-    bluetoothStarted_ = false;
   }
   if (active_ == this) active_ = nullptr;
 }
