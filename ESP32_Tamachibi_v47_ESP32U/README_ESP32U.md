@@ -226,14 +226,17 @@ repeat off/all/one, song and folder browsers, stop, Exit Player, and BT Output
 On/Off. The Bluetooth option is on the second options page. For first pairing,
 put the target headphones in pairing mode, choose BT Output On, then press Select
 to play. Tamachibi connects to the first compatible audio device it finds and
-remembers that device for later reconnection. Holding Right also exits directly.
-Exit stops the music and restores the normal care display.
+remembers that device for later reconnection. Changing the output stops the
+current song; press Select to start it again on the selected output. Holding
+Right also exits directly. Exit stops the music, disconnects connected
+headphones, and restores the normal care display.
 
 The care screen scrolls long filenames. The main screen shows the current pet
 wearing headphones in a room, animated notes during playback, output status, and
 volume. The ESP32 resamples MP3 audio to the 44.1 kHz stereo PCM format used by
-the Bluetooth A2DP output. Its Bluetooth link remains available while the board
-is on; switching to wired output stops the Bluetooth audio feed.
+the Bluetooth A2DP output. The encoder controls both decoded audio gain and the
+Bluetooth headset's reported volume. Turning Bluetooth output off requests a
+nonblocking disconnect so the player can continue using wired audio.
 
 Shuffle builds a queue so every song plays once per pass, and Previous retraces
 that queue. Repeat Off stops at the end of the queue; Repeat All wraps it;

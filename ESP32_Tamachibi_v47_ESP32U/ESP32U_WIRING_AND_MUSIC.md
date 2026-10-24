@@ -55,7 +55,7 @@ Wired playback needs a compatible I²S DAC/amplifier. Bluetooth headphone playba
 
 ## Bluetooth headphones
 
-Bluetooth audio uses the ESP32-WROOM-32U's built-in Bluetooth Classic radio, so no additional Bluetooth transmitter or audio wires are needed. In **Play → Music Player**, hold Select to open options, move to the second options page, and choose **BT OUTPUT ON**. Put the target headphones in pairing mode, then press Select to play a song. The ESP32 scans for a compatible Bluetooth audio device and connects to the first one found; keep other Bluetooth speakers/headphones out of pairing mode during initial pairing. The player remembers the last connection and attempts to reconnect on later playback. The encoder changes the playback volume for Bluetooth and wired audio.
+Bluetooth audio uses the ESP32-WROOM-32U's built-in Bluetooth Classic radio, so no additional Bluetooth transmitter or audio wires are needed. In **Play → Music Player**, hold Select to open options, move to the second options page, and choose **BT OUTPUT ON**. Put the target headphones in pairing mode, then press Select to play a song. The ESP32 scans for a compatible Bluetooth audio device and connects to the first one found; keep other Bluetooth speakers/headphones out of pairing mode during initial pairing. The player remembers the last connection and attempts to reconnect on later playback. The encoder changes decoded audio gain and sends the matching Bluetooth volume level to the headset. Changing the output stops the current song; press Select to start it on the selected output. Turning Bluetooth off and exiting request a nonblocking disconnect.
 
 ## LiPo battery and separate charger
 

@@ -19,6 +19,8 @@ public:
   bool SetGain(float gain) override;
   bool ConsumeSample(int16_t sample[2]) override;
   bool stop() override;
+  void disconnect();
+  void service();
 
   bool isConnected() const { return connected_; }
 
@@ -36,6 +38,8 @@ private:
   volatile uint32_t writeFrame_ = 0;
   volatile bool feedEnabled_ = false;
   volatile bool connected_ = false;
+  volatile bool volumeSyncPending_ = false;
+  volatile uint8_t bluetoothVolume_ = 0;
   bool bluetoothStarted_ = false;
   bool havePrevious_ = false;
   int inputRate_ = static_cast<int>(kBluetoothSampleRate);

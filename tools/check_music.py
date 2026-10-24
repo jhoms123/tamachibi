@@ -113,7 +113,7 @@ struct AudioOutputI2S:AudioOutput{
 struct BluetoothAudioOutput:AudioOutput{
  bool begin(){return true;}bool SetRate(int){return true;}bool SetChannels(int){return true;}
  bool SetGain(float)override{return true;}bool ConsumeSample(int16_t[2]){return true;}
- bool stop()override{return true;}bool isConnected()const{return true;}
+  bool stop()override{return true;}void disconnect(){}void service(){}bool isConnected()const{return true;}
 };
 struct AudioGeneratorMP3{
  bool running=false;

@@ -35,6 +35,13 @@ bool BluetoothAudioOutput::begin() {
     source_.set_data_callback(provideAudio);
     source_.start();
     bluetoothStarted_ = true;
+  } else if (!source_.is_connected() && !source_.is_discovery_active() &&
+             source_.get_connection_state() ==
+                 ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+    // A deliberate disconnect disables the library's automatic retry. Reuse
+    // the remembered headset when Bluetooth output is selected again.
+    source_.reconnect();
+    source_.set_auto_reconnect(true, 3);
   }
   return true;
 }
@@ -58,6 +65,10 @@ bool BluetoothAudioOutput::SetChannels(int channelCount) {
 }
 
 bool BluetoothAudioOutput::SetGain(float gain) {
+  const float clippedGain = gain < 0.0f ? 0.0f : gain > 0.9f ? 0.9f : gain;
+  bluetoothVolume_ = static_cast<uint8_t>(
+      clippedGain * (127.0f / 0.9f) + 0.5f);
+  if (source_.is_connected()) source_.set_volume(bluetoothVolume_);
   return AudioOutput::SetGain(gain);
 }
 
@@ -127,6 +138,27 @@ bool BluetoothAudioOutput::stop() {
   return true;
 }
 
+void BluetoothAudioOutput::disconnect() {
+  stop();
+  if (bluetoothStarted_ &&
+      source_.get_connection_state() !=
+          ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
+    // Do not wait for the Bluetooth stack while the game controls are running.
+    source_.disconnect();
+  }
+}
+
+void BluetoothAudioOutput::service() {
+  if (!volumeSyncPending_ || !connected_ || !source_.is_connected()) return;
+  volumeSyncPending_ = false;
+
+  // The library skips identical volume values. Nudge its cached value so the
+  // desired level is sent again after a headset reconnects.
+  const uint8_t currentVolume = bluetoothVolume_;
+  source_.set_volume(currentVolume == 127 ? 126 : currentVolume + 1);
+  source_.set_volume(currentVolume);
+}
+
 int32_t BluetoothAudioOutput::provideAudio(uint8_t *data, int32_t byteCount) {
   if (!data || byteCount <= 0) return 0;
   if (active_) return active_->fillAudio(data, byteCount);
@@ -146,8 +178,10 @@ bool BluetoothAudioOutput::selectAudioSink(const char *name,
 void BluetoothAudioOutput::connectionChanged(esp_a2d_connection_state_t state,
                                              void *context) {
   auto *output = static_cast<BluetoothAudioOutput *>(context);
-  if (output)
+  if (output) {
     output->connected_ = state == ESP_A2D_CONNECTION_STATE_CONNECTED;
+    output->volumeSyncPending_ = output->connected_;
+  }
 }
 
 int32_t BluetoothAudioOutput::fillAudio(uint8_t *data, int32_t byteCount) {

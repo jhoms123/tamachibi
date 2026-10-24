@@ -348,6 +348,7 @@ void Esp32MusicPlayer::run() {
       else if (advance(1, repeat_ == 1)) startPlayback();
     }
     updateGain();
+    bluetoothOutput_.service();
     const uint8_t pins[3] = {buttonLeft_, buttonSelect_, buttonRight_};
     for (uint8_t i = 0; i < 3; ++i) {
       const bool sample = digitalRead(pins[i]) == LOW;
@@ -356,7 +357,12 @@ void Esp32MusicPlayer::run() {
       if (pressed && !prev[i]) { down[i] = now; held[i] = false; }
       if (i != 0 && pressed && !held[i] && now - down[i] >= RIGHT_HOLD_EXIT_MS) {
         held[i] = true;
-        if (i == 2) { stopPlayback("STOPPED"); waitForButtonsReleased(); return; }
+        if (i == 2) {
+          stopPlayback("STOPPED");
+          bluetoothOutput_.disconnect();
+          waitForButtonsReleased();
+          return;
+        }
         if (i == 1) { browser_ = false; options_ = !options_; option_ = 0; }
       }
       if (!pressed && prev[i] && !held[i] && now - down[i] >= BUTTON_DEBOUNCE_MS) {
@@ -377,13 +383,16 @@ void Esp32MusicPlayer::run() {
           else if (option_ == 3) { shuffle_ = !shuffle_; rebuildQueue(); }
           else if (option_ == 4) repeat_ = (repeat_ + 1) % 3;
           else if (option_ == 5) stopPlayback("STOPPED");
-          else if (option_ == 6) { stopPlayback("STOPPED"); return; }
+          else if (option_ == 6) {
+            stopPlayback("STOPPED");
+            bluetoothOutput_.disconnect();
+            return;
+          }
           else if (option_ == 7) {
-            const bool resumePlayback = isPlaying() && !paused_;
             stopPlayback("STOPPED");
             bluetoothEnabled_ = !bluetoothEnabled_;
+            if (!bluetoothEnabled_) bluetoothOutput_.disconnect();
             options_ = false;
-            if (resumePlayback) startPlayback();
           }
         } else if (i == 0) moveSelection(-1);
         else if (i == 2) moveSelection(1);
