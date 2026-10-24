@@ -45,14 +45,13 @@ bool BluetoothAudioOutput::begin() {
     source_.start();
     bluetoothStarted_ = true;
   } else if (!source_.is_connected() && !source_.is_discovery_active() &&
-             !(scanning_ && !discoveryStarted_) &&
+             !scanning_ &&
              source_.get_connection_state() ==
                  ESP_A2D_CONNECTION_STATE_DISCONNECTED) {
     // A deliberate disconnect disables the library's automatic retry. Reuse
     // the remembered headset when Bluetooth output is selected again.
-    const bool reconnectStarted = source_.reconnect();
     source_.set_auto_reconnect(true, 3);
-    if (!reconnectStarted && discoveryStarted_) return restartSource();
+    source_.reconnect();
   }
   return true;
 }
@@ -66,24 +65,11 @@ bool BluetoothAudioOutput::startPairing() {
 
   const esp_a2d_connection_state_t state = source_.get_connection_state();
   if (state != ESP_A2D_CONNECTION_STATE_DISCONNECTED ||
-      source_.is_discovery_active() || (scanning_ && !discoveryStarted_))
+      source_.is_discovery_active() || scanning_)
     return true;
 
-  return restartSource();
-}
-
-bool BluetoothAudioOutput::restartSource() {
-  // The library has no public "start discovery again" call. End the idle,
-  // disconnected profile and start it again so PAIR / SEARCH really scans
-  // instead of silently retrying only the previously remembered address.
-  source_.cancel_discovery();
-  source_.end(false);
-  bluetoothStarted_ = false;
-  connected_ = false;
-  scanning_ = false;
-  discoveryStarted_ = false;
-  connectionState_ = ESP_A2D_CONNECTION_STATE_DISCONNECTED;
-  clearDeviceName();
+  // Retry through the library's reconnect state machine. Calling end() here
+  // can block the game's input loop while the Bluetooth stack shuts down.
   return begin();
 }
 

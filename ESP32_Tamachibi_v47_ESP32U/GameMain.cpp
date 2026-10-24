@@ -10,6 +10,7 @@
 */
 
 #include <Arduino.h>
+#include <esp_system.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include "GameDisplay.h"
@@ -13304,6 +13305,9 @@ uint8_t detectMainOledAddress() {
 void setup() {
   Serial.begin(115200);
   Serial.println(F("Tamachibi v47 ESP32-WROOM-32U starting"));
+  Serial.printf("ESP reset reason code: %d; free heap: %u bytes\n",
+                static_cast<int>(esp_reset_reason()),
+                static_cast<unsigned int>(ESP.getFreeHeap()));
 
   // Allow USB power and the OLED charge pump to settle cleanly.
   delay(750);

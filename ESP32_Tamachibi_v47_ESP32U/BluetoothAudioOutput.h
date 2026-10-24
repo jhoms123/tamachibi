@@ -67,5 +67,4 @@ private:
   int32_t fillAudio(uint8_t *data, int32_t byteCount);
   void clearPcm(bool enableFeed);
   void clearDeviceName();
-  bool restartSource();
 };

@@ -35,7 +35,7 @@ In the Play menu, choose **Music Player**:
 - Encoder push switch: Right / D2
 - On the main pet screen, the same encoder cycles Pet → House → City
 
-The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, Exit Player, and a separate Bluetooth menu. To pair headphones the first time, put them in pairing mode and open **BLUETOOTH MENU**; the screen reports STARTING, SEARCHING, CONNECTING, and CONNECTED as those states occur and shows a discovered device name. Choose **PAIR / SEARCH** to restart discovery after a scan has stopped. The saved device is used for reconnection on later playback. Bluetooth works without an audio board. Wired output uses I²S BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4 and needs a compatible DAC/amplifier.
+The player reads up to 128 `.mp3` files beneath `/music`, including subfolders up to eight levels deep, and sorts them by full path. The options menu offers song/folder browsing, shuffle, repeat off/all/one, stop, Exit Player, and a separate Bluetooth menu. To pair headphones the first time, put them in pairing mode and open **BLUETOOTH MENU**; the screen reports STARTING, SEARCHING, CONNECTING, and CONNECTED as those states occur and shows a discovered device name. Choose **PAIR / SEARCH** to retry the saved connection if it has disconnected; a scan already in progress continues automatically. The saved device is used for reconnection on later playback. Bluetooth works without an audio board. Wired output uses I²S BCLK GPIO14, LRCLK GPIO13, and DATA GPIO4 and needs a compatible DAC/amplifier.
 
 ## Hardware and card setup
 
@@ -227,7 +227,7 @@ Turn the encoder for volume. Hold Select for the options menu, use Left/Right
 to select an option, then Select to activate it. Options include shuffle,
 repeat off/all/one, song and folder browsers, stop, Exit Player, and Bluetooth
 Menu on the second options page. Opening Bluetooth Menu starts scanning. Choose
-**PAIR / SEARCH** to retry, **DISCONNECT** to disconnect, or **BACK TO OPTIONS**
+**PAIR / SEARCH** to retry the connection, **DISCONNECT** to disconnect, or **BACK TO OPTIONS**
 to return. Leave headphones in pairing mode until the status reads CONNECTED.
 Tamachibi connects to the first compatible audio device it finds and remembers
 that device for later reconnection. Changing the output stops the current song;
